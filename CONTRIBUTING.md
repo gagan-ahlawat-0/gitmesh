@@ -10,17 +10,8 @@ GitMesh aims to transform how developers collaborate by integrating AI-powered i
 
 ### Essential Requirements
 
-<!-- Before contributing to GitMesh, please ensure you have:
 
-- **Git**: Installed and properly configured with your GitHub account
-- **Node.js**: Version 18 or higher with npm/yarn package manager
-- **GitHub Account**: With SSH keys configured for secure authentication
-- **Development Environment**: VS Code or your preferred IDE
-- **Basic Git Knowledge**: Understanding of Git workflows and version control concepts
-
-### Community Participation -->
-
-**Join the [weekly meetings](https://zoom-lfx.platform.linuxfoundation.org/meeting/96156160446?password=436922cc-9811-4e05-aa60-04f7b4679c7e) on Monday at 9 am EST time zone.**
+**Join the weekly meetings on Wednesday at 1 pm UTC time zone.**
 
 These meetings are essential for:
 - Understanding project roadmap and priorities
@@ -40,30 +31,10 @@ As a Linux Foundation Decentralized Trust project, GitMesh adheres to strict com
 
 Please review and understand these policies before contributing.
 
-## Project Structure
-
-```
-gitmesh/
-├── gitmesh_backend/     # Backend API and AI services
-│   ├── src/            # Source code
-│   ├── tests/          # Test suites
-│   └── docs/           # Backend documentation
-├── gitmesh_frontend/    # Frontend application
-│   ├── src/            # React/TypeScript source
-│   ├── public/         # Static assets
-│   └── tests/          # Frontend tests
-├── docs/               # Project documentation
-├── scripts/            # Build and deployment scripts
-├── CONTRIBUTING.md     # This file
-├── LICENSE.md          # License information
-└── README.md           # Project overview
-```
-
-## GitHub Flow
 
 ### Issue Selection
 
-**Important**: Please select a task from the [published issues](https://github.com/lfdt-gitmesh/gitmesh/issues). Contributions not addressing existing issues will not be considered. For improvement proposals, kindly attend the [Monday meetings](https://zoom-lfx.platform.linuxfoundation.org/meeting/96156160446?password=436922cc-9811-4e05-aa60-04f7b4679c7e).
+**Important**: Please select a task from the [published issues](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/issues). Contributions not addressing existing issues will not be considered. For improvement proposals, kindly attend the Wednesday meetings.
 
 ### Workflow Overview
 
@@ -82,14 +53,15 @@ Below is the GitMesh project workflow:
 
 1. Open your web browser and navigate to the official GitMesh repository:
    ```
-   https://github.com/lfdt-gitmesh/gitmesh
+   https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh
    ```
 
 #### Step 2: Fork the Repository
 
 1. **Locate the Fork Button**: In the top-right corner of the repository page, find and click the "Fork" button.
 
-![fork](images/fork_repo.png)
+<img src="images/fork_repo.png" alt="git status" width="800"/>
+
 
 2. **Configure Fork Settings**: 
    - **Uncheck** the "Copy the main branch only" checkbox to ensure you get all branches
@@ -97,14 +69,13 @@ Below is the GitMesh project workflow:
    - Ensure the description matches the original repository
    - Click "Create fork"
 
-
-
 3. **Verify Fork Creation**: You'll be redirected to your personal fork at:
    ```
    https://github.com/YOUR_USERNAME/gitmesh
    ```
 
-![fork-settings](images/fork_settings.png)
+<img src="images/fork_settings.png" alt="git status" width="800"/>
+
 
 #### Step 3: Clone the Repository Locally
 
@@ -147,7 +118,7 @@ Below is the GitMesh project workflow:
    ls -la
    ```
    
-   You should see the project structure including folders like `gitmesh_backend`, `gitmesh_frontend`, etc.
+   You should see the project structure.
 
 #### Step 5: Set Up Remote Upstream
 
@@ -163,7 +134,6 @@ Below is the GitMesh project workflow:
    
    You should see both `origin` (your fork) and `upstream` (official repository).
 
-*Screenshot would show: Terminal output showing both remotes configured*
 
 #### Step 6: Check Available Branches
 
@@ -176,7 +146,6 @@ Below is the GitMesh project workflow:
 
 2. **Understanding Branch Structure**:
    - `main`: Production-ready code
-   - `dev`: Development integration branch
    - `remotes/origin/*`: Branches from your fork
    - `remotes/upstream/*`: Branches from the official repository
 
@@ -188,8 +157,6 @@ Below is the GitMesh project workflow:
    ```bash
    git checkout -b dev origin/dev
    ```
-
-
 
 2. **Verify Current Branch**:
    ```bash
@@ -247,7 +214,8 @@ For development setup instructions, please refer to [Readme.md](README.md).
    - New files (red)
    - Files ready to commit (green)
 
-![git status](images/git_status.png)
+<img src="images/git_status.png" alt="git status" width="800"/>
+
 
 2. **Review Changes**:
    ```bash
@@ -265,10 +233,10 @@ For development setup instructions, please refer to [Readme.md](README.md).
    
    Or add all changes:
    ```bash
-   git add -A
+   git add .
    ```
 
-*Screenshot would show: Terminal after git add command*
+![fit add](images/git_add.png)
 
 2. **Verify Staged Changes**:
    ```bash
@@ -291,26 +259,8 @@ For development setup instructions, please refer to [Readme.md](README.md).
 
    **Important**: The `-s` flag is mandatory for Linux Foundation projects as it adds a "Signed-off-by" line.
 
-   **Commit Message Examples**:
-   ```bash
-   git commit -s -m "feat(ai-engine): implement contextual branch suggestions
-   
-   - Add new AI service for analyzing branch context
-   - Integrate with existing Git workflow detection
-   - Implements functionality requested in issue #45
-   - Includes comprehensive test coverage"
-   ```
 
-   ```bash
-   git commit -s -m "fix(branch-parser): resolve merge conflict detection bug
-   
-   - Fix false positive merge conflict detection
-   - Update conflict resolution algorithm
-   - Resolves issue #67
-   - Add regression tests to prevent future occurrences"
-   ```
-
-*Screenshot would show: Terminal after successful commit with signed-off-by line*
+![commit](images/commit.png)
 
 #### Step 13: Push to Your Fork
 
@@ -321,14 +271,14 @@ For development setup instructions, please refer to [Readme.md](README.md).
    
    The `-u` flag sets up tracking between your local and remote branch.
 
-*Screenshot would show: Terminal output showing successful push to origin*
+<img src="images/push.png" alt="git status" width="800"/>
+
 
 2. **Verify Push Success**:
    - Check your GitHub fork in the browser
    - Your new branch should appear in the branch dropdown
    - Recent commits should be visible
 
-*Screenshot would show: GitHub fork page with new branch visible*
 
 #### Step 14: Create Pull Request
 
@@ -336,7 +286,8 @@ For development setup instructions, please refer to [Readme.md](README.md).
    - Go to your fork on GitHub: `https://github.com/YOUR_USERNAME/gitmesh`
    - GitHub should display a banner suggesting to create a pull request
 
-*Screenshot would show: GitHub fork page with "Compare & pull request" button*
+<img src="images/new_branch.png" alt="git status" width="800"/>
+
 
 2. **Initiate Pull Request**:
    - Click "Compare & pull request" button
@@ -347,7 +298,8 @@ For development setup instructions, please refer to [Readme.md](README.md).
    - Select your feature branch as the source
    - Select `lfdt-gitmesh/gitmesh:dev` as the destination
 
-*Screenshot would show: Pull request creation interface*
+<img src="images/pull_request.png" alt="git status" width="800"/>
+
 
 3. **Configure Pull Request Details**:
    
@@ -388,193 +340,7 @@ For development setup instructions, please refer to [Readme.md](README.md).
    (Include if UI changes were made)
    ```
 
-*Screenshot would show: Pull request form with all fields filled*
 
 4. **Submit Pull Request**:
    - Review all information for accuracy
    - Click "Create pull request"
-
-*Screenshot would show: Successfully created pull request page*
-
-#### Step 15: Address Review Feedback
-
-1. **Monitor Pull Request**:
-   - Watch for comments from maintainers
-   - Respond to feedback promptly
-   - Make requested changes in the same branch
-
-2. **Update Pull Request**:
-   If changes are needed:
-   ```bash
-   # Make your changes
-   git add -A
-   git commit -s -m "address review feedback: specific changes made"
-   git push origin feature/your-feature-name
-   ```
-   
-   The pull request will automatically update.
-
-#### Step 16: Clean Up After Merge
-
-1. **After Successful Merge**:
-   ```bash
-   git checkout dev
-   git pull upstream dev
-   git branch -d feature/your-feature-name  # Delete local branch
-   git push origin --delete feature/your-feature-name  # Delete remote branch
-   ```
-
-*Screenshot would show: Terminal after cleanup commands*
-
-## Code Quality Standards
-
-### Backend Standards (gitmesh_backend)
-
-- **Language**: Follow language-specific best practices
-- **Testing**: Maintain minimum 80% code coverage
-- **Documentation**: Document all public APIs with clear examples
-- **Performance**: Profile code for performance impacts
-- **Security**: Follow secure coding practices
-
-### Frontend Standards (gitmesh_frontend)
-
-- **Framework**: React with TypeScript
-- **Styling**: Follow established design system
-- **Accessibility**: Ensure WCAG 2.1 AA compliance
-- **Performance**: Optimize bundle size and runtime performance
-- **Testing**: Unit tests for components and integration tests for workflows
-
-### General Standards
-
-- **Code Formatting**: Use project's ESLint and Prettier configurations
-- **Commit Messages**: Follow semantic commit message format
-- **Documentation**: Update relevant documentation for all changes
-- **Testing**: Write comprehensive tests for new functionality
-- **Backwards Compatibility**: Avoid breaking changes without discussion
-
-## Documentation Requirements
-
-All contributions must include appropriate documentation:
-
-- **Code Comments**: Clear, concise comments for complex logic
-- **API Documentation**: Update OpenAPI/Swagger specs for API changes
-- **User Documentation**: Update user guides for feature changes
-- **Developer Documentation**: Update technical documentation for architectural changes
-
-## Quality Assurance Checklist
-
-Before submitting your pull request, ensure:
-
-### Code Quality
-- [ ] Code follows project style guidelines
-- [ ] All existing tests pass locally
-- [ ] New functionality includes appropriate tests
-- [ ] Code coverage meets project standards
-- [ ] No performance regressions introduced
-
-### Documentation
-- [ ] Code includes appropriate comments
-- [ ] API documentation updated (if applicable)
-- [ ] User documentation updated (if applicable)
-- [ ] CHANGELOG.md updated (if applicable)
-
-### Security and Compliance
-- [ ] No security vulnerabilities introduced
-- [ ] All commits are signed (DCO compliance)
-- [ ] No sensitive information committed
-- [ ] Licensing requirements met
-
-### Functionality
-- [ ] Feature works as described in the issue
-- [ ] Edge cases considered and handled
-- [ ] Error handling implemented appropriately
-- [ ] User experience considerations addressed
-
-## Issue Reporting and Feature Requests
-
-### Bug Reports
-
-When reporting bugs, please include:
-
-- **Clear Title**: Descriptive summary of the issue
-- **Environment**: Operating system, Node.js version, browser (if applicable)
-- **Steps to Reproduce**: Detailed steps to recreate the issue
-- **Expected Behavior**: What should have happened
-- **Actual Behavior**: What actually happened
-- **Screenshots/Logs**: Visual evidence or error logs
-- **Additional Context**: Any other relevant information
-
-### Feature Requests
-
-For new feature proposals:
-
-- **Use Case**: Explain the problem this feature would solve
-- **Proposed Solution**: High-level description of the proposed feature
-- **Alternative Solutions**: Other approaches considered
-- **Implementation Notes**: Technical considerations (if any)
-- **Priority**: Business impact and urgency
-
-## Community Support and Communication
-
-### Getting Help
-
-- **GitHub Issues**: For bug reports and feature requests
-- **GitHub Discussions**: For general questions and community discussion
-- **Weekly Meetings**: For real-time collaboration and guidance
-- **Documentation**: Check existing docs before asking questions
-
-### Communication Guidelines
-
-- **Be Respectful**: Follow the code of conduct in all interactions
-- **Be Patient**: Maintainers are volunteers with other commitments
-- **Be Specific**: Provide detailed information when asking questions
-- **Search First**: Check existing issues and discussions before creating new ones
-
-## Recognition and Attribution
-
-We value all contributions to GitMesh:
-
-- **Contributors**: Listed in the project's contributors file
-- **Significant Contributions**: Highlighted in release notes
-- **Community Recognition**: Acknowledged in community meetings and communications
-
-## License and Legal
-
-By contributing to GitMesh, you agree to:
-
-- License your contributions under the same license as the project
-- Confirm you have the right to submit the contributions
-- Acknowledge the Linux Foundation Decentralized Trust legal requirements
-- Comply with the Developer Certificate of Origin (DCO)
-
-## Advanced Contribution Topics
-
-### Release Process
-
-GitMesh follows semantic versioning:
-- **Major versions**: Breaking changes
-- **Minor versions**: New features (backwards compatible)
-- **Patch versions**: Bug fixes (backwards compatible)
-
-### Performance Considerations
-
-When contributing code that may impact performance:
-- Profile your changes locally
-- Include performance test results in your PR description
-- Consider memory usage and computational complexity
-- Test with realistic data volumes
-
-### Security Best Practices
-
-- Never commit sensitive information (API keys, passwords, etc.)
-- Validate all user inputs
-- Follow secure coding practices for your language/platform
-- Report security vulnerabilities privately to maintainers
-
-## Conclusion
-
-Thank you for your interest in contributing to GitMesh! Your contributions help make Git collaboration more intelligent and developer-friendly. By following this guide, you ensure that your contributions can be efficiently reviewed and integrated into the project.
-
-Remember that contributing to open source is a learning experience for everyone involved. Don't hesitate to ask questions, seek guidance, and engage with the community. Every contribution, no matter how small, makes GitMesh better for all users.
-
-Welcome to the GitMesh community!
