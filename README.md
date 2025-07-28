@@ -7,29 +7,15 @@
 *Transforming Open Source Development with AI-Powered Branch Intelligence*
 
 [![OpenSource License](https://img.shields.io/badge/License-Apache%20License-orange.svg?style=for-the-badge)](LICENSE.md)
-[![Contributors](https://img.shields.io/github/contributors/RAWx18/Beetle.svg?style=for-the-badge&logo=git)](https://github.com/RAWx18/Beetle/graphs/contributors)
+[![Contributors](https://img.shields.io/github/contributors/LF-Decentralized-Trust-Mentorships/gitmesh.svg?style=for-the-badge&logo=git)](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/graphs/contributors)
 [![Under Development](https://img.shields.io/badge/Status-Under%20Development-yellow.svg?style=for-the-badge)](#)
 [![Join Discord](https://img.shields.io/badge/Join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/FkrWfGtZn3)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10871/badge)](https://www.bestpractices.dev/projects/10871)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/RAWx18/Beetle/badge)](https://scorecard.dev/viewer/?uri=github.com/RAWx18/Beetle)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10972/badge)](https://www.bestpractices.dev/projects/10972)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/LF-Decentralized-Trust-Mentorships/gitmesh/badge)](https://scorecard.dev/viewer/?uri=github.com/LF-Decentralized-Trust-Mentorships/gitmesh)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Ffossas%2Ffossa-cli.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Ffossas%2Ffossa-cli?ref=badge_shield)
 
-[🚀 **Try Demo**](https://beetle-demo.vercel.app/) • [📖 **Documentation**](https://github.com/RAWx18/Beetle/README.md) • [💬 **Join Community**](https://discord.gg/FkrWfGtZn3)
+[🚀 **Try Demo**](https://beetle-demo.vercel.app/) • [📖 **Documentation**](https://github.comLF-Decentralized-Trust-Mentorships/gitmesh/README.md) • [💬 **Join Community**](https://discord.gg/FkrWfGtZn3)
 
-</div>
-
----
-
-<div align="center">
-  <h3>Security & Open Source Badge</h3>
-
-  <a href="https://www.bestpractices.dev/projects/10871" style="margin-right: 30px;">
-    <img src="https://openssf.org/wp-content/uploads/2024/03/bestpracticesbadge.svg" width="120" alt="OpenSSF Best Practices"/>
-  </a>
-
-  <a href="https://github.com/marketplace/actions/ossf-scorecard-action" style="margin-left: 30px;">
-    <img src="https://openssf.org/wp-content/uploads/2024/03/openssf_security_scorecards.png" width="60" alt="OSSF Scorecard Action"/>
-  </a>
 </div>
 
 ---
@@ -230,9 +216,14 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 Our mascot is excited to see what amazing contributions you'll bring to the GitMesh community!
 
+---
+
 <p align="center">
-<img src="https://readme-contribs.as93.net/contributors/RAWx18/beetle?avatarSize=50&perRow=5&shape=circle&title=Our+Awesome+Contributors&fontSize=14&textColor=ffffff&backgroundColor=000000&outerBorderWidth=2&outerBorderRadius=8&hideLabel=true" alt="Contributors"/>
+Our Awesome Contributors
 </p>
+<a href="https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=LF-Decentralized-Trust-Mentorships/gitmesh&max=100&columns=10" alt="GitMesh Contributors" />
+</a>
 
 ---
 
@@ -249,7 +240,7 @@ Our mascot is excited to see what amazing contributions you'll bring to the GitM
 | 🎮 [Discord](https://discord.gg/FkrWfGtZn3)                     | Real-time             | Quick questions, community discussions               |
 | 📧 [Email Support](mailto:rawx18.dev@gmail.com)                 | 24–48 hours           | Technical issues, detailed bug reports               |
 | 🐦 [Twitter / X](https://x.com/RAWx18_dev)                      | Online                | Tagging the project, general updates, public reports |
-| 🐛 [GitHub Issues](https://github.com/beetle-dev/beetle/issues) | 1–3 days              | Bug reports, feature requests, feedback              |
+| 🐛 [GitHub Issues](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/issues) | 1–3 days              | Bug reports, feature requests, feedback              |
 
 </div>
 
@@ -261,10 +252,10 @@ Our mascot is excited to see what amazing contributions you'll bring to the GitM
 
 | Metric | Value |
 |--------|-------|
-| 📝 **Total Commits** | ![Commits](https://img.shields.io/github/commit-activity/t/RAWx18/beetle) |
-| 🔀 **Pull Requests** | ![PRs](https://img.shields.io/github/issues-pr/RAWx18/beetle) |
-| 🐛 **Issues Resolved** | ![Issues](https://img.shields.io/github/issues-closed/RAWx18/beetle) |
-| 📦 **Latest Release** | ![Release](https://img.shields.io/github/v/release/RAWx18/beetle) |
+| 📝 **Total Commits** | ![Commits](https://img.shields.io/github/commit-activity/t/LF-Decentralized-Trust-Mentorships/gitmesh) |
+| 🔀 **Pull Requests** | ![PRs](https://img.shields.io/github/issues-pr/LF-Decentralized-Trust-Mentorships/gitmesh) |
+| 🐛 **Issues Resolved** | ![Issues](https://img.shields.io/github/issues-closed/LF-Decentralized-Trust-Mentorships/gitmesh) |
+| 📦 **Latest Release** | ![Release](https://img.shields.io/github/v/release/LF-Decentralized-Trust-Mentorships/gitmesh) |
 
 </div>
 
@@ -272,7 +263,7 @@ Our mascot is excited to see what amazing contributions you'll bring to the GitM
 
 ## 📜 License
 
-This project is licensed under the Non-Commercial Use License - see the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the Non-Commercial Use License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -286,24 +277,22 @@ This project is licensed under the Non-Commercial Use License - see the [LICENSE
 
 ## 🌟 Star Graph: Project GitMesh
 
-<div align="center"> <img src="https://starchart.cc/RAWx18/beetle.svg" alt="Star Graph for Project GitMesh" width="600"/> <br/> <sub>✨ GitHub star history of <strong><a href="https://github.com/RAWx18/beetle" target="_blank">RAWx18/beetle</a></strong></sub> </div>
+<div align="center"> <img src="https://starchart.cc/LF-Decentralized-Trust-Mentorships/gitmesh.svg" alt="Star Graph for Project GitMesh" width="600"/> <br/> <sub>✨ GitHub star history of <strong><a href="https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh" target="_blank">LF-Decentralized-Trust-Mentorships/gitmesh</a></strong></sub> </div>
 
 ---
 
 <br></br>
+[![Supported by the Linux Foundation Decentralized Trust](https://www.lfdecentralizedtrust.org/hubfs/LF%20Decentralized%20Trust/lfdt-horizontal-white.png)](https://www.lfdecentralizedtrust.org/)
 
+**Supported by the [Linux Foundation Decentralized Trust](https://www.lfdecentralizedtrust.org/)** – Advancing open source innovation.
+
+---
+
+<br></br>
 <div align="center">
 
 **Made with ❤️ by the GitMesh Team**
 
 *Transforming the future of collaborative development, one commit at a time.*
-
-</div>
-
----
-
-<div align="center">
-
-**This project is supported by Linux Foundation Decentralised Trust**
 
 </div>
