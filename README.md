@@ -1,6 +1,6 @@
 <div align="center">
 
-![Beetle Logo](beetle_frontend/public/favicon.png)
+![GitMesh Logo](beetle_frontend/public/GitMesh-logo.png)
 
 **The Next-Generation Git Collaboration Platform**
 
@@ -34,13 +34,13 @@
 
 ---
 
-## 🌟 What is Beetle?
+## 🌟 What is GitMesh?
 
-<img src="beetle_frontend/public/mascott/mascott_4.png" width="200" height="200" align="right" alt="Beetle Mascot">
+<img src="beetle_frontend/public/mascott/mascott_4.png" width="200" height="200" align="right" alt="GitMesh Mascot">
 
-**Beetle** revolutionizes Git-based collaboration by introducing **Branch-Level Intelligence** — a paradigm shift that transforms how teams plan, develop, and contribute to open-source projects. Unlike traditional project management tools, Beetle understands your codebase at the branch level, providing contextual AI assistance, intelligent contribution tracking, and seamless workflow orchestration.
+**GitMesh** revolutionizes Git-based collaboration by introducing **Branch-Level Intelligence** — a paradigm shift that transforms how teams plan, develop, and contribute to open-source projects. Unlike traditional project management tools, GitMesh understands your codebase at the branch level, providing contextual AI assistance, intelligent contribution tracking, and seamless workflow orchestration.
 
-Our friendly mascot here represents the core philosophy of Beetle: small, efficient, but incredibly powerful when working together in a team!
+Our friendly mascot here represents the core philosophy of GitMesh: small, efficient, but incredibly powerful when working together in a team!
 
 Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here — ready to revolutionize the open source world like never before.
 
@@ -113,7 +113,7 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here �
 ## 🚀 Quick Start
 
 <div align="center">
-<img src="beetle_frontend/public/mascott/mascott_2.png" width="200" height="200" alt="Docker Beetle">
+<img src="beetle_frontend/public/mascott/mascott_2.png" width="200" height="200" alt="Docker GitMesh">
 </div>
 
 ### Prerequisites
@@ -143,8 +143,8 @@ cp beetle_frontend/env.example beetle_frontend/.env
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/RAWx18/Beetle.git
-   cd Beetle
+   git clone https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh
+   cd gitmesh
    ```
 
 2. **Setup Python Backend**
@@ -202,7 +202,7 @@ cp beetle_frontend/env.example beetle_frontend/.env
 
 ## 🛣️ Roadmap
 
-<img src="beetle_frontend/public/mascott/mascott_1.png" width="200" height="200" align="right" alt="Roadmap Beetle">
+<img src="beetle_frontend/public/mascott/mascott_1.png" width="200" height="200" align="right" alt="Roadmap GitMesh">
 
 ### 🚀 **Q3 2025 - Intelligence Enhancement**
 - ✅ ~~Structure Idea~~
@@ -218,7 +218,7 @@ cp beetle_frontend/env.example beetle_frontend/.env
 
 ## 🤝 Contributing
 
-<img src="beetle_frontend/public/mascott/mascott_3.png" width="200" height="200" align="right" alt="Contributing Beetle">
+<img src="beetle_frontend/public/mascott/mascott_3.png" width="200" height="200" align="right" alt="Contributing GitMesh">
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
@@ -228,7 +228,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 3. Make your changes
 4. Submit a pull request
 
-Our mascot is excited to see what amazing contributions you'll bring to the Beetle community!
+Our mascot is excited to see what amazing contributions you'll bring to the GitMesh community!
 
 <p align="center">
 <img src="https://readme-contribs.as93.net/contributors/RAWx18/beetle?avatarSize=50&perRow=5&shape=circle&title=Our+Awesome+Contributors&fontSize=14&textColor=ffffff&backgroundColor=000000&outerBorderWidth=2&outerBorderRadius=8&hideLabel=true" alt="Contributors"/>
@@ -284,9 +284,9 @@ This project is licensed under the Non-Commercial Use License - see the [LICENSE
 
 ---
 
-## 🌟 Star Graph: Project Beetle
+## 🌟 Star Graph: Project GitMesh
 
-<div align="center"> <img src="https://starchart.cc/RAWx18/beetle.svg" alt="Star Graph for Project Beetle" width="600"/> <br/> <sub>✨ GitHub star history of <strong><a href="https://github.com/RAWx18/beetle" target="_blank">RAWx18/beetle</a></strong></sub> </div>
+<div align="center"> <img src="https://starchart.cc/RAWx18/beetle.svg" alt="Star Graph for Project GitMesh" width="600"/> <br/> <sub>✨ GitHub star history of <strong><a href="https://github.com/RAWx18/beetle" target="_blank">RAWx18/beetle</a></strong></sub> </div>
 
 ---
 
@@ -294,8 +294,16 @@ This project is licensed under the Non-Commercial Use License - see the [LICENSE
 
 <div align="center">
 
-**Made with ❤️ by the Beetle Team**
+**Made with ❤️ by the GitMesh Team**
 
 *Transforming the future of collaborative development, one commit at a time.*
+
+</div>
+
+---
+
+<div align="center">
+
+**This project is supported by Linux Foundation Decentralised Trust**
 
 </div>
