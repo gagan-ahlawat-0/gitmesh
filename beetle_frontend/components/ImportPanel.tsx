@@ -72,6 +72,7 @@ import GitHubAPI from '@/lib/github-api';
 import AnimatedTransition from './AnimatedTransition';
 import { ImportSource } from '@/lib/types';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 const importSources: ImportSource[] = [
   {
@@ -911,6 +912,7 @@ export const ImportPanel: React.FC = () => {
   const { token, user } = useAuth();
   const { updateKnowledgeBase } = useKnowledgeBase();
   const githubAPI = new GitHubAPI(token || '');
+  const router = useRouter();
 
   // Branches and file structure
   const [branchList, setBranchList] = useState<string[]>([]);
@@ -929,21 +931,10 @@ export const ImportPanel: React.FC = () => {
   const [controlPanelLoading, setControlPanelLoading] = useState(false);
   const [controlPanelError, setControlPanelError] = useState<string | null>(null);
 
-  // CSV, API, URL, File, Text states (add as needed)
+  // Import states
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [apiEndpoint, setApiEndpoint] = useState('');
-  const [apiAuthMethod, setApiAuthMethod] = 'API Key';
-  const [url, setUrl] = useState('');
-  const [extractText, setExtractText] = useState(false);
   const [textTitle, setTextTitle] = useState('');
   const [textContent, setTextContent] = useState('');
-  const [fileUpload, setFileUpload] = useState<File | null>(null);
-  const [textLoading, setTextLoading] = useState(false);
-  const [csvLoading, setCsvLoading] = useState(false);
-  const [apiLoading, setApiLoading] = useState(false);
-  const [urlLoading, setUrlLoading] = useState(false);
-  const [fileLoading, setFileLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -1292,15 +1283,7 @@ export const ImportPanel: React.FC = () => {
     return branch.charAt(0).toUpperCase() + branch.slice(1) + " Branch";
   };
 
-  const handleControlPanelImport = () => {
-    const filteredData = getFilteredData();
-    try {
-      updateKnowledgeBase(filteredData);
-      toast.success('Control Panel data imported to knowledge base!');
-    } catch (e) {
-      toast.error('Failed to import control panel data.');
-    }
-  };
+
 
   // Function to get the branch color
   const getBranchColorClass = (branch: string): string => {
@@ -1415,59 +1398,15 @@ export const ImportPanel: React.FC = () => {
     setImportError(null);
     
     try {
-      let importResult;
+      let importedData: any = null;
       console.log('Selected source:', selectedSource);
-      if (selectedSource === 'control-panel') {
-        // Import GitHub data using multi-agent system
-        const importData = {
-          repository_id: repository?.full_name || 'default',
-          branch: selectedBranchFilter === 'all' ? 'main' : selectedBranchFilter,
-          data_types: Object.keys(selectedDataTypes).filter(key => selectedDataTypes[key as keyof typeof selectedDataTypes]),
-          github_token: token
-        };
-
-        console.log('Importing data:', importData);
+      
+      if (selectedSource === 'branch') {
+        // Basic branch import for MVP
+        if (selectedBranches.length === 0) {
+          throw new Error('Please select at least one branch');
+        }
         
-        const response = await fetch(`${process.env.BACKEND_URL}/api/ai/import-github`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(importData)
-        });
-        
-        importResult = await response.json();
-        
-      } else if (selectedSource === 'file') {
-        // Import files using multi-agent system
-        const formData = new FormData();
-        formData.append('repository_id', repository?.full_name || 'default');
-        formData.append('branch', selectedBranches[0] || 'main');
-        formData.append('source_type', 'file');
-        
-        // Add selected files to form data
-        selectedFileContents.forEach(file => {
-          // Create a blob from the content and append directly
-          const blob = new Blob([file.content], { type: 'text/plain' });
-          formData.append('files', blob, file.path.split('/').pop() || 'file.txt');
-        });
-        
-        const response = await fetch(`${process.env.BACKEND_URL}/api/ai/import`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        });
-        
-        importResult = await response.json();
-        
-      } else if (selectedSource === 'branch') {
-        // Import branch files using multi-agent system
-        console.log('Importing branch files:', selectedBranches);
-        
-        // Get all selected file paths with their branches
         const filesToImport: FileToImport[] = [];
         
         // Collect all selected files
@@ -1502,79 +1441,43 @@ export const ImportPanel: React.FC = () => {
           throw new Error('No files selected for import');
         }
         
-        // Send import request to backend
-        const importData = {
-          repository_id: repository?.full_name || 'default',
-          source_type: 'github',
+        importedData = {
+          type: 'branch',
+          branches: selectedBranches,
           files: filesToImport,
-          github_token: token
+          fileStructures: branchFileStructures
         };
         
-        console.log('Sending import request for files:', JSON.stringify(importData));
-        
-        console.log(process.env.NEXT_PUBLIC_BACKEND_URL);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/ai/import-github`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(importData)
-        });
-        
-        importResult = await response.json();
-        
-      } else if (selectedSource === 'text') {
-        // Import text content using multi-agent system
-        const formData = new FormData();
-        formData.append('repository_id', repository?.full_name || 'default');
-        formData.append('branch', 'main');
-        formData.append('source_type', 'text');
-        
-        // Create a blob from text content and append directly
-        const blob = new Blob([textContent], { type: 'text/plain' });
-        formData.append('files', blob, `${textTitle}.txt`);
-        
-        const response = await fetch(`${process.env.BACKEND_URL}}/api/ai/import`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        });
-        
-        importResult = await response.json();
+        toast.success(`Successfully prepared ${filesToImport.length} files from ${selectedBranches.length} branch(es) for chat!`);
       }
       
-      if (importResult?.success) {
-        toast.success(importResult.message || 'Data imported successfully!');
-        
-        // Clear form data after successful import
-        if (selectedSource === 'text') {
-          setTextTitle('');
-          setTextContent('');
-        } else if (selectedSource === 'file') {
-          setSelectedFileContents([]);
-        }
-        
-        // Reset data type selections for control panel
-        if (selectedSource === 'control-panel') {
-          setSelectedDataTypes({
-            pullRequests: false,
-            issues: false,
-            botLogs: false,
-            activities: false
-          });
-        }
-        
-      } else {
-        throw new Error(importResult?.error || 'Import failed');
+      // Store imported data in localStorage for chat context
+      if (importedData) {
+        const existingImports = JSON.parse(localStorage.getItem('beetle_imported_data') || '[]');
+        const newImport = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          repository: repository?.full_name || 'default',
+          data: importedData
+        };
+        localStorage.setItem('beetle_imported_data', JSON.stringify([...existingImports, newImport]));
+      }
+      
+      // Clear form data after successful import
+      if (selectedSource === 'text') {
+        setTextTitle('');
+        setTextContent('');
+      }
+      
+      // Navigate to chat page after successful import
+      if (importedData) {
+        router.push('/contribution/chat');
       }
       
     } catch (error) {
       console.error('Import error:', error);
       setImportError(error instanceof Error ? error.message : 'Import failed');
-      toast.error('Failed to import data. Please try again.');
+      toast.error('Failed to add data to chat. Please try again.');
     } finally {
       setImportLoading(false);
     }
@@ -1583,6 +1486,8 @@ export const ImportPanel: React.FC = () => {
   // Total selected counts
   const { files: totalFiles, folders: totalFolders } = getTotalSelectedItems();
   const hasSelections = totalFiles > 0 || totalFolders > 0;
+
+
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -1786,9 +1691,18 @@ export const ImportPanel: React.FC = () => {
                 <button 
                   className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!hasSelectedDataTypes()}
-                  onClick={handleControlPanelImport}
+                  onClick={() => {
+                    const filteredData = getFilteredData();
+                    try {
+                      updateKnowledgeBase(filteredData);
+                      toast.success('Control Panel data added to chat!');
+                      router.push('/contribution/chat');
+                    } catch (e) {
+                      toast.error('Failed to add control panel data to chat.');
+                    }
+                  }}
                 >
-                  Import Selected Data
+                  Add to Chat
                 </button>
               </div>
               
@@ -1940,12 +1854,13 @@ export const ImportPanel: React.FC = () => {
                   }]
                 };
                 updateKnowledgeBase(dataToImport);
-                toast.success('Text content added to knowledge base!');
+                toast.success('Text content added to chat!');
                 setTextTitle('');
                 setTextContent('');
+                router.push('/contribution/chat');
               }}
             >
-              Save to Knowledge Base
+              Add to Chat
             </button>
           </div>
         )}
@@ -2039,33 +1954,29 @@ export const ImportPanel: React.FC = () => {
         )}
       </AnimatedTransition>
       
-      {/* Global Import Button */}
+      {/* Global Add to Chat Button */}
       {selectedSource && (
         <div className="mt-6 border-t border-border pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium">Import to Knowledge Base</h4>
+              <h4 className="font-medium">Add to Chat</h4>
               <p className="text-sm text-muted-foreground mt-1">
                 {(() => {
                   switch (selectedSource) {
                     case 'control-panel':
                       return hasSelectedDataTypes() 
                         ? `${getSelectedDataCount()} items from ${getBranchDisplayName(selectedBranchFilter)}`
-                        : "Select at least one data type to import";
+                        : "Select at least one data type to add";
                     case 'branch':
                       return hasSelections 
                         ? `${totalFiles} files and ${totalFolders} folders from ${selectedBranches.length} branch(es)`
-                        : "Select files and folders to import";
+                        : "Select files and folders to add";
                     case 'text':
                       return textTitle && textContent 
                         ? `"${textTitle}" content`
-                        : "Enter title and content to import";
-                    case 'file':
-                      return selectedFileContents.length > 0 
-                        ? `${selectedFileContents.length} file(s)`
-                        : "Select files to import";
+                        : "Enter title and content to add";
                     default:
-                      return "Ready to import data";
+                      return "Ready to add data to chat";
                   }
                 })()}
               </p>
@@ -2081,16 +1992,14 @@ export const ImportPanel: React.FC = () => {
                     return !hasSelections;
                   case 'text':
                     return !textTitle.trim() || !textContent.trim();
-                  case 'file':
-                    return selectedFileContents.length === 0;
                   default:
                     return false;
                 }
               })()}
               onClick={handleImport}
             >
-              <Database size={16} />
-              Import to Knowledge Base
+              <MessageSquare size={16} />
+              Add to Chat
             </button>
           </div>
         </div>
