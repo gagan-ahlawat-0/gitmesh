@@ -117,15 +117,21 @@ class BaseAgent(ABC):
         """Setup Instructor client for structured outputs."""
         try:
             import instructor
-            import openai
             from config.settings import get_settings
             
             settings = get_settings()
             
-            # Create proper OpenAI client for Instructor
+            # Check if we have OpenAI API key for Instructor
+            if not settings.openai_api_key:
+                self.logger.warning("OpenAI API key not available, Instructor client disabled")
+                self._instructor_client = None
+                return
+            
+            # Create OpenAI client for Instructor (Instructor works best with OpenAI models)
+            import openai
             openai_client = openai.OpenAI(
-                api_key=settings.gemini_api_key,
-                base_url="https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+                api_key=settings.openai_api_key,
+                base_url=None  # Use default OpenAI base URL
             )
             
             # Create Instructor client from the OpenAI client
@@ -329,10 +335,10 @@ Expected Output Type: {task.expected_output_type}"""
         self._performance_metrics["capability_usage"][capability_name] = \
             self._performance_metrics["capability_usage"].get(capability_name, 0) + 1
     
-    def _create_result(self, task: AgentTask, success: bool, output: Dict[str, Any], 
+    async def _create_result(self, task: AgentTask, success: bool, output: Dict[str, Any], 
                       error_message: str = None, execution_time: float = 0.0) -> AgentResult:
         """Create an enhanced agent result."""
-        self._update_performance_metrics(task, execution_time, success, error_message)
+        await self._update_performance_metrics(task, execution_time, success, error_message)
         
         return AgentResult(
             task_id=task.task_id,
@@ -460,10 +466,19 @@ class EnhancedAgentRegistry:
     
     def get_agents_by_type(self, agent_type: str) -> List[BaseAgent]:
         """Get agents by type."""
-        return [
-            agent for agent in self.agents.values()
-            if agent_type.lower() in agent.name.lower()
-        ]
+        agent_type_lower = agent_type.lower()
+        matching_agents = []
+        
+        for agent in self.agents.values():
+            agent_name_lower = agent.name.lower()
+            # Check for exact match or partial match
+            if (agent_type_lower in agent_name_lower or 
+                agent_name_lower in agent_type_lower or
+                agent_type_lower.replace('_', ' ') in agent_name_lower or
+                agent_name_lower.replace(' ', '_') in agent_type_lower):
+                matching_agents.append(agent)
+        
+        return matching_agents
     
     async def health_check_all(self) -> Dict[str, AgentHealthStatus]:
         """Check health of all agents with caching."""
@@ -486,6 +501,10 @@ class EnhancedAgentRegistry:
     def get_all_agents(self) -> List[BaseAgent]:
         """Get all registered agents."""
         return list(self.agents.values())
+    
+    def list_registered_agents(self) -> List[str]:
+        """List all registered agent names for debugging."""
+        return [agent.name for agent in self.agents.values()]
     
     def get_agent_stats(self) -> Dict[str, Dict[str, Any]]:
         """Get comprehensive statistics for all agents."""

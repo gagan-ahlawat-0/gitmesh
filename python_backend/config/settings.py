@@ -8,6 +8,9 @@ import yaml
 from typing import Optional, List, Dict, Any
 from pydantic import Field, validator
 from pydantic_settings import BaseSettings
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 class Settings(BaseSettings):
@@ -323,7 +326,7 @@ class Settings(BaseSettings):
     def qdrant_connection_url(self) -> str:
         """Get the appropriate Qdrant URL based on mode."""
         if self.is_qdrant_online:
-            print(f"Qdrant URL: {self.qdrant_url}")
+            logger.info(f"Qdrant URL: {self.qdrant_url}")
             return self.qdrant_url
         else:
             return "http://localhost:6333"

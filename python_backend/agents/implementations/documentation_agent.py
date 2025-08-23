@@ -108,7 +108,7 @@ class DocumentationAgent(BaseAgent):
         try:
             # Validate task
             if not self._validate_task(task):
-                return self._create_result(
+                return await self._create_result(
                     task=task,
                     success=False,
                     output={},
@@ -133,7 +133,7 @@ class DocumentationAgent(BaseAgent):
             else:
                 output = await self._general_documentation_structured(query, context_chunks, task.parameters)
             
-            return self._create_result(
+            return await self._create_result(
                 task=task,
                 success=True,
                 output=output,
@@ -142,7 +142,7 @@ class DocumentationAgent(BaseAgent):
             
         except Exception as e:
             logger.error("Documentation agent execution failed", error=str(e))
-            return self._create_result(
+            return await self._create_result(
                 task=task,
                 success=False,
                 output={"error": str(e)},
@@ -242,10 +242,3 @@ class DocumentationAgent(BaseAgent):
             return base_healthy and response_healthy and retriever_healthy
         except Exception:
             return False
-
-
-# Register the agent
-from agents.base.base_agent import get_enhanced_agent_registry
-agent_registry = get_enhanced_agent_registry()
-documentation_agent = DocumentationAgent()
-agent_registry.register(documentation_agent)

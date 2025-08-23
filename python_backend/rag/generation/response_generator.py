@@ -14,13 +14,46 @@ from llm.base.base_llm import LLMRequest, LLMResponse, LLMStreamChunk
 from llm.providers.litellm_provider import LiteLLMProvider
 from rag.retrieval.vector_retriever import get_enhanced_vector_retriever
 from config.settings import get_settings
+from utils.prompt_loader import render_prompt, render_prompt_with_fallback
 import instructor
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()
 
 
-# Pydantic models for structured outputs
+# Enhanced Pydantic models for query classification and response generation
+class QueryClassification(BaseModel):
+    """Query classification result."""
+    query_type: str = Field(description="Type of query: casual_conversation, technical_question, code_analysis, debugging, file_specific, documentation, architecture, meta_question, ambiguous")
+    response_style: str = Field(description="Response style: conversational, technical, educational, concise, comprehensive")
+    confidence: float = Field(description="Confidence level 0-1")
+    key_indicators: List[str] = Field(description="Factors that led to this classification")
+    suggested_context: List[str] = Field(default_factory=list, description="Additional context that would be helpful")
+    followup_questions: List[str] = Field(default_factory=list, description="Clarifying questions if needed")
+    user_intent: str = Field(description="Detected user intent")
+
+
+class ConversationContext(BaseModel):
+    """Conversation context information."""
+    session_id: str = Field(description="Session identifier")
+    conversation_history: List[Dict[str, str]] = Field(default_factory=list, description="Recent conversation messages")
+    user_preferences: Dict[str, Any] = Field(default_factory=dict, description="User preferences and settings")
+    current_topic: str = Field(default="", description="Current conversation topic")
+    context_files: List[str] = Field(default_factory=list, description="Files currently in context")
+
+
+class ResponseQualityMetrics(BaseModel):
+    """Response quality assessment."""
+    relevance_score: float = Field(description="How well the response addresses the query (0-1)")
+    accuracy_score: float = Field(description="Technical accuracy of the response (0-1)")
+    clarity_score: float = Field(description="Clarity and understandability (0-1)")
+    completeness_score: float = Field(description="Completeness of the response (0-1)")
+    actionability_score: float = Field(description="How actionable the response is (0-1)")
+    overall_score: float = Field(description="Overall quality score (0-1)")
+    improvement_suggestions: List[str] = Field(default_factory=list, description="Suggestions for improvement")
+
+
+# Existing models...
 class CodeAnalysisResult(BaseModel):
     """Structured code analysis result."""
     summary: str = Field(description="Brief summary of what the code does")
@@ -60,7 +93,7 @@ class RAGResponse(BaseModel):
 
 
 class EnhancedResponseGenerator:
-    """Enhanced RAG response generation system with structured outputs."""
+    """Enhanced RAG response generation system with intelligent query classification and context-aware responses."""
     
     def __init__(self):
         """Initialize the enhanced response generator with Gemini support."""
@@ -74,6 +107,12 @@ class EnhancedResponseGenerator:
         self.instructor_client = None
         self._setup_instructor_if_needed()
         
+        self.vector_retriever = get_enhanced_vector_retriever()
+        self.default_model = settings.default_llm_model
+        
+        # Query classification cache
+        self._classification_cache: Dict[str, QueryClassification] = {}
+    
     def _setup_instructor_if_needed(self):
         """Setup Instructor client only for supported models."""
         try:
@@ -338,6 +377,465 @@ Response (JSON only):"""
         except Exception as e:
             logger.error("Enhanced response generation failed", error=str(e), query=query[:100])
             return f"Sorry, I encountered an error: {str(e)}"
+    
+    async def classify_query(
+        self, 
+        query: str, 
+        conversation_history: List[Dict[str, str]] = None,
+        context_files: List[str] = None
+    ) -> QueryClassification:
+        """Classify user query to determine intent and appropriate response style."""
+        try:
+            # Check cache first
+            cache_key = f"{query}_{hash(str(conversation_history))}_{hash(str(context_files))}"
+            if cache_key in self._classification_cache:
+                return self._classification_cache[cache_key]
+            
+            # Prepare context for classification
+            context = {
+                "query": query,
+                "conversation_history": self._format_conversation_history(conversation_history or []),
+                "available_files": ", ".join(context_files or [])
+            }
+            
+            # Use query classifier prompt
+            classification_prompt = render_prompt("query_classifier.j2", context)
+            
+            # Generate classification using LLM
+            llm_request = LLMRequest(
+                    messages=[
+                    {"role": "system", "content": "You are an expert at analyzing user queries to determine their intent and appropriate response style."},
+                    {"role": "user", "content": classification_prompt}
+                ],
+                model=self.default_model,
+                temperature=0.1,  # Low temperature for consistent classification
+                max_tokens=500,
+                stream=False
+            )
+            
+            response = await self.llm_provider.generate(llm_request)
+            
+            # Parse classification from response
+            classification = self._parse_classification_response(response.content)
+            
+            # Cache the result
+            self._classification_cache[cache_key] = classification
+            
+            logger.info("Query classified", 
+                       query=query[:50], 
+                       classification=classification.query_type,
+                       confidence=classification.confidence)
+            
+            return classification
+                
+        except Exception as e:
+            logger.error("Query classification failed", error=str(e), query=query[:50])
+            # Return default classification
+            return QueryClassification(
+                query_type="ambiguous",
+                response_style="conversational",
+                confidence=0.0,
+                key_indicators=["classification_failed"],
+                user_intent="unknown"
+            )
+    
+    def _format_conversation_history(self, history: List[Dict[str, str]]) -> str:
+        """Format conversation history for classification."""
+        if not history:
+            return "No previous conversation"
+        
+        formatted = []
+        for msg in history[-5:]:  # Last 5 messages
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")[:100]  # Truncate long messages
+            formatted.append(f"{role}: {content}")
+        
+        return "\n".join(formatted)
+    
+    def _parse_classification_response(self, response: str) -> QueryClassification:
+        """Parse classification response from LLM output with enhanced pattern matching."""
+        try:
+            # Extract classification from response using regex patterns
+            import re
+            
+            # Default values
+            query_type = "ambiguous"
+            response_style = "conversational"
+            confidence = 0.5
+            key_indicators = []
+            user_intent = "unknown"
+            
+            # Enhanced pattern matching for query types
+            response_lower = response.lower()
+            
+            # Casual conversation patterns
+            casual_patterns = [
+                r"query type:\s*casual_conversation",
+                r"casual_conversation",
+                r"greeting",
+                r"hi\b", r"hello\b", r"hey\b", r"how are you",
+                r"good morning", r"good afternoon", r"good evening",
+                r"what's up", r"how's it going", r"nice to meet you"
+            ]
+            
+            # Technical question patterns
+            technical_patterns = [
+                r"query type:\s*technical_question",
+                r"technical_question",
+                r"how do i", r"what is", r"explain", r"describe",
+                r"algorithm", r"data structure", r"design pattern",
+                r"framework", r"library", r"api", r"database",
+                r"optimization", r"performance", r"scalability"
+            ]
+            
+            # Code analysis patterns
+            code_analysis_patterns = [
+                r"query type:\s*code_analysis",
+                r"code_analysis",
+                r"review this code", r"analyze this", r"code review",
+                r"what's wrong with", r"how can i improve",
+                r"best practices", r"code quality", r"refactoring"
+            ]
+            
+            # Debugging patterns
+            debugging_patterns = [
+                r"query type:\s*debugging",
+                r"debugging",
+                r"error", r"bug", r"fix", r"doesn't work",
+                r"problem", r"issue", r"troubleshoot",
+                r"exception", r"crash", r"fail"
+            ]
+            
+            # File-specific patterns
+            file_specific_patterns = [
+                r"query type:\s*file_specific",
+                r"file_specific",
+                r"this file", r"in this file", r"file:", r".py", r".js", r".java",
+                r"function", r"class", r"method", r"line \d+"
+            ]
+            
+            # Documentation patterns
+            documentation_patterns = [
+                r"query type:\s*documentation",
+                r"documentation",
+                r"document", r"readme", r"comment", r"explain",
+                r"write documentation", r"create docs"
+            ]
+            
+            # Architecture patterns
+            architecture_patterns = [
+                r"query type:\s*architecture",
+                r"architecture",
+                r"design", r"structure", r"pattern", r"system design",
+                r"microservices", r"monolith", r"distributed",
+                r"scalable", r"maintainable"
+            ]
+            
+            # Meta question patterns
+            meta_patterns = [
+                r"query type:\s*meta_question",
+                r"meta_question",
+                r"what can you do", r"your capabilities", r"how do you work",
+                r"system", r"ai", r"assistant", r"yourself"
+            ]
+            
+            # Determine query type based on patterns
+            if any(re.search(pattern, response_lower) for pattern in casual_patterns):
+                query_type = "casual_conversation"
+                response_style = "conversational"
+                confidence = 0.9
+                key_indicators = ["greeting", "casual_tone", "social_interaction"]
+                user_intent = "casual_interaction"
+            elif any(re.search(pattern, response_lower) for pattern in technical_patterns):
+                query_type = "technical_question"
+                response_style = "technical"
+                confidence = 0.8
+                key_indicators = ["technical_terms", "programming_concepts", "learning_request"]
+                user_intent = "technical_help"
+            elif any(re.search(pattern, response_lower) for pattern in code_analysis_patterns):
+                query_type = "code_analysis"
+                response_style = "comprehensive"
+                confidence = 0.8
+                key_indicators = ["code_review", "analysis_request", "improvement_seeking"]
+                user_intent = "code_analysis"
+            elif any(re.search(pattern, response_lower) for pattern in debugging_patterns):
+                query_type = "debugging"
+                response_style = "educational"
+                confidence = 0.8
+                key_indicators = ["error", "problem", "fix", "troubleshooting"]
+                user_intent = "debugging_help"
+            elif any(re.search(pattern, response_lower) for pattern in file_specific_patterns):
+                query_type = "file_specific"
+                response_style = "technical"
+                confidence = 0.7
+                key_indicators = ["file_reference", "specific_code", "context_aware"]
+                user_intent = "file_analysis"
+            elif any(re.search(pattern, response_lower) for pattern in documentation_patterns):
+                query_type = "documentation"
+                response_style = "educational"
+                confidence = 0.7
+                key_indicators = ["documentation", "explain", "writing_help"]
+                user_intent = "documentation_help"
+            elif any(re.search(pattern, response_lower) for pattern in architecture_patterns):
+                query_type = "architecture"
+                response_style = "comprehensive"
+                confidence = 0.7
+                key_indicators = ["architecture", "design", "structure", "system_design"]
+                user_intent = "architecture_help"
+            elif any(re.search(pattern, response_lower) for pattern in meta_patterns):
+                query_type = "meta_question"
+                response_style = "conversational"
+                confidence = 0.6
+                key_indicators = ["system_question", "meta", "capability_inquiry"]
+                user_intent = "system_inquiry"
+            
+            # Extract confidence from response if available
+            confidence_match = re.search(r"confidence:\s*([\d.]+)", response_lower)
+            if confidence_match:
+                try:
+                    extracted_confidence = float(confidence_match.group(1))
+                    if 0 <= extracted_confidence <= 1:
+                        confidence = extracted_confidence
+                except ValueError:
+                    pass
+            
+            # Extract response style from response if available
+            style_match = re.search(r"response style:\s*(\w+)", response_lower)
+            if style_match:
+                extracted_style = style_match.group(1)
+                if extracted_style in ["conversational", "technical", "educational", "concise", "comprehensive"]:
+                    response_style = extracted_style
+            
+            return QueryClassification(
+                query_type=query_type,
+                response_style=response_style,
+                confidence=confidence,
+                key_indicators=key_indicators,
+                user_intent=user_intent
+            )
+            
+        except Exception as e:
+            logger.error("Failed to parse classification response", error=str(e))
+            return QueryClassification(
+                query_type="ambiguous",
+                response_style="conversational",
+                confidence=0.0,
+                key_indicators=["parsing_error"],
+                user_intent="unknown"
+            )
+    
+    async def generate_response_with_classification(
+        self, 
+        query: str, 
+        conversation_history: List[Dict[str, str]] = None,
+        context_files: List[str] = None,
+        context_chunks: List[Dict[str, Any]] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 1000
+    ) -> Dict[str, Any]:
+        """Generate response with intelligent query classification and context-aware prompting."""
+        try:
+            # Step 1: Classify the query with enhanced context awareness
+            classification = await self.classify_query(query, conversation_history, context_files)
+            
+            # Step 2: Intelligent context selection based on classification
+            if not context_chunks:
+                if classification.query_type in ["casual_conversation", "meta_question"]:
+                    # No technical context needed for casual conversations
+                    context_chunks = []
+                elif classification.query_type == "file_specific":
+                    # Get context specifically for mentioned files
+                    context_chunks = await self._get_file_specific_context(query, context_files)
+                else:
+                    # Get general relevant context
+                    context_chunks = await self.vector_retriever.retrieve_relevant_chunks(query)
+            
+            # Step 3: Dynamic prompt selection and context preparation
+            if classification.query_type == "casual_conversation":
+                # Use casual conversation template with enhanced context
+                context = {
+                    "conversation_history": self._format_conversation_history(conversation_history or []),
+                    "user_context": f"Query: {query}",
+                    "response_style": classification.response_style,
+                    "confidence": classification.confidence
+                }
+                system_prompt = render_prompt("casual_conversation.j2", context)
+                # Adjust temperature for more natural conversation
+                adjusted_temperature = min(temperature + 0.1, 0.9)
+                adjusted_max_tokens = min(max_tokens, 300)  # Shorter responses for casual chat
+            else:
+                # Use enhanced code chat template with classification-aware context
+                context = {
+                    "context": self._prepare_code_context(context_chunks or []),
+                    "conversation_history": self._format_conversation_history(conversation_history or []),
+                    "user_intent": classification.user_intent,
+                    "query_type": classification.query_type,
+                    "response_style": classification.response_style,
+                    "confidence": classification.confidence,
+                    "key_indicators": classification.key_indicators
+                }
+                system_prompt = render_prompt("code_chat_system.j2", context)
+                # Adjust parameters based on query type
+                adjusted_temperature = temperature
+                adjusted_max_tokens = max_tokens
+                
+                # Adjust for specific query types
+                if classification.query_type == "debugging":
+                    adjusted_temperature = max(temperature - 0.1, 0.3)  # More focused for debugging
+                    adjusted_max_tokens = max(max_tokens, 1500)  # Longer for detailed debugging
+                elif classification.query_type == "code_analysis":
+                    adjusted_max_tokens = max(max_tokens, 2000)  # Longer for comprehensive analysis
+            
+            # Step 4: Generate response with optimized parameters
+            llm_request = LLMRequest(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ],
+                model=self.default_model,
+                temperature=adjusted_temperature,
+                max_tokens=adjusted_max_tokens,
+                stream=False
+            )
+            
+            response = await self.llm_provider.generate(llm_request)
+            
+            # Step 5: Post-process response based on classification
+            processed_response = self._post_process_response(
+                response.content, 
+                classification, 
+                query
+            )
+            
+            # Step 6: Return comprehensive result with enhanced metadata
+            return {
+                "response": processed_response,
+                "classification": classification,
+                "context_chunks": context_chunks or [],
+                "metadata": {
+                    "query_type": classification.query_type,
+                    "response_style": classification.response_style,
+                    "confidence": classification.confidence,
+                    "user_intent": classification.user_intent,
+                    "key_indicators": classification.key_indicators,
+                    "temperature_used": adjusted_temperature,
+                    "max_tokens_used": adjusted_max_tokens,
+                    "context_chunks_count": len(context_chunks or []),
+                    "conversation_history_length": len(conversation_history or [])
+                }
+            }
+            
+        except Exception as e:
+            logger.error("Response generation with classification failed", error=str(e))
+            return {
+                "response": f"Sorry, I encountered an error: {str(e)}",
+                "classification": QueryClassification(
+                    query_type="ambiguous",
+                    response_style="conversational",
+                    confidence=0.0,
+                    key_indicators=["error_occurred"],
+                    user_intent="error_recovery"
+                ),
+                "context_chunks": [],
+                "metadata": {
+                    "query_type": "ambiguous",
+                    "response_style": "conversational",
+                    "confidence": 0.0,
+                    "user_intent": "error_recovery",
+                    "error": str(e)
+                }
+            }
+    
+    async def _get_file_specific_context(self, query: str, context_files: List[str]) -> List[Dict[str, Any]]:
+        """Get context specifically for files mentioned in the query."""
+        try:
+            # Extract file references from query
+            import re
+            file_patterns = [
+                r'file[:\s]+([^\s]+)',
+                r'([^/\s]+\.(py|js|java|cpp|c|ts|jsx|tsx|html|css|json|yaml|yml|md|txt))',
+                r'in\s+([^/\s]+\.(py|js|java|cpp|c|ts|jsx|tsx|html|css|json|yaml|yml|md|txt))',
+                r'([a-zA-Z_][a-zA-Z0-9_]*\.(py|js|java|cpp|c|ts|jsx|tsx|html|css|json|yaml|yml|md|txt))'
+            ]
+            
+            mentioned_files = []
+            for pattern in file_patterns:
+                matches = re.findall(pattern, query, re.IGNORECASE)
+                for match in matches:
+                    if isinstance(match, tuple):
+                        mentioned_files.extend([f for f in match if f])
+                    else:
+                        mentioned_files.append(match)
+            
+            # Get context for mentioned files
+            context_chunks = []
+            for file_path in mentioned_files:
+                try:
+                    file_chunks = await self.vector_retriever.retrieve_relevant_chunks(f"file: {file_path}")
+                    context_chunks.extend(file_chunks)
+                except Exception as e:
+                    logger.warning(f"Failed to get context for file {file_path}", error=str(e))
+            
+            return context_chunks
+            
+        except Exception as e:
+            logger.error("File-specific context retrieval failed", error=str(e))
+            return []
+    
+    def _post_process_response(self, response: str, classification: QueryClassification, original_query: str) -> str:
+        """Post-process response based on classification and query type."""
+        try:
+            # For casual conversations, ensure natural flow
+            if classification.query_type == "casual_conversation":
+                # Remove any technical jargon that might have slipped in
+                technical_terms = [
+                    "function", "method", "class", "variable", "algorithm", "data structure",
+                    "API", "endpoint", "database", "framework", "library", "dependency"
+                ]
+                
+                for term in technical_terms:
+                    if term.lower() in response.lower() and term.lower() not in original_query.lower():
+                        # Replace with more conversational alternatives
+                        response = response.replace(f" {term} ", " ")
+                        response = response.replace(f"{term} ", "")
+                        response = response.replace(f" {term}", "")
+                
+                # Ensure response is conversational
+                if not any(word in response.lower() for word in ["hi", "hello", "hey", "good", "great", "nice", "thanks", "welcome"]):
+                    # Add a friendly prefix if response seems too technical
+                    if len(response) > 100 and not response.startswith(("Hi", "Hello", "Hey")):
+                        response = f"Hi there! {response}"
+            
+            # For debugging responses, ensure step-by-step structure
+            elif classification.query_type == "debugging":
+                if "step" not in response.lower() and "first" not in response.lower():
+                    # Add structure if missing
+                    lines = response.split('\n')
+                    if len(lines) > 3:
+                        structured_response = "Let me help you debug this step by step:\n\n"
+                        for i, line in enumerate(lines, 1):
+                            if line.strip():
+                                structured_response += f"{i}. {line.strip()}\n"
+                        response = structured_response
+            
+            # For code analysis, ensure comprehensive structure
+            elif classification.query_type == "code_analysis":
+                if "analysis" not in response.lower() and "review" not in response.lower():
+                    # Add analysis structure if missing
+                    if len(response) > 200:
+                        response = f"Here's my analysis of your code:\n\n{response}"
+            
+            # Ensure proper code formatting
+            if "```" in response:
+                # Ensure code blocks have language specification
+                response = response.replace("```\n", "```python\n")
+                response = response.replace("```\r\n", "```python\r\n")
+            
+            return response.strip()
+            
+        except Exception as e:
+            logger.error("Response post-processing failed", error=str(e))
+            return response
     
     async def generate_structured_code_analysis(
         self,

@@ -87,6 +87,10 @@ class SentenceTransformersEmbeddingsProvider(BaseEmbeddingsProvider):
         except Exception as e:
             logger.error("Local embedding generation failed", error=str(e), model=model_name)
             raise
+
+    async def embed_text(self, text: str, model: str = None, **kwargs) -> List[float]:
+        """Generate embedding for a single text (alias for embed_single)."""
+        return await self.embed_single(text, model, **kwargs)
     
     def get_supported_models(self) -> List[str]:
         """Get list of supported local models."""

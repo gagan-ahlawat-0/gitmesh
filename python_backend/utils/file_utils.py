@@ -490,7 +490,7 @@ class FileProcessor:
         """
         try:
             # Detect language from content
-            language = detect_language(filename, content)
+            language = await self.detect_language(filename)
             
             # Process content based on file type
             if file_type == "markdown" or filename.endswith('.md'):
@@ -525,49 +525,106 @@ class FileProcessor:
             raise
     
     def _process_text_content(self, content: str) -> List[Any]:
-        """Process plain text content."""
+        """Process plain text content with enhanced chunking for RAG."""
         if not content.strip():
             return []
         
-        # Split content into paragraphs
-        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
-        
+        # Enhanced chunking strategy for better RAG performance
+        lines = content.split('\n')
         elements = []
-        for i, paragraph in enumerate(paragraphs):
-            # Create a simple text element
-            element = self._create_text_element(paragraph, i)
-            elements.append(element)
+        current_chunk = []
+        current_line_count = 0
+        chunk_size_limit = 500  # Target chunk size in characters
+        min_chunk_size = 50     # Minimum chunk size
+        
+        for i, line in enumerate(lines):
+            current_chunk.append(line)
+            current_line_count += 1
+            
+            # Create chunk when we hit size limit or encounter natural breaks
+            should_create_chunk = (
+                len(''.join(current_chunk)) >= chunk_size_limit or
+                (line.strip() == '' and len(''.join(current_chunk)) >= min_chunk_size) or
+                (i < len(lines) - 1 and lines[i + 1].startswith('#')) or  # Next line is a header
+                (i < len(lines) - 1 and lines[i + 1].startswith('```')) or  # Next line is code block
+                i == len(lines) - 1  # Last line
+            )
+            
+            if should_create_chunk and len(''.join(current_chunk)) >= min_chunk_size:
+                chunk_text = '\n'.join(current_chunk).strip()
+                if chunk_text:
+                    element = self._create_text_element(
+                        chunk_text, 
+                        len(elements),
+                        start_line=i - current_line_count + 1,
+                        end_line=i
+                    )
+                    elements.append(element)
+                
+                # Reset for next chunk
+                current_chunk = []
+                current_line_count = 0
+        
+        # Handle any remaining content
+        if current_chunk and len(''.join(current_chunk)) >= min_chunk_size:
+            chunk_text = '\n'.join(current_chunk).strip()
+            if chunk_text:
+                element = self._create_text_element(
+                    chunk_text, 
+                    len(elements),
+                    start_line=len(lines) - len(current_chunk),
+                    end_line=len(lines) - 1
+                )
+                elements.append(element)
         
         return elements
     
     def _process_markdown_content(self, content: str) -> List[Any]:
-        """Process markdown content."""
+        """Process markdown content with enhanced chunking for RAG."""
         if not content.strip():
             return []
         
-        # Split content into sections based on headers
+        # Enhanced markdown processing with better chunking
         lines = content.split('\n')
         elements = []
         current_section = []
         current_header = None
+        section_start_line = 0
         
         for i, line in enumerate(lines):
             if line.startswith('#'):
                 # Save previous section
                 if current_section:
-                    element = self._create_text_element('\n'.join(current_section), len(elements), current_header)
-                    elements.append(element)
+                    section_text = '\n'.join(current_section).strip()
+                    if section_text:
+                        element = self._create_text_element(
+                            section_text, 
+                            len(elements), 
+                            current_header,
+                            start_line=section_start_line,
+                            end_line=i - 1
+                        )
+                        elements.append(element)
                 
                 # Start new section
                 current_header = line.strip()
                 current_section = [line]
+                section_start_line = i
             else:
                 current_section.append(line)
         
         # Save last section
         if current_section:
-            element = self._create_text_element('\n'.join(current_section), len(elements), current_header)
-            elements.append(element)
+            section_text = '\n'.join(current_section).strip()
+            if section_text:
+                element = self._create_text_element(
+                    section_text, 
+                    len(elements), 
+                    current_header,
+                    start_line=section_start_line,
+                    end_line=len(lines) - 1
+                )
+                elements.append(element)
         
         return elements
     
@@ -590,20 +647,23 @@ class FileProcessor:
             # If JSON parsing fails, treat as text
             return self._process_text_content(content)
     
-    def _create_text_element(self, text: str, index: int, header: str = None) -> Any:
-        """Create a text element with metadata."""
+    def _create_text_element(self, text: str, index: int, header: str = None, start_line: int = None, end_line: int = None) -> Any:
+        """Create a text element with enhanced metadata for RAG processing."""
         class TextElement:
-            def __init__(self, text, index, header=None):
+            def __init__(self, text, index, header=None, start_line=None, end_line=None):
                 self.text = text
                 self.metadata = {
                     "index": index,
                     "header": header,
-                    "start_line": index,
-                    "end_line": index + text.count('\n'),
-                    "element_type": "text"
+                    "start_line": start_line if start_line is not None else index,
+                    "end_line": end_line if end_line is not None else index + text.count('\n'),
+                    "start_char": 0,  # Will be calculated when needed
+                    "end_char": len(text),
+                    "element_type": "text",
+                    "chunk_size": len(text)
                 }
         
-        return TextElement(text, index, header)
+        return TextElement(text, index, header, start_line, end_line)
 
 
 # Utility functions

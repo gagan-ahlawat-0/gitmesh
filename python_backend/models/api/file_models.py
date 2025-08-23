@@ -3,11 +3,12 @@ File processing models for the RAG system.
 Handles file metadata, chunking, and processing status.
 """
 
+import hashlib
+import uuid
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from enum import Enum
-import hashlib
 
 
 class FileStatus(str, Enum):
@@ -72,6 +73,13 @@ class ChunkMetadata(BaseModel):
     language: Optional[str] = Field(default=None, description="Programming language")
     complexity_score: Optional[float] = Field(default=None, description="Code complexity score")
     created_at: datetime = Field(default_factory=datetime.now, description="Chunk creation timestamp")
+    
+    @validator('chunk_id')
+    def generate_chunk_id(cls, v, values):
+        if v:
+            return v
+        # Generate UUID for chunk ID
+        return str(uuid.uuid4())
 
 
 class DocumentChunk(BaseModel):
@@ -89,6 +97,13 @@ class DocumentChunk(BaseModel):
         if not v.strip():
             raise ValueError("Chunk content cannot be empty")
         return v.strip()
+    
+    @validator('chunk_id')
+    def generate_chunk_id(cls, v, values):
+        if v:
+            return v
+        # Generate UUID for chunk ID
+        return str(uuid.uuid4())
 
 
 class FileProcessingResult(BaseModel):

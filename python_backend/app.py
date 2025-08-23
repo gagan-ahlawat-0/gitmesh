@@ -1,6 +1,6 @@
 """
 Beetle RAG System - FastAPI Application
-Main entry point for the RAG system with agent registry, context management, and observability.
+Main entry point for the RAG system with session-based context management.
 """
 
 import asyncio
@@ -8,14 +8,14 @@ import os
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 import structlog
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Import core components
-from core.orchestrator import RAGOrchestrator
-from agents.registry import AgentRegistry
+from core.orchestrator import get_orchestrator, initialize_orchestrator, shutdown_orchestrator
 from agents.base.base_agent import get_enhanced_agent_registry
 from config.features import is_agent_enabled, is_provider_enabled
 from config.settings import get_settings
@@ -29,8 +29,14 @@ logger = structlog.get_logger(__name__)
 settings = get_settings()
 
 # Global orchestrator instance
-orchestrator: RAGOrchestrator = None
+orchestrator = None
 agent_registry = get_enhanced_agent_registry()
+
+
+def get_global_orchestrator():
+    """Get the global orchestrator instance."""
+    global orchestrator
+    return orchestrator
 
 
 @asynccontextmanager
@@ -39,23 +45,31 @@ async def lifespan(app: FastAPI):
     global orchestrator
     
     # Startup
-    logger.info("🚀 Starting Beetle RAG System...")
+    logger.info("🚀 Starting Beetle RAG System with session management...")
     
     try:
-        # Initialize orchestrator
-        orchestrator = RAGOrchestrator()
-        await orchestrator.initialize()
+        # Initialize orchestrator (includes session manager)
+        success = await initialize_orchestrator()
+        if not success:
+            logger.error("❌ Failed to initialize orchestrator")
+            raise RuntimeError("Orchestrator initialization failed")
+        
+        orchestrator = get_orchestrator()
         
         # Load and register agents based on feature flags
         await _load_enabled_agents()
         
         # Health check
-        health_status = await orchestrator.health_check()
-        if not health_status:
+        health_status = await orchestrator.get_orchestrator_stats()
+        if health_status and "error" in health_status:
+            logger.warning("⚠️ System health check has warnings", error=health_status["error"])
+            # Don't fail startup for health check warnings, just log them
+        elif not health_status:
             logger.error("❌ System health check failed")
             raise RuntimeError("System initialization failed")
         
         logger.info("✅ Beetle RAG System started successfully")
+        logger.info(f"📊 System stats: {health_status}")
         trace("app_started", {"status": "success", "agents_loaded": len(agent_registry.get_all_agents())})
         
     except Exception as e:
@@ -68,8 +82,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("🛑 Shutting down Beetle RAG System...")
     try:
-        if orchestrator:
-            await orchestrator.cleanup()
+        await shutdown_orchestrator()
         trace("app_shutdown", {"status": "success"})
     except Exception as e:
         logger.error("❌ Error during shutdown", error=str(e))
@@ -79,7 +92,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Beetle RAG System",
-    description="Advanced RAG system with multi-agent architecture, structured outputs, and enhanced features",
+    description="Advanced RAG system with session-based context management and multi-agent architecture",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -99,265 +112,241 @@ app.include_router(health.router, prefix="/api/v1", tags=["health"])
 
 # Add a test endpoint to verify the connection
 @app.get("/test")
-async def test_endpoint():
-    """Test endpoint to verify the connection."""
-    return {"message": "Python backend is running!", "status": "ok"}
-
-
-# Pydantic models for API
-class ChatRequest(BaseModel):
-    query: str
-    agent_type: str = "code_chat"
-    context_chunks: list = []
-    use_structured: bool = True
-    temperature: float = 0.7
-    max_tokens: int = 1000
-
-
-class ChatResponse(BaseModel):
-    response: str
-    agent_used: str
-    context_chunks_used: int
-    processing_time: float
-    metadata: Dict[str, Any] = {}
-
-
-class SystemStatus(BaseModel):
-    status: str
-    agents: Dict[str, bool]
-    providers: Dict[str, bool]
-    health: Dict[str, Any]
-
-
-# API Routes
-@app.get("/")
-async def root():
-    """Root endpoint."""
+async def test_connection():
+    """Test endpoint to verify the system is running."""
     return {
-        "message": "Beetle RAG System",
+        "status": "ok",
+        "message": "Beetle RAG System is running",
         "version": "2.0.0",
-        "status": "running"
+        "session_management": "enabled",
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/test/quick")
+async def quick_test():
+    """Quick test endpoint for fast response."""
+    return {
+        "status": "ok",
+        "message": "Quick response test",
+        "timestamp": datetime.now().isoformat()
     }
 
 
 @app.get("/health")
 async def health_check():
-    """System health check."""
+    """Comprehensive health check endpoint."""
+    try:
+        if not orchestrator:
+            return {
+                "status": "unhealthy",
+                "error": "Orchestrator not initialized",
+                "timestamp": asyncio.get_event_loop().time()
+            }
+        
+        # Get system stats
+        stats = await orchestrator.get_orchestrator_stats()
+        
+        # Check if any critical components are failing
+        is_healthy = True
+        errors = []
+        
+        if "error" in stats:
+            is_healthy = False
+            errors.append(stats["error"])
+        
+        # Check session manager
+        session_stats = stats.get("session_manager", {})
+        if not session_stats:
+            is_healthy = False
+            errors.append("Session manager not available")
+        
+        # Check agents
+        agent_stats = stats.get("agents", {})
+        if agent_stats.get("active_agents", 0) == 0:
+            is_healthy = False
+            errors.append("No active agents")
+        
+        return {
+            "status": "healthy" if is_healthy else "unhealthy",
+            "timestamp": asyncio.get_event_loop().time(),
+            "components": {
+                "orchestrator": True,
+                "session_manager": bool(session_stats),
+                "agents": agent_stats.get("active_agents", 0) > 0,
+                "vector_store": "vector_store" in stats
+            },
+            "stats": stats,
+            "errors": errors if errors else None
+        }
+    
+    except Exception as e:
+        logger.error("Health check failed", error=str(e))
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": asyncio.get_event_loop().time()
+        }
+
+
+async def _load_enabled_agents():
+    """Load and register agents based on feature flags."""
+    try:
+        logger.info("Loading enabled agents...")
+        
+        # Load agents based on feature flags
+        if is_agent_enabled("code_chat"):
+            from agents.implementations.code_chat_agent import CodeChatAgent
+            agent = CodeChatAgent()
+            agent_registry.register(agent)
+            logger.info(f"✅ Loaded agent: {agent.name}")
+        
+        if is_agent_enabled("documentation"):
+            from agents.implementations.documentation_agent import DocumentationAgent
+            agent = DocumentationAgent()
+            agent_registry.register(agent)
+            logger.info(f"✅ Loaded agent: {agent.name}")
+        
+        # Note: General agent doesn't exist in implementations, so removing it
+        # if is_agent_enabled("general"):
+        #     from agents.general.general_agent import GeneralAgent
+        #     agent = GeneralAgent()
+        #     agent_registry.register(agent)
+        #     logger.info(f"✅ Loaded agent: {agent.name}")
+        
+        # Debug: list all registered agents
+        all_agents = agent_registry.get_all_agents()
+        agent_names = [agent.name for agent in all_agents]
+        logger.info(f"Loaded {len(all_agents)} agents: {agent_names}")
+    
+    except Exception as e:
+        logger.error(f"Failed to load agents: {e}")
+        raise
+
+
+# Background task for system maintenance
+@app.post("/maintenance/cleanup")
+async def cleanup_system(background_tasks: BackgroundTasks):
+    """Trigger system cleanup tasks."""
     try:
         if not orchestrator:
             raise HTTPException(status_code=503, detail="System not initialized")
         
-        health_status = await orchestrator.health_check()
-        return {"status": "healthy" if health_status else "unhealthy"}
-    
-    except Exception as e:
-        logger.error("Health check failed", error=str(e))
-        raise HTTPException(status_code=503, detail=str(e))
-
-
-@app.get("/status")
-async def system_status() -> SystemStatus:
-    """Get comprehensive system status."""
-    try:
-        # Check agent status
-        agents_status = {}
-        for agent in agent_registry.get_all_agents():
-            agents_status[agent.name] = await agent.health_check()
+        # Add cleanup tasks to background
+        background_tasks.add_task(_perform_cleanup)
         
-        # Check provider status
-        providers_status = {
-            "litellm": is_provider_enabled("litellm"),
-            "anthropic": is_provider_enabled("anthropic")
+        return {
+            "message": "Cleanup tasks scheduled",
+            "status": "scheduled"
         }
         
-        # Get orchestrator health
-        orchestrator_health = await orchestrator.health_check() if orchestrator else False
-        
-        return SystemStatus(
-            status="running" if orchestrator_health else "error",
-            agents=agents_status,
-            providers=providers_status,
-            health={
-                "orchestrator": orchestrator_health,
-                "vector_store": await orchestrator.vector_retriever.health_check() if orchestrator else False,
-                "llm_provider": await orchestrator.response_generator.health_check() if orchestrator else False
-            }
-        )
-    
     except Exception as e:
-        logger.error("Status check failed", error=str(e))
+        logger.error(f"Cleanup request failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/chat")
-async def chat(request: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
-    """Main chat endpoint with agent routing."""
+async def _perform_cleanup():
+    """Perform system cleanup tasks."""
     try:
-        start_time = asyncio.get_event_loop().time()
+        logger.info("Starting system cleanup...")
         
-        # Trace the request
-        trace("chat_request", {
-            "query": request.query[:100],
-            "agent_type": request.agent_type,
-            "use_structured": request.use_structured
-        })
+        # Get system stats before cleanup
+        stats_before = await orchestrator.get_orchestrator_stats()
+        logger.info(f"System stats before cleanup: {stats_before}")
         
-        # Validate agent type
-        if not is_agent_enabled(request.agent_type):
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Agent type '{request.agent_type}' is not enabled"
-            )
+        # Perform cleanup tasks
+        # (Add specific cleanup logic here as needed)
         
-        # Get appropriate agent
-        agent = _get_agent_by_type(request.agent_type)
-        if not agent:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Agent type '{request.agent_type}' not found"
-            )
+        # Get system stats after cleanup
+        stats_after = await orchestrator.get_orchestrator_stats()
+        logger.info(f"System stats after cleanup: {stats_after}")
         
-        # Create task
-        from agents.base.base_agent import AgentTask
-        task = AgentTask(
-            task_type=request.agent_type,
-            input_data={
-                "query": request.query,
-                "context_chunks": request.context_chunks
+        logger.info("System cleanup completed")
+        
+    except Exception as e:
+        logger.error(f"Cleanup failed: {e}")
+
+
+# API documentation customization
+@app.get("/")
+async def root():
+    """Root endpoint with API information."""
+    return {
+        "name": "Beetle RAG System",
+        "version": "2.0.0",
+        "description": "Advanced RAG system with session-based context management",
+        "features": [
+            "Session-based context management",
+            "Multi-agent architecture",
+            "Real-time chat with files",
+            "Vector search and retrieval",
+            "File processing and chunking"
+        ],
+        "endpoints": {
+            "health": "/health",
+            "test": "/test",
+            "chat": "/api/v1/chat",
+            "sessions": "/api/v1/chat/sessions",
+            "docs": "/docs"
+        },
+        "session_management": {
+            "enabled": True,
+            "features": [
+                "Session creation and management",
+                "File context within sessions",
+                "Message history per session",
+                "Context statistics and monitoring"
+            ]
+        }
+    }
+
+
+@app.get("/debug/agents")
+async def debug_agents():
+    """Debug endpoint to check available agents."""
+    try:
+        if not orchestrator:
+            return {
+                "status": "error",
+                "message": "Orchestrator not initialized"
+            }
+        
+        # Get agents from both registries
+        global_agents = agent_registry.get_all_agents()
+        orchestrator_agents = orchestrator.agent_registry.get_all_agents()
+        
+        return {
+            "status": "ok",
+            "global_agent_registry": {
+                "count": len(global_agents),
+                "agents": [agent.name for agent in global_agents]
             },
-            parameters={
-                "temperature": request.temperature,
-                "max_tokens": request.max_tokens,
-                "use_structured": request.use_structured
+            "orchestrator_agent_registry": {
+                "count": len(orchestrator_agents),
+                "agents": [agent.name for agent in orchestrator_agents]
+            },
+            "feature_flags": {
+                "code_chat": is_agent_enabled("code_chat"),
+                "documentation": is_agent_enabled("documentation")
             }
-        )
-        
-        # Execute task
-        result = await agent.execute(task)
-        
-        if not result.success:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Agent execution failed: {result.error_message}"
-            )
-        
-        processing_time = asyncio.get_event_loop().time() - start_time
-        
-        # Trace the response
-        trace("chat_response", {
-            "agent_type": request.agent_type,
-            "processing_time": processing_time,
-            "success": result.success
-        })
-        
-        return ChatResponse(
-            response=result.output.get("response", str(result.output)),
-            agent_used=request.agent_type,
-            context_chunks_used=len(request.context_chunks),
-            processing_time=processing_time,
-            metadata={
-                "execution_time": result.execution_time,
-                "structured_output": result.structured_output is not None
-            }
-        )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Chat request failed", error=str(e))
-        trace("chat_error", {"error": str(e)})
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/agents")
-async def list_agents():
-    """List all available agents."""
-    agents = []
-    for agent in agent_registry.get_all_agents():
-        agents.append({
-            "name": agent.name,
-            "description": agent.description,
-            "capabilities": [cap.name for cap in agent.get_capabilities()],
-            "enabled": is_agent_enabled(agent.name.lower().replace(" ", "_"))
-        })
-    
-    return {"agents": agents}
-
-
-@app.get("/agents/{agent_name}/health")
-async def agent_health(agent_name: str):
-    """Check health of a specific agent."""
-    agent = _get_agent_by_name(agent_name)
-    if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    
-    health_status = await agent.health_check()
-    return {"agent": agent_name, "healthy": health_status.is_healthy if hasattr(health_status, 'is_healthy') else health_status}
-
-
-@app.post("/upload")
-async def upload_file(background_tasks: BackgroundTasks):
-    """Upload and process files."""
-    # TODO: Implement file upload endpoint
-    return {"message": "File upload endpoint - to be implemented"}
-
-
-# Helper functions
-async def _load_enabled_agents():
-    """Load and register agents based on feature flags."""
-    logger.info("Loading enabled agents...")
-    
-    # Import agent modules to trigger registration
-    try:
-        from agents.implementations.code_chat_agent import CodeChatAgent
-        from agents.implementations.documentation_agent import DocumentationAgent
-        
-        # Register agents if enabled
-        if is_agent_enabled("code_chat"):
-            agent_registry.register(CodeChatAgent())
-            logger.info("✅ Code Chat Agent registered")
-        
-        if is_agent_enabled("documentation"):
-            agent_registry.register(DocumentationAgent())
-            logger.info("✅ Documentation Agent registered")
-        
-        logger.info(f"Loaded {len(agent_registry.get_all_agents())} agents")
+        }
         
     except Exception as e:
-        logger.error("Failed to load agents", error=str(e))
-        raise
-
-
-def _get_agent_by_type(agent_type: str):
-    """Get agent by type name."""
-    for agent in agent_registry.get_all_agents():
-        if agent.name.lower().replace(" ", "_") == agent_type:
-            return agent
-    return None
-
-
-def _get_agent_by_name(agent_name: str):
-    """Get agent by name."""
-    for agent in agent_registry.get_all_agents():
-        if agent.name == agent_name:
-            return agent
-    return None
+        logger.error(f"Debug agents failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 
 if __name__ == "__main__":
     import uvicorn
     
-    # Get configuration
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
-    reload = os.getenv("RELOAD", "false").lower() == "true"
-    
-    logger.info(f"Starting server on {host}:{port}")
-    
+    # Development server configuration
     uvicorn.run(
         "app:app",
-        host=host,
-        port=port,
-        reload=reload,
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
         log_level="info"
     )

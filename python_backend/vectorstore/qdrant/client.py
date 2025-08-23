@@ -244,21 +244,47 @@ class EnhancedQdrantClient:
     async def upsert_chunks_with_embeddings(
         self, 
         chunks: List[DocumentChunk],
-        generate_embeddings: bool = False
+        generate_embeddings: bool = False,
+        orchestrator=None
     ) -> bool:
         """Upsert chunks with optional local embedding generation."""
         if not chunks:
             return True
         
         try:
-            # Generate embeddings locally if requested
-            if generate_embeddings and self._use_fastembed:
+            # Generate embeddings if requested
+            if generate_embeddings:
                 texts = [chunk.content for chunk in chunks if chunk.content]
                 if texts:
-                    embeddings = await self.generate_embeddings_with_fastembed(texts)
-                    for chunk, embedding in zip(chunks, embeddings):
-                        if not chunk.embedding:  # Only if embedding is missing
+                    embeddings = []
+                    
+                    # Try FastEmbed first
+                    if self._use_fastembed:
+                        try:
+                            embeddings = await self.generate_embeddings_with_fastembed(texts)
+                            logger.info(f"Generated {len(embeddings)} embeddings using FastEmbed")
+                        except Exception as e:
+                            logger.warning(f"FastEmbed failed, falling back to orchestrator embeddings: {e}")
+                            embeddings = []
+                    
+                    # Fallback to orchestrator embeddings provider
+                    if not embeddings and orchestrator and hasattr(orchestrator, 'embeddings_provider'):
+                        try:
+                            embeddings = []
+                            for text in texts:
+                                embedding = await orchestrator.embeddings_provider.embed_text(text)
+                                embeddings.append(embedding)
+                            logger.info(f"Generated {len(embeddings)} embeddings using orchestrator provider")
+                        except Exception as e:
+                            logger.error(f"Orchestrator embeddings failed: {e}")
+                            embeddings = []
+                    
+                    # Assign embeddings to chunks
+                    if embeddings and len(embeddings) == len(chunks):
+                        for chunk, embedding in zip(chunks, embeddings):
                             chunk.embedding = embedding
+                    else:
+                        logger.warning(f"Embedding count mismatch: {len(embeddings)} embeddings for {len(chunks)} chunks")
             
             return await self.upsert_chunks(chunks)
             
