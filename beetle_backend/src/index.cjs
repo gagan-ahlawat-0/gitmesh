@@ -12,9 +12,10 @@ const authRoutes = require('./routes/auth.cjs');
 const githubRoutes = require('./routes/github.cjs');
 const analyticsRoutes = require('./routes/analytics.cjs');
 const projectsRoutes = require('./routes/projects.cjs');
-const aiRoutes = require('./routes/ai.cjs');
+const { router: aiRoutes, initializeWebSocket } = require('./routes/ai.cjs');
 const aggregatedRoutes = require('./routes/aggregated.cjs');
 const webhookRoutes = require('./routes/webhooks.cjs');
+const chatRoutes = require('./routes/chat.routes.js');
 
 // Import environment utilities
 const { printEnvStatus } = require('./utils/env.cjs');
@@ -116,6 +117,7 @@ app.use('/api/analytics', authMiddleware, analyticsRoutes);
 app.use('/api/projects', authMiddleware, projectsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -130,7 +132,8 @@ app.get('/', (req, res) => {
       analytics: '/api/analytics',
       projects: '/api/projects',
       ai: '/api/ai',
-      webhooks: '/api/webhooks'
+      webhooks: '/api/webhooks',
+      chat: '/api/chat'
     }
   });
 });
@@ -155,11 +158,15 @@ const startServer = async () => {
     // Print environment configuration status
     printEnvStatus();
     
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 Beetle Backend server running on port ${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
       console.log(`🤖 AI Pipeline: http://localhost:${PORT}/api/ai/health`);
+      
+      // Initialize WebSocket server
+      initializeWebSocket(server);
+      console.log(`🔌 WebSocket server initialized for real-time chat`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

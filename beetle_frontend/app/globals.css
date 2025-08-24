@@ -103,3 +103,126 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Syntax highlighting for code blocks */
+.hljs {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.hljs-keyword {
+  color: #ff79c6;
+}
+
+.hljs-string {
+  color: #f1fa8c;
+}
+
+.hljs-comment {
+  color: #6272a4;
+  font-style: italic;
+}
+
+.hljs-function {
+  color: #50fa7b;
+}
+
+.hljs-number {
+  color: #bd93f9;
+}
+
+.hljs-variable {
+  color: #f8f8f2;
+}
+
+.hljs-title {
+  color: #8be9fd;
+}
+
+.hljs-params {
+  color: #f8f8f2;
+}
+
+.hljs-built_in {
+  color: #8be9fd;
+}
+
+.hljs-literal {
+  color: #ff79c6;
+}
+
+.hljs-type {
+  color: #8be9fd;
+}
+
+.hljs-addition {
+  color: #50fa7b;
+}
+
+.hljs-deletion {
+  color: #ff5555;
+}
+
+/* Dark mode syntax highlighting */
+.dark .hljs {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.dark .hljs-keyword {
+  color: #ff79c6;
+}
+
+.dark .hljs-string {
+  color: #f1fa8c;
+}
+
+.dark .hljs-comment {
+  color: #6272a4;
+}
+
+.dark .hljs-function {
+  color: #50fa7b;
+}
+
+.dark .hljs-number {
+  color: #bd93f9;
+}
+
+.dark .hljs-variable {
+  color: #f8f8f2;
+}
+
+.dark .hljs-title {
+  color: #8be9fd;
+}
+
+.dark .hljs-params {
+  color: #f8f8f2;
+}
+
+.dark .hljs-built_in {
+  color: #8be9fd;
+}
+
+.dark .hljs-literal {
+  color: #ff79c6;
+}
+
+.dark .hljs-type {
+  color: #8be9fd;
+}
+
+.dark .hljs-addition {
+  color: #50fa7b;
+}
+
+.dark .hljs-deletion {
+  color: #ff5555;
+}
