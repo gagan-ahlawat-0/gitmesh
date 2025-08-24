@@ -96,9 +96,20 @@ export const ChatSessionManager: React.FC<ChatSessionManagerProps> = ({ isOpen, 
     toast.info('Clear functionality will be implemented in Phase 2');
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | string | undefined) => {
+    if (!date) {
+      return 'Unknown';
+    }
+    
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    const dateObj = date instanceof Date ? date : new Date(date);
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      return 'Invalid date';
+    }
+    
+    const diffInHours = Math.floor((now.getTime() - dateObj.getTime()) / (1000 * 60 * 60));
     
     if (diffInHours < 1) {
       return 'Just now';

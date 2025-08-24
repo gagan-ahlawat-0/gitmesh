@@ -87,6 +87,9 @@ import { toast } from 'sonner';
 import GitHubAPI from '@/lib/github-api';
 import { transformGitHubData, fallbackContributionData } from './manage/contribution-data';
 import { ImportSource } from '@/lib/types';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 
 import AnimatedTransition from './AnimatedTransition';
 import { ChatSessionManager } from './ChatSessionManager';
@@ -270,6 +273,7 @@ interface FileSystemNodeProps {
   onFileSelect?: (branch: string, filePath: string, content: string) => void;
   fileContent?: string;
   isLoadingContent?: boolean;
+  selectedFiles: Array<{branch: string, path: string, content: string}>;
 }
 
 const FileSystemNode: React.FC<FileSystemNodeProps> = ({ 
@@ -281,16 +285,32 @@ const FileSystemNode: React.FC<FileSystemNodeProps> = ({
   branch,
   onFileSelect,
   fileContent,
-  isLoadingContent
+  isLoadingContent,
+  selectedFiles
 }) => {
   const isFolder = item.type === 'folder';
+  
+  // Check if this item is selected based on the selectedFiles array
+  const isItemSelected = selectedFiles.some(file => 
+    file.branch === branch && file.path === path.join('/')
+  );
+  
+  // Check if folder has selected files
+  const hasSelectedFiles = isFolder && item.children && item.children.some(child => {
+    if (child.type === 'file') {
+      const childPath = [...path, child.name].join('/');
+      return selectedFiles.some(file => file.branch === branch && file.path === childPath);
+    }
+    return false;
+  });
   
   return (
     <div className="select-none">
       <div 
         className={cn(
           "flex items-center py-1 px-1 rounded-md hover:bg-primary/10 cursor-pointer transition-colors",
-          item.selected && "bg-primary/20"
+          item.selected && "bg-primary/20",
+          hasSelectedFiles && "bg-green-500/10 border border-green-500/20"
         )}
         style={{ paddingLeft: `${(level * 8) + 4}px` }}
       >
@@ -302,7 +322,7 @@ const FileSystemNode: React.FC<FileSystemNodeProps> = ({
             onSelect(item, path);
           }}
         >
-          {item.selected ? 
+          {isItemSelected ? 
             <CheckSquare size={12} className="text-primary" /> : 
             <Square size={12} className="text-muted-foreground" />
           }
@@ -342,21 +362,29 @@ const FileSystemNode: React.FC<FileSystemNodeProps> = ({
           }}
         >
           {isFolder ? 
-            <Folder size={12} className="mr-1 text-amber-500" /> : 
+            <Folder size={12} className={cn(
+              "mr-1",
+              hasSelectedFiles ? "text-green-500" : "text-amber-500"
+            )} /> : 
             getFileIcon(item.name)
           }
           
           <span className="text-xs truncate">{item.name}</span>
-          {!isFolder && (
-            <div className="flex items-center gap-1 ml-auto">
-              {isLoadingContent && (
-                <Loader2 size={10} className="animate-spin text-muted-foreground" />
-              )}
+          <div className="flex items-center gap-1 ml-auto">
+            {isFolder && item.children && (
+              <span className="text-xs text-muted-foreground">
+                {item.children.length} item{item.children.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            {!isFolder && isLoadingContent && (
+              <Loader2 size={10} className="animate-spin text-muted-foreground" />
+            )}
+            {!isFolder && (
               <span className="text-xs text-muted-foreground">
                 {item.size ? `${(item.size / 1024).toFixed(1)}KB` : ''}
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
       
@@ -375,6 +403,7 @@ const FileSystemNode: React.FC<FileSystemNodeProps> = ({
               onFileSelect={onFileSelect}
               fileContent={fileContent}
               isLoadingContent={isLoadingContent}
+              selectedFiles={selectedFiles}
             />
           ))}
         </div>
@@ -430,8 +459,66 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onCopy }) =
             </div>
           </div>
           
-          <div className="prose prose-sm max-w-none">
-            {message.content}
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={{
+                // Custom styling for different markdown elements
+                h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-base font-medium mb-1">{children}</h3>,
+                h4: ({ children }) => <h4 className="text-sm font-medium mb-1">{children}</h4>,
+                p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                li: ({ children }) => <li className="text-sm">{children}</li>,
+                blockquote: ({ children }) => (
+                  <blockquote className="border-l-4 border-primary/30 pl-4 italic text-muted-foreground mb-2">
+                    {children}
+                  </blockquote>
+                ),
+                code: ({ children, className }) => {
+                  const isInline = !className;
+                  if (isInline) {
+                    return <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>;
+                  }
+                  return <code className={className}>{children}</code>;
+                },
+                pre: ({ children }) => (
+                  <pre className="bg-muted p-3 rounded-md overflow-x-auto mb-2">
+                    {children}
+                  </pre>
+                ),
+                table: ({ children }) => (
+                  <div className="overflow-x-auto mb-2">
+                    <table className="min-w-full border border-border">
+                      {children}
+                    </table>
+                  </div>
+                ),
+                th: ({ children }) => (
+                  <th className="border border-border px-3 py-2 text-left font-medium bg-muted">
+                    {children}
+                  </th>
+                ),
+                td: ({ children }) => (
+                  <td className="border border-border px-3 py-2">
+                    {children}
+                  </td>
+                ),
+                a: ({ children, href }) => (
+                  <a href={href} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
+                    {children}
+                  </a>
+                ),
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+                hr: () => <hr className="border-border my-4" />,
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
           </div>
           
           {/* File references */}
@@ -832,22 +919,50 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
       
       githubAPI.getBranchesWithTrees(repository.owner.login, repository.name)
         .then(data => {
+          console.log('Fetched repository data:', data);
           setSelectedBranches(data.branches.map((b: { name: string }) => b.name));
           
           Object.entries(data.treesByBranch).forEach(([branchName, branchData]) => {
             const typedBranchData = branchData as { tree?: Array<{ path: string; type: string; size?: number }>; error?: string };
             if (typedBranchData.tree && !typedBranchData.error) {
-              setFileStructure(branchName, convertTreeToFileStructure(typedBranchData.tree));
+              const fileStructure = convertTreeToFileStructure(typedBranchData.tree);
+              console.log(`Setting file structure for branch ${branchName}:`, fileStructure);
+              
+              // Set in both places to ensure compatibility
+              setFileStructure(branchName, fileStructure);
+              setBranchFileStructures(prev => ({
+                ...prev,
+                [branchName]: fileStructure
+              }));
             }
           });
         })
         .catch(err => {
           console.error('Failed to fetch branches with trees:', err);
           setError('sessions', undefined, 'Failed to load repository structure');
-          // Fallback to just fetching branches
+          
+          // Fallback: fetch branches first, then individual trees
           githubAPI.getRepositoryBranches(repository.owner.login, repository.name)
             .then(branches => {
+              console.log('Fetched branches (fallback):', branches);
               setSelectedBranches(branches.map((b: { name: string }) => b.name));
+              
+              // Fetch tree for each branch individually
+              branches.forEach(async (branch: { name: string }) => {
+                try {
+                  const tree = await githubAPI.getRepositoryTree(repository.owner.login, repository.name, branch.name);
+                  console.log(`Fetched tree for branch ${branch.name}:`, tree);
+                  
+                  const fileStructure = convertTreeToFileStructure(tree);
+                  setFileStructure(branch.name, fileStructure);
+                  setBranchFileStructures(prev => ({
+                    ...prev,
+                    [branch.name]: fileStructure
+                  }));
+                } catch (treeErr) {
+                  console.error(`Failed to fetch tree for branch ${branch.name}:`, treeErr);
+                }
+              });
             })
             .catch(branchErr => {
               console.error('Failed to fetch branches (fallback):', branchErr);
@@ -858,6 +973,45 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
     }
   }, [repository, token, setLoadingState, setFileStructure, setError]);
   
+  // Get filtered file structure for a branch
+  const getFilteredStructure = (branch: string): FileSystemItem[] => {
+    // Try to get structure from local state first, then from context
+    const structure = branchFileStructures[branch] || state.fileStructures[branch] || [];
+    
+    console.log(`Getting filtered structure for branch ${branch}:`, structure);
+    
+    if (!searchQuery.trim() && !showOnlySelected) {
+      return structure;
+    }
+    
+    const filterItems = (items: FileSystemItem[]): FileSystemItem[] => {
+      return items.filter(item => {
+        const matchesSearch = !searchQuery.trim() || 
+          item.name.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        const matchesSelection = !showOnlySelected || 
+          (item.type === 'file' && selectedFiles.some(f => 
+            f.branch === branch && f.path === item.path
+          )) ||
+          (item.type === 'folder' && item.children && 
+           item.children.some(child => 
+             selectedFiles.some(f => f.branch === branch && f.path === child.path)
+           ));
+        
+        if (item.type === 'folder' && item.children) {
+          const filteredChildren = filterItems(item.children);
+          if (filteredChildren.length > 0) {
+            return { ...item, children: filteredChildren };
+          }
+        }
+        
+        return matchesSearch && matchesSelection;
+      });
+    };
+    
+    return filterItems(structure);
+  };
+
   // Helper function to convert GitHub tree to file structure
   const convertTreeToFileStructure = (treeData: Array<{ path: string; type: string; size?: number }>): FileSystemItem[] => {
     const structure: FileSystemItem[] = [];
@@ -916,11 +1070,45 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   
 
   
-  // File selection handlers
+  // Folder expansion handler
+  const handleFolderToggle = useCallback((item: FileSystemItem, path: string[]) => {
+    if (item.type !== 'folder') return;
+    
+    const branch = selectedBranches[0] || 'main';
+    const currentStructure = branchFileStructures[branch] || [];
+    
+    // Update the structure to toggle the folder's expanded state
+    const updateStructure = (items: FileSystemItem[], currentPath: string[], index: number): FileSystemItem[] => {
+      return items.map(currentItem => {
+        if (currentItem.name === currentPath[index]) {
+          if (index === currentPath.length - 1) {
+            // This is the target item
+            return { ...currentItem, expanded: !currentItem.expanded };
+          } else if (currentItem.children) {
+            // Keep traversing the path
+            return {
+              ...currentItem,
+              children: updateStructure(currentItem.children, currentPath, index + 1)
+            };
+          }
+        }
+        return currentItem;
+      });
+    };
+    
+    const newStructure = updateStructure(currentStructure, path, 0);
+    setBranchFileStructures(prev => ({
+      ...prev,
+      [branch]: newStructure
+    }));
+  }, [selectedBranches, branchFileStructures]);
+
+  // File and folder selection handler
   const handleFileSelect = useCallback(async (item: FileSystemItem, path: string[]) => {
+    const branch = selectedBranches[0] || 'main';
+    
     if (item.type === 'file') {
       const filePath = path.join('/');
-      const branch = selectedBranches[0] || 'main';
       
       // Check if file is already selected
       const isSelected = selectedFiles.some(f => f.branch === branch && f.path === filePath);
@@ -946,8 +1134,124 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
           setSelectedFiles(errorFiles);
         }
       }
+    } else if (item.type === 'folder') {
+      // Handle folder selection - select all files in the folder recursively
+      const selectFilesInFolder = (folderItem: FileSystemItem, folderPath: string[]): string[] => {
+        const filePaths: string[] = [];
+        
+        if (folderItem.children) {
+          folderItem.children.forEach(child => {
+            const childPath = [...folderPath, child.name];
+            if (child.type === 'file') {
+              filePaths.push(childPath.join('/'));
+            } else if (child.type === 'folder') {
+              filePaths.push(...selectFilesInFolder(child, childPath));
+            }
+          });
+        }
+        
+        return filePaths;
+      };
+      
+      const filePaths = selectFilesInFolder(item, path);
+      
+      // Add all files in the folder to selected files
+      for (const filePath of filePaths) {
+        const isAlreadySelected = selectedFiles.some(f => f.branch === branch && f.path === filePath);
+        if (!isAlreadySelected) {
+          addSelectedFile({ branch, path: filePath, content: 'Loading...' });
+          try {
+            await fetchFileContent(branch, filePath);
+          } catch (error) {
+            console.error(`Failed to fetch content for ${filePath}:`, error);
+          }
+        }
+      }
     }
   }, [selectedBranches, selectedFiles, removeSelectedFile, addSelectedFile, fetchFileContent, setSelectedFiles]);
+
+  // Utility function to expand all folders
+  const expandAllFolders = useCallback((branch: string) => {
+    const currentStructure = branchFileStructures[branch] || [];
+    
+    const expandItems = (items: FileSystemItem[]): FileSystemItem[] => {
+      return items.map(item => {
+        if (item.type === 'folder' && item.children) {
+          return {
+            ...item,
+            expanded: true,
+            children: expandItems(item.children)
+          };
+        }
+        return item;
+      });
+    };
+    
+    const newStructure = expandItems(currentStructure);
+    setBranchFileStructures(prev => ({
+      ...prev,
+      [branch]: newStructure
+    }));
+  }, [branchFileStructures]);
+
+  // Utility function to collapse all folders
+  const collapseAllFolders = useCallback((branch: string) => {
+    const currentStructure = branchFileStructures[branch] || [];
+    
+    const collapseItems = (items: FileSystemItem[]): FileSystemItem[] => {
+      return items.map(item => {
+        if (item.type === 'folder' && item.children) {
+          return {
+            ...item,
+            expanded: false,
+            children: collapseItems(item.children)
+          };
+        }
+        return item;
+      });
+    };
+    
+    const newStructure = collapseItems(currentStructure);
+    setBranchFileStructures(prev => ({
+      ...prev,
+      [branch]: newStructure
+    }));
+  }, [branchFileStructures]);
+
+  // Utility function to select all files in a branch
+  const selectAllFiles = useCallback(async (branch: string) => {
+    const currentStructure = branchFileStructures[branch] || [];
+    
+    const getAllFilePaths = (items: FileSystemItem[], currentPath: string[] = []): string[] => {
+      const filePaths: string[] = [];
+      
+      items.forEach(item => {
+        const itemPath = [...currentPath, item.name];
+        if (item.type === 'file') {
+          filePaths.push(itemPath.join('/'));
+        } else if (item.type === 'folder' && item.children) {
+          filePaths.push(...getAllFilePaths(item.children, itemPath));
+        }
+      });
+      
+      return filePaths;
+    };
+    
+    const allFilePaths = getAllFilePaths(currentStructure);
+    
+    // Add all files to selected files
+    for (const filePath of allFilePaths) {
+      const isAlreadySelected = selectedFiles.some(f => f.branch === branch && f.path === filePath);
+      if (!isAlreadySelected) {
+        addSelectedFile({ branch, path: filePath, content: 'Loading...' });
+        try {
+          await fetchFileContent(branch, filePath);
+        } catch (error) {
+          console.error(`Failed to fetch content for ${filePath}:`, error);
+        }
+      }
+    }
+  }, [branchFileStructures, selectedFiles, addSelectedFile, fetchFileContent]);
   
   // Chat handlers
   const handleSendMessage = async () => {
@@ -1063,10 +1367,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
     }
   };
   
-  // File management handlers
-  const selectAllFiles = () => {
-    // Implementation for selecting all files
-  };
+
   
   const clearAllSelections = () => {
     setSelectedFiles([]);
@@ -1076,36 +1377,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
     // Implementation for selecting files by type
   };
   
-  // Filter files based on search and selection
-  const getFilteredStructure = (branch: string) => {
-    const structure = state.fileStructures[branch] || [];
-    
-    if (!searchQuery.trim() && !showOnlySelected) {
-      return structure;
-    }
-    
-    const filterStructure = (items: FileSystemItem[], query: string, showSelected: boolean): FileSystemItem[] => {
-      return items.filter(item => {
-        const matchesQuery = !query || item.name.toLowerCase().includes(query.toLowerCase());
-        const matchesSelected = !showSelected || item.selected;
-        
-        if (item.children) {
-          const filteredChildren = filterStructure(item.children, query, showSelected);
-          if (filteredChildren.length > 0) {
-            return {
-              ...item,
-              expanded: true,
-              children: filteredChildren
-            };
-          }
-        }
-        
-        return matchesQuery && matchesSelected;
-      });
-    };
-    
-    return filterStructure(structure, searchQuery, showOnlySelected);
-  };
+
   
   return (
     <div className="w-full h-screen flex bg-background">
@@ -1438,7 +1710,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
             <div className="flex flex-wrap gap-1">
               <button 
                 className="px-1.5 py-0.5 text-xs rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                onClick={selectAllFiles}
+                onClick={() => selectedBranches.forEach(branch => selectAllFiles(branch))}
               >
                 Select All
               </button>
@@ -1448,6 +1720,53 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
                 disabled={selectedFiles.length === 0}
               >
                 Clear
+              </button>
+              <button 
+                className="px-1.5 py-0.5 text-xs rounded bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors"
+                onClick={() => selectedBranches.forEach(branch => expandAllFolders(branch))}
+              >
+                Expand All
+              </button>
+              <button 
+                className="px-1.5 py-0.5 text-xs rounded bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 transition-colors"
+                onClick={() => selectedBranches.forEach(branch => collapseAllFolders(branch))}
+              >
+                Collapse All
+              </button>
+              <button 
+                className="px-1.5 py-0.5 text-xs rounded bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors"
+                onClick={() => {
+                  if (repository?.owner?.login && repository?.name) {
+                    setLoadingState('sessions', undefined, true);
+                    githubAPI.getBranchesWithTrees(repository.owner.login, repository.name)
+                      .then(data => {
+                        console.log('Manual refresh - fetched repository data:', data);
+                        setSelectedBranches(data.branches.map((b: { name: string }) => b.name));
+                        
+                        Object.entries(data.treesByBranch).forEach(([branchName, branchData]) => {
+                          const typedBranchData = branchData as { tree?: Array<{ path: string; type: string; size?: number }>; error?: string };
+                          if (typedBranchData.tree && !typedBranchData.error) {
+                            const fileStructure = convertTreeToFileStructure(typedBranchData.tree);
+                            console.log(`Manual refresh - setting file structure for branch ${branchName}:`, fileStructure);
+                            
+                            setFileStructure(branchName, fileStructure);
+                            setBranchFileStructures(prev => ({
+                              ...prev,
+                              [branchName]: fileStructure
+                            }));
+                          }
+                        });
+                      })
+                      .catch(err => {
+                        console.error('Manual refresh failed:', err);
+                        setError('sessions', undefined, 'Failed to refresh repository');
+                      })
+                      .finally(() => setLoadingState('sessions', undefined, false));
+                  }
+                }}
+                disabled={state.loadingStates.sessions}
+              >
+                {state.loadingStates.sessions ? 'Loading...' : 'Refresh'}
               </button>
             </div>
             
@@ -1482,42 +1801,55 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
             
             {/* File tree */}
             <div className="border border-border rounded-lg flex-1 overflow-y-auto bg-card/30 min-h-0">
-              {selectedBranches.map(branch => (
-                <div key={branch} className="p-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <GitBranch size={12} className="text-primary" />
-                    <span className="text-xs font-medium capitalize">{branch}</span>
-                  </div>
-                  
-                  {state.loadingStates.sessions ? (
-                    <div className="p-2 text-center text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin mx-auto mb-1" />
-                      <p className="text-xs">Loading files...</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-0.5">
-                      {getFilteredStructure(branch).map((item, index) => {
-                        const contentKey = getFileCacheKey(branch, item.path || '');
-                        const cachedContent = getCachedFileContent(contentKey);
-                        return (
-                          <FileSystemNode
-                            key={`${item.name}-${index}`}
-                            item={item}
-                            level={0}
-                            onToggle={() => {}} // Implement folder toggle
-                            onSelect={handleFileSelect}
-                            path={[item.name]}
-                            branch={branch}
-                            onFileSelect={fetchFileContent}
-                            fileContent={cachedContent?.content || ''}
-                            isLoadingContent={state.loadingStates.files[contentKey] || false}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
+              {selectedBranches.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  <p className="text-xs mb-2">No branches loaded</p>
+                  <p className="text-xs">Repository: {repository?.owner?.login}/{repository?.name || 'Unknown'}</p>
+                  <p className="text-xs">Token: {token ? 'Available' : 'Missing'}</p>
                 </div>
-              ))}
+              ) : (
+                selectedBranches.map(branch => (
+                  <div key={branch} className="p-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <GitBranch size={12} className="text-primary" />
+                      <span className="text-xs font-medium capitalize">{branch}</span>
+                    </div>
+                    
+                    {state.loadingStates.sessions ? (
+                      <div className="p-2 text-center text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin mx-auto mb-1" />
+                        <p className="text-xs">Loading files...</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {(() => {
+                          const structure = getFilteredStructure(branch);
+                          console.log(`Rendering structure for branch ${branch}:`, structure);
+                          return structure.map((item, index) => {
+                            const contentKey = getFileCacheKey(branch, item.path || '');
+                            const cachedContent = getCachedFileContent(contentKey);
+                            return (
+                              <FileSystemNode
+                                key={`${item.name}-${index}`}
+                                item={item}
+                                level={0}
+                                onToggle={handleFolderToggle}
+                                onSelect={handleFileSelect}
+                                path={[item.name]}
+                                branch={branch}
+                                onFileSelect={fetchFileContent}
+                                fileContent={cachedContent?.content || ''}
+                                isLoadingContent={state.loadingStates.files[contentKey] || false}
+                                selectedFiles={selectedFiles}
+                              />
+                            );
+                          });
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
