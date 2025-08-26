@@ -114,19 +114,19 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here â€
 > Backend Configuration
 
 ```bash
-cp beetle_backend/env.example beetle_backend/.env
+cp beetle_backend/.env.example beetle_backend/.env
 ```
 
 > Python Backend Configuration
 
 ```bash
-cp python_backend/env.example python_backend/.env
+cp python_backend/.env.example python_backend/.env
 ```
 
 > Frontend Configuration
 
 ```bash
-cp beetle_frontend/env.example beetle_frontend/.env
+cp beetle_frontend/.env.example beetle_frontend/.env
 ```
 
 > **Note**: Replace all placeholder values (starting with `your_`) with your actual configuration values.
