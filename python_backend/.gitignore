@@ -35,7 +35,9 @@
 # All .env environment variable files
 .env
 .env.*
-!.env.example   # Keep example env files as templates
+
+# Keep .env.example files for documentation
+!.env.example
 
 # dotenv-debug log (from dotenv-debug)
 /.env.debug

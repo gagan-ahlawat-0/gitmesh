@@ -117,6 +117,12 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here â€
 cp beetle_backend/env.example beetle_backend/.env
 ```
 
+> Python Backend Configuration
+
+```bash
+cp python_backend/env.example python_backend/.env
+```
+
 > Frontend Configuration
 
 ```bash
@@ -161,8 +167,7 @@ cp beetle_frontend/env.example beetle_frontend/.env
    cd beetle_backend
    source venv/bin/activate  # On Linux/Mac
    .\venv\Scripts\activate # On Windows
-   cd src/ai
-   uvicorn fastapi_server:app --host 0.0.0.0 --port 8000 --reload
+   uvicorn app:app --host 0.0.0.0 --port 8000 --reload
    ```
 
 2. **Start JavaScript Backend** (in second terminal)
