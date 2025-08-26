@@ -87,9 +87,12 @@ web_modules/
 .env.production.local
 .env.local
 
+# Keep .env.example files for documentation
+!.env.example
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
-.parcel-cache
+.parcel-cache 
 
 # Next.js build output
 .next
