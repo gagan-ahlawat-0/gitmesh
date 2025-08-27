@@ -30,6 +30,8 @@ Our friendly mascot here represents the core philosophy of GitMesh: small, effic
 
 Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here — ready to revolutionize the open source world like never before.
 
+[Waitlist website](gitmesh.vercel.app)
+
 ---
 
 # ⚡ Key Features
@@ -105,7 +107,7 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here �
 ### Prerequisites
 
 - Node.js v18+ and npm/yarn
-- Python 3.11+
+- Python 3.12
 - Qdrant database (cloud or local)
 - Git
 
@@ -141,7 +143,7 @@ cp beetle_frontend/.env.example beetle_frontend/.env
 
 2. **Setup Python Backend**
    ```bash
-   cd beetle_backend
+   cd python_backend
    python -m venv venv
    source venv/bin/activate  # On Linux/Mac
    .\venv\Scripts\activate # On Windows
@@ -160,11 +162,16 @@ cp beetle_frontend/.env.example beetle_frontend/.env
    npm install
    ```
 
+5. **Setup Qdrant**
+   ```bash
+   docker run -p 6333:6333 -p 6334:6334 -v $(pwd)/qdrant_storage:/qdrant/storage:z qdrant/qdrant
+   ```
+
 ### Running the Application
 
 1. **Start Python Backend** (in first terminal)
    ```bash
-   cd beetle_backend
+   cd python_backend
    source venv/bin/activate  # On Linux/Mac
    .\venv\Scripts\activate # On Windows
    uvicorn app:app --host 0.0.0.0 --port 8000 --reload
@@ -176,6 +183,12 @@ cp beetle_frontend/.env.example beetle_frontend/.env
    ./setup.bat # On windows
    ./setup.sh # On linux
    ./setup.js # On Mac
+   ```
+   or
+
+      ```bash
+   cd beetle_backend
+   npm run dev
    ```
 
 3. **Start Frontend** (in third terminal)
@@ -200,10 +213,10 @@ cp beetle_frontend/.env.example beetle_frontend/.env
 - ✅ ~~UI Designed~~
 - ✅ ~~Static Demo Implemented~~
 - ✅ ~~Backend with Github Integrated~~
-- ⏳ AI RAG integration
+- ✅ ~~AI RAG integration~~
 - ⏳ Security Enhancement & Rate Limit Optimization
 
-[📋 **View Full Roadmap**](https://beetle-github.vercel.app/)
+[📋 **View Full Roadmap**](https://git-mesh.vercel.app/)
 
 ---
 
