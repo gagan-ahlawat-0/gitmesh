@@ -31,8 +31,42 @@ class Settings(BaseSettings):
     qdrant_api_key: Optional[str] = Field(default=None, env="QDRANT_API_KEY")
     redis_url: str = Field(default="redis://localhost:6379", env="REDIS_URL")
     
+    # Database Configuration
+    database_provider: str = Field(default="sqlite", env="DATABASE_PROVIDER")
+    database_url: Optional[str] = Field(default=None, env="DATABASE_URL")
+    
+    # PostgreSQL Settings
+    postgres_host: str = Field(default="localhost", env="POSTGRES_HOST")
+    postgres_port: int = Field(default=5432, env="POSTGRES_PORT")
+    postgres_db: str = Field(default="beetle_rag", env="POSTGRES_DB")
+    postgres_user: str = Field(default="beetle", env="POSTGRES_USER")
+    postgres_password: str = Field(default="beetlepass", env="POSTGRES_PASSWORD")
+    postgres_ssl: str = Field(default="prefer", env="POSTGRES_SSL")
+    
+    # Supabase Settings
+    supabase_url: Optional[str] = Field(default=None, env="SUPABASE_URL")
+    supabase_anon_key: Optional[str] = Field(default=None, env="SUPABASE_ANON_KEY")
+    supabase_service_role_key: Optional[str] = Field(default=None, env="SUPABASE_SERVICE_ROLE_KEY")
+    
+    # Database Pool Settings
+    db_pool_size: int = Field(default=10, env="DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=20, env="DB_MAX_OVERFLOW")
+    db_pool_timeout: int = Field(default=30, env="DB_POOL_TIMEOUT")
+    db_pool_recycle: int = Field(default=3600, env="DB_POOL_RECYCLE")
+    db_create_tables: bool = Field(default=True, env="DB_CREATE_TABLES")
+    
     # Security
     secret_key: str = Field(default="your-super-secret-key-change-in-production-minimum-32-chars", env="SECRET_KEY")
+    jwt_secret: str = Field(default="your-jwt-secret-key-change-in-production-minimum-32-chars", env="JWT_SECRET")
+    
+    # GitHub Integration
+    github_client_id: Optional[str] = Field(default=None, env="GITHUB_CLIENT_ID")
+    github_client_secret: Optional[str] = Field(default=None, env="GITHUB_CLIENT_SECRET")
+    github_callback_url: Optional[str] = Field(default=None, env="GITHUB_CALLBACK_URL")
+    github_webhook_secret: Optional[str] = Field(default=None, env="GITHUB_WEBHOOK_SECRET")
+    
+    # Allowed origins for CORS and security
+    allowed_origins: Optional[str] = Field(default=None, env="ALLOWED_ORIGINS")
     
     # Observability
     trace_file: str = Field(default="./traces.jsonl", env="TRACE_FILE")
@@ -256,6 +290,39 @@ class Settings(BaseSettings):
         return self.get_yaml_config("security.access_token_expire_minutes", 30)
     
     # ========================
+    # GITHUB INTEGRATION (Environment Variables)
+    # ========================
+    @property
+    def GITHUB_CLIENT_ID(self) -> Optional[str]:
+        return self.github_client_id
+    
+    @property
+    def GITHUB_CLIENT_SECRET(self) -> Optional[str]:
+        return self.github_client_secret
+    
+    @property
+    def GITHUB_CALLBACK_URL(self) -> Optional[str]:
+        return self.github_callback_url
+    
+    @property
+    def GITHUB_WEBHOOK_SECRET(self) -> Optional[str]:
+        return self.github_webhook_secret
+    
+    @property
+    def JWT_SECRET(self) -> str:
+        return self.jwt_secret
+    
+    @property
+    def ALLOWED_ORIGINS(self) -> List[str]:
+        if self.allowed_origins:
+            return [origin.strip() for origin in self.allowed_origins.split(',')]
+        return ["*"]
+    
+    @property
+    def ENVIRONMENT(self) -> str:
+        return self.environment
+    
+    # ========================
     # FEATURE FLAGS (from YAML)
     # ========================
     @property
@@ -343,6 +410,60 @@ class Settings(BaseSettings):
             return self.qdrant_api_key
         else:
             return None  # Local Qdrant doesn't need API key
+    
+    # ========================
+    # DATABASE CONFIGURATION HELPERS
+    # ========================
+    
+    @property
+    def is_supabase_configured(self) -> bool:
+        """Check if Supabase is configured."""
+        return bool(self.supabase_url and self.supabase_anon_key)
+    
+    @property
+    def is_postgresql_configured(self) -> bool:
+        """Check if PostgreSQL is configured."""
+        return bool(self.postgres_host and self.postgres_user and self.postgres_password)
+    
+    @property
+    def effective_database_provider(self) -> str:
+        """Get the effective database provider based on configuration."""
+        # Auto-detect based on available configuration
+        if self.database_url:
+            if 'supabase' in self.database_url or self.is_supabase_configured:
+                return "supabase"
+            elif 'postgresql' in self.database_url:
+                return "postgresql"
+            elif 'sqlite' in self.database_url:
+                return "sqlite"
+        
+        if self.is_supabase_configured:
+            return "supabase"
+        elif self.is_postgresql_configured:
+            return "postgresql"
+        else:
+            return "sqlite"  # Development fallback
+    
+    def get_database_connection_string(self) -> str:
+        """Get the database connection string."""
+        if self.database_url:
+            return self.database_url
+        
+        provider = self.effective_database_provider
+        
+        if provider == "supabase" and self.supabase_url:
+            # Extract PostgreSQL connection from Supabase URL
+            supabase_host = self.supabase_url.replace('https://', '').replace('http://', '')
+            return (f"postgresql://{self.postgres_user}:{self.postgres_password}@"
+                   f"db.{supabase_host}:5432/{self.postgres_db}?sslmode=require")
+        
+        elif provider == "postgresql":
+            return (f"postgresql://{self.postgres_user}:{self.postgres_password}@"
+                   f"{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+                   f"?sslmode={self.postgres_ssl}")
+        
+        else:  # sqlite
+            return "sqlite:///./beetle_dev.db"
     
     model_config = {
         "env_file": ".env",

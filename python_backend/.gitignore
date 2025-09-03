@@ -42,6 +42,8 @@
 # dotenv-debug log (from dotenv-debug)
 /.env.debug
 
+qdrant_storage/
+
 #######################################
 # 🐞 DEBUG LOGS & TEMP FILES
 #######################################

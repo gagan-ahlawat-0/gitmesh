@@ -132,6 +132,8 @@ dist
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 
+qdrant_storage/
+
 # yarn v2
 .yarn/cache
 .yarn/unplugged
@@ -165,7 +167,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
