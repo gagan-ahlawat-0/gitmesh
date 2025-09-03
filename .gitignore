@@ -183,6 +183,8 @@ MANIFEST
 *.manifest
 *.spec
 
+hey.ipynb
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -316,5 +318,7 @@ poetry.toml
 
 # LSP config files
 pyrightconfig.json
+
+
 
 # End of https://www.toptal.com/developers/gitignore/api/python,node
