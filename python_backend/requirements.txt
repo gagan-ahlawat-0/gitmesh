@@ -58,9 +58,17 @@ python-json-logger>=2.0.7
 # Authentication & Security
 python-multipart>=0.0.12
 python-jose[cryptography]>=3.3.0
+pyjwt>=2.8.0
 passlib[bcrypt]>=1.7.4
 cryptography>=43.0.0
 bcrypt>=4.2.0
+
+# WebSocket Support
+websockets>=12.0
+python-multipart>=0.0.12
+
+# File Upload Support
+aiofiles>=23.2.0
 
 # Utilities
 python-dotenv>=1.0.0
@@ -105,3 +113,22 @@ llama-cpp-python>=0.3.0
 ctransformers>=0.2.27
 
 unstructured[pdf]
+
+# ========================
+# DATABASE DEPENDENCIES
+# ========================
+
+# SQLAlchemy ORM
+sqlalchemy>=2.0.0
+sqlalchemy[asyncio]>=2.0.0
+
+# Database drivers
+asyncpg>=0.29.0  # PostgreSQL async driver
+psycopg2-binary>=2.9.7  # PostgreSQL sync driver
+aiosqlite>=0.19.0  # SQLite async driver
+
+# Supabase (optional)
+supabase>=2.0.0
+
+# Database utilities
+alembic>=1.12.0  # Database migrations
