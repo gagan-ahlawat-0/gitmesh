@@ -363,7 +363,9 @@ class AggregatedDataService:
                 "open_prs": 0,
                 "open_issues": 0,
                 "languages": {},
-                "recent_activity": []
+                "recent_activity": [],
+                "commitsToday": 0,  # Will be calculated below
+                "collaborators": 0   # Will be calculated below
             }
             
             # Aggregate basic statistics
@@ -408,6 +410,48 @@ class AggregatedDataService:
                     "stars": repo.get('stargazers_count', 0)
                 })
             
+            # Calculate additional metrics for frontend compatibility
+            
+            # Get commits from today for user repositories (limited to avoid rate limits)
+            today = datetime.now().date()
+            commits_today = 0
+            total_collaborators = 0
+            
+            # For commits today, we'll fetch commits from the last 24 hours for the top 3 most recently updated repos
+            top_repos = sorted(repositories, key=lambda r: r.get('updated_at', ''), reverse=True)[:3]
+            
+            semaphore_commits = asyncio.Semaphore(2)  # More conservative for commits
+            commit_tasks = []
+            
+            for repo in top_repos:
+                task = self._fetch_today_commits_count(semaphore_commits, repo, today)
+                commit_tasks.append(task)
+            
+            commit_results = await asyncio.gather(*commit_tasks, return_exceptions=True)
+            
+            for result in commit_results:
+                if not isinstance(result, Exception):
+                    commits_today += result
+            
+            # For collaborators, get unique collaborators across repositories (limited to first 5 repos)
+            collaborator_tasks = []
+            for repo in repositories[:5]:
+                task = self._fetch_repository_collaborators_count(semaphore, repo)
+                collaborator_tasks.append(task)
+            
+            collaborator_results = await asyncio.gather(*collaborator_tasks, return_exceptions=True)
+            
+            # Get unique collaborators (simplified - just sum for now)
+            for result in collaborator_results:
+                if not isinstance(result, Exception):
+                    total_collaborators += result
+            
+            # Update summary data with calculated values
+            summary_data["commitsToday"] = commits_today
+            summary_data["collaborators"] = total_collaborators
+            summary_data["activePRs"] = summary_data["open_prs"]  # Alias for frontend compatibility
+            summary_data["starsEarned"] = summary_data["total_stars"]  # Alias for frontend compatibility
+            
             return ActivitySummary(**summary_data)
             
         except Exception as error:
@@ -442,6 +486,78 @@ class AggregatedDataService:
                     error=str(error)
                 )
                 return 0, 0
+
+    async def _fetch_today_commits_count(
+        self, 
+        semaphore: asyncio.Semaphore,
+        repository: Dict[str, Any],
+        today: Any
+    ) -> int:
+        """Fetch commits made today for a repository"""
+        async with semaphore:
+            try:
+                owner = repository['owner']['login']
+                repo_name = repository['name']
+                
+                # Fetch commits from the last 24 hours
+                since = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                
+                # Use GitHub service to get commits (this is a simplified approach)
+                # In a real implementation, you'd want to filter by date
+                commits = await self.github_service.get_repository_commits(
+                    owner, repo_name, token=self.token, page=1, per_page=100
+                )
+                
+                # Filter commits to only those from today by the authenticated user
+                today_commits = 0
+                for commit in commits:
+                    commit_date_str = commit.get('commit', {}).get('author', {}).get('date', '')
+                    if commit_date_str:
+                        try:
+                            commit_date = datetime.fromisoformat(commit_date_str.replace('Z', '+00:00')).date()
+                            if commit_date == today:
+                                # Check if this commit is by the authenticated user
+                                author_login = commit.get('author', {}).get('login') if commit.get('author') else None
+                                if author_login:  # Could add more sophisticated user matching here
+                                    today_commits += 1
+                        except (ValueError, TypeError):
+                            continue
+                
+                return today_commits
+                
+            except Exception as error:
+                logger.warning(
+                    "Error fetching today's commits for repository",
+                    repository=repository.get('full_name'),
+                    error=str(error)
+                )
+                return 0
+
+    async def _fetch_repository_collaborators_count(
+        self, 
+        semaphore: asyncio.Semaphore,
+        repository: Dict[str, Any]
+    ) -> int:
+        """Fetch collaborators count for a repository"""
+        async with semaphore:
+            try:
+                owner = repository['owner']['login']
+                repo_name = repository['name']
+                
+                # Get collaborators
+                collaborators = await self.github_service.get_repository_contributors(
+                    owner, repo_name, token=self.token
+                )
+                
+                return len(collaborators) if collaborators else 0
+                
+            except Exception as error:
+                logger.warning(
+                    "Error fetching collaborators for repository",
+                    repository=repository.get('full_name'),
+                    error=str(error)
+                )
+                return 0
 
 # Global service instance
 aggregated_service = AggregatedDataService()

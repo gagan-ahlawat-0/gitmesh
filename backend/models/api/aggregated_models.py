@@ -80,6 +80,12 @@ class ActivitySummary(BaseModel):
     open_issues: int = Field(..., description="Total open issues")
     languages: Dict[str, int] = Field(..., description="Language distribution")
     recent_activity: List[Dict[str, Any]] = Field(..., description="Recent activity items")
+    
+    # Frontend-expected fields
+    commitsToday: int = Field(default=0, description="Number of commits made today")
+    activePRs: int = Field(..., description="Number of active pull requests")
+    starsEarned: int = Field(..., description="Total stars earned across repositories")
+    collaborators: int = Field(default=0, description="Total number of collaborators across repositories")
 
 # --- Query Parameters ---
 

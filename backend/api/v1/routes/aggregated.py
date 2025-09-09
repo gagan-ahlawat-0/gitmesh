@@ -10,7 +10,7 @@ from utils.aggregated_utils import (
 )
 from models.api.aggregated_models import (
     AggregatedPullRequestsResponse, AggregatedIssuesResponse, 
-    ActivitySummaryResponse
+    ActivitySummaryResponse, ActivitySummary
 )
 
 logger = structlog.get_logger(__name__)
@@ -128,7 +128,7 @@ async def get_aggregated_issues_route(
             }
         )
 
-@router.get("/summary", response_model=ActivitySummaryResponse)
+@router.get("/summary", response_model=ActivitySummary)
 async def get_activity_summary_route(
     limit: int = Query(
         default=10, 
@@ -156,7 +156,7 @@ async def get_activity_summary_route(
             limit
         )
         
-        return ActivitySummaryResponse(summary=summary)
+        return summary
         
     except Exception as error:
         logger.error(
