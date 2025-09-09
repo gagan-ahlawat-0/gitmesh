@@ -1,6 +1,9 @@
 <div align="center">
 
-![GitMesh Logo](beetle_frontend/public/GitMesh-logo.png)
+<picture>
+   <source srcset="public/logo/light_logo.png" media="(prefers-color-scheme: dark)">
+   <img src="public/logo/dark_logo.png" alt="GitMesh Logo" width="250">
+</picture>
 
 **The Next-Generation Git Collaboration Platform**
 
@@ -14,15 +17,13 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/LF-Decentralized-Trust-Mentorships/gitmesh/badge)](https://scorecard.dev/viewer/?uri=github.com/LF-Decentralized-Trust-Mentorships/gitmesh)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Ffossas%2Ffossa-cli.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Ffossas%2Ffossa-cli?ref=badge_shield)
 
-[🚀 **Try Demo**](https://beetle-demo.vercel.app/) • [📖 **Documentation**](https://github.comLF-Decentralized-Trust-Mentorships/gitmesh/README.md) • [💬 **Join Community**](https://discord.gg/FkrWfGtZn3)
+[**Documentation**](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/README.md) • [**Join Community**](https://discord.gg/FkrWfGtZn3)
 
 </div>
 
 ---
 
-## 🌟 What is GitMesh?
-
-<img src="beetle_frontend/public/mascott/mascott_4.png" width="200" height="200" align="right" alt="GitMesh Mascot">
+## </> What is GitMesh?
 
 **GitMesh** revolutionizes Git-based collaboration by introducing **Branch-Level Intelligence** — a paradigm shift that transforms how teams plan, develop, and contribute to open-source projects. Unlike traditional project management tools, GitMesh understands your codebase at the branch level, providing contextual AI assistance, intelligent contribution tracking, and seamless workflow orchestration.
 
@@ -34,50 +35,50 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here �
 
 ---
 
-# ⚡ Key Features
+## </> Key Features
 
 <div align="center">
 
-### 🧠 **AI-Powered Intelligence**
+### 👾 **AI-Powered Intelligence**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ✨ Contextual Code Assistant                               │
-│  📝 Smart PR Summaries                                      │
-│  🎯 Intelligent Issue Triage                                │
-│  👀 Code Review Assistance                                  │
-│  💡 Suggestions on which issues to work                     │
-│  🎪 Which project best to contribute to and all             │
+│     Contextual Code Assistant                               │
+│     Smart PR Summaries                                      │
+│     Intelligent Issue Triage                                │
+│     Code Review Assistance                                  │
+│     Suggestions on which issues to work                     │
+│     Which project best to contribute to and all             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 🔄 **Easy Workflow Management**
+### 👾 **Easy Workflow Management**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  🌿 Branch-Specific Planning                                │
-│  🤝 Help opensource contributors know what's important      │
-│  🔄 Automated Status Tracking                               │
-│  📋 Custom Workflow Templates                               │
+│     Branch-Specific Planning                                │
+│     Help opensource contributors know what's important      │
+│     Automated Status Tracking                               │
+│     Custom Workflow Templates                               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 📊 **Analytics & Insights**
+### 👾 **Analytics & Insights**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  🔥 Contribution Heatmaps                                   │
-│  ⚡ Velocity Tracking                                        │
-│  👥 See who's working on which issue/PR                     │
-│  📈 Team Performance Dashboards                             │
-│  🎯 Showcase skills & avoid conflicts                       │
+│     Contribution Heatmaps                                   │
+│     Velocity Tracking                                       │
+│     See who's working on which issue/PR                     │
+│     Team Performance Dashboards                             │
+│     Showcase skills & avoid conflicts                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 🌐 **Enterprise Integration**
+### 👾 **Enterprise Integration**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  🔗 Multi-Platform Support (GitHub, GitLab, Bitbucket)      │
-│  🔐 SSO Authentication                                      │
-│  🤖 Multi Agent FAQ agent integrated                        │
-│  ⚡ Webhook Automation                                       │
+│     Multi-Platform Support (GitHub, GitLab, Bitbucket)      │
+│     SSO Authentication                                      │
+│     Multi Agent FAQ agent integrated                        │
+│     Webhook Automation                                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,9 +88,9 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here �
 
 <div align="center">
 
-## 🚀 **Why Choose Our Platform?**
+## </> **Why Choose Our Platform?**
 
-| 🎯 **Smart** | 🚀 **Fast** | 🤝 **Collaborative** | 🔒 **Secure** |
+| **Smart** | **Fast** | **Collaborative** | **Secure** |
 |:---:|:---:|:---:|:---:|
 | AI-driven insights | Lightning fast responses | Team-first approach | Enterprise-grade security |
 | Contextual recommendations | Real-time updates | Conflict-free workflows | SSO & compliance ready |
@@ -98,141 +99,118 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here �
 
 ---
 
-## 🚀 Quick Start
+## </> Quick Start
 
 <div align="center">
-<img src="beetle_frontend/public/mascott/mascott_2.png" width="200" height="200" alt="Docker GitMesh">
+<picture>
+   <source srcset="public/mascott/meshy.png" media="(prefers-color-scheme: dark)">
+   <img src="public/mascott/mesh.png" alt="GitMesh Logo" width="250">
+</picture>
 </div>
 
-### Prerequisites
+### 👾 Prerequisites
 
-- Node.js v18+ and npm/yarn
+- Node.js v18+ and npm
 - Python 3.12
 - Qdrant database (cloud or local)
 - Git
 
-### Environment Variables
-
-> Backend Configuration
-
-```bash
-cp beetle_backend/.env.example beetle_backend/.env
-```
-
-> Python Backend Configuration
-
-```bash
-cp python_backend/.env.example python_backend/.env
-```
-
-> Frontend Configuration
-
-```bash
-cp beetle_frontend/.env.example beetle_frontend/.env
-```
-
-> **Note**: Replace all placeholder values (starting with `your_`) with your actual configuration values.
-
-### Installation
-
-1. **Clone the repository**
+### 👾 Clone the repository
    ```bash
    git clone https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh
    cd gitmesh
    ```
 
-2. **Setup Python Backend**
+
+### 👾 Environment Variables
+
+> Python Backend Configuration
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+> Frontend Configuration
+
+```bash
+cp ui/.env.example ui/.env
+```
+
+> **Note**: Replace all placeholder values [REDACTED] with your actual configuration values.
+
+### 👾 Installation
+
+1. **Setup Python Backend**
    ```bash
-   cd python_backend
+   cd backend
    python -m venv venv
    source venv/bin/activate  # On Linux/Mac
    .\venv\Scripts\activate # On Windows
    pip install -r requirements.txt
    ```
 
-3. **Setup JavaScript Backend**
+2. **Setup Frontend**
    ```bash
-   cd beetle_backend
+   cd ui
    npm install
    ```
 
-4. **Setup Frontend**
-   ```bash
-   cd beetle_frontend
-   npm install
-   ```
-
-5. **Setup Qdrant**
+3. **Setup Qdrant**
    ```bash
    docker run -p 6333:6333 -p 6334:6334 -v $(pwd)/qdrant_storage:/qdrant/storage:z qdrant/qdrant
    ```
 
-### Running the Application
+### 👾 Running the Application
 
 1. **Start Python Backend** (in first terminal)
    ```bash
-   cd python_backend
+   cd backend
    source venv/bin/activate  # On Linux/Mac
    .\venv\Scripts\activate # On Windows
    uvicorn app:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-2. **Start JavaScript Backend** (in second terminal)
+2. **Start Frontend** (in third terminal)
    ```bash
-   cd beetle_backend
-   ./setup.bat # On windows
-   ./setup.sh # On linux
-   ./setup.js # On Mac
-   ```
-   or
-
-      ```bash
-   cd beetle_backend
+   cd ui
    npm run dev
    ```
 
-3. **Start Frontend** (in third terminal)
-   ```bash
-   cd beetle_frontend
-   npm run dev
-   ```
-
-4. **Access the Application**
+3. **Access the Application**
    - Frontend: http://localhost:3000
   
-### Static Demo
+### 👾 Static Demo
 
 [Deployed on Vercel](https://beetle-demo.vercel.app/)
 
-## 🛣️ Roadmap
+## </> Roadmap
 
-<img src="beetle_frontend/public/mascott/mascott_1.png" width="200" height="200" align="right" alt="Roadmap GitMesh">
-
-### 🚀 **Q3 2025 - Intelligence Enhancement**
-- ✅ ~~Structure Idea~~
-- ✅ ~~UI Designed~~
-- ✅ ~~Static Demo Implemented~~
-- ✅ ~~Backend with Github Integrated~~
-- ✅ ~~AI RAG integration~~
-- ⏳ Security Enhancement & Rate Limit Optimization
-
-[📋 **View Full Roadmap**](https://git-mesh.vercel.app/)
+### 👾 **Q4 2025 - Production Goals**
+- ✅ ~~Implement Retrieval-Augmented Generation (RAG)~~
+- ✅ ~~Refactor and rebase codebase with proper routing architecture~~
+- ⏳ Enhance user interface (UI) for improved usability and aesthetics
+- ⏳ Integrate AIFAQ LFDT module
+- ⏳ Implement efficient indexing for the RAG codebase
+- ⏳ Shift complete database to cloud
+- ⏳ Develop AI-powered suggestion and recommendation system
+- ⏳ Strengthen security and optimize rate-limiting mechanisms
+- ⏳ Containerize the application using Docker
+- ⏳ Deploy the complete website to production environment
+- ⏳ Set up and publish project documentation site
 
 ---
 
-## 🤝 Contributing
-
-<img src="beetle_frontend/public/mascott/mascott_3.png" width="200" height="200" align="right" alt="Contributing GitMesh">
+## </> Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-### Quick Contributing Steps:
+### 👾 Quick Contributing Steps:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
 
-Our mascot is excited to see what amazing contributions you'll bring to the GitMesh community!
+Mesh & Meshy are excited to see what amazing contributions you'll bring to the GitMesh community!
 
 ---
 
@@ -245,47 +223,47 @@ Our Awesome Contributors
 
 ---
 
-## 🌍 Community & Support
+## </> Community & Support
 
 <div align="center">
 
 [![Join Discord](https://img.shields.io/badge/Join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/FkrWfGtZn3)
 
-### 📞 **Support Channels**
+### 👾 **Support Channels**
 
 | Channel                                                         | Typical Response Time | Best For                                             |
 | --------------------------------------------------------------- | --------------------- | ---------------------------------------------------- |
-| 🎮 [Discord](https://discord.gg/FkrWfGtZn3)                     | Real-time             | Quick questions, community discussions               |
-| 📧 [Email Support](mailto:rawx18.dev@gmail.com)                 | 24–48 hours           | Technical issues, detailed bug reports               |
-| 🐦 [Twitter / X](https://x.com/RAWx18_dev)                      | Online                | Tagging the project, general updates, public reports |
-| 🐛 [GitHub Issues](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/issues) | 1–3 days              | Bug reports, feature requests, feedback              |
+| [Discord](https://discord.gg/FkrWfGtZn3)                     | Real-time             | Quick questions, community discussions               |
+| [Email Support](mailto:gitmesh.oss@gmail.com)                 | 24–48 hours           | Technical issues, detailed bug reports               |
+| [Twitter / X](https://x.com/gitmesh_oss)                      | Online                | Tagging the project, general updates, public reports |
+| [GitHub Issues](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/issues) | 1–3 days              | Bug reports, feature requests, feedback              |
 
 </div>
 
 ---
 
-## 📊 Project Statistics
+## </> Project Statistics
 
 <div align="center">
 
 | Metric | Value |
 |--------|-------|
-| 📝 **Total Commits** | ![Commits](https://img.shields.io/github/commit-activity/t/LF-Decentralized-Trust-Mentorships/gitmesh) |
-| 🔀 **Pull Requests** | ![PRs](https://img.shields.io/github/issues-pr/LF-Decentralized-Trust-Mentorships/gitmesh) |
-| 🐛 **Issues Resolved** | ![Issues](https://img.shields.io/github/issues-closed/LF-Decentralized-Trust-Mentorships/gitmesh) |
-| 📦 **Latest Release** | ![Release](https://img.shields.io/github/v/release/LF-Decentralized-Trust-Mentorships/gitmesh) |
+| **Total Commits** | ![Commits](https://img.shields.io/github/commit-activity/t/LF-Decentralized-Trust-Mentorships/gitmesh) |
+| **Pull Requests** | ![PRs](https://img.shields.io/github/issues-pr/LF-Decentralized-Trust-Mentorships/gitmesh) |
+| **Issues Resolved** | ![Issues](https://img.shields.io/github/issues-closed/LF-Decentralized-Trust-Mentorships/gitmesh) |
+| **Latest Release** | ![Release](https://img.shields.io/github/v/release/LF-Decentralized-Trust-Mentorships/gitmesh) |
 
 </div>
 
 ---
 
-## 📜 License
+## </> License
 
-This project is licensed under the Non-Commercial Use License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache-2.0 License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+## </> Acknowledgments
 
 - All our contributors and community members
 - Open source libraries that made this possible
@@ -293,7 +271,7 @@ This project is licensed under the Non-Commercial Use License - see the [LICENSE
 
 ---
 
-## 🌟 Star Graph: Project GitMesh
+## </> Star Graph: Project GitMesh
 
 <div align="center"> <img src="https://starchart.cc/LF-Decentralized-Trust-Mentorships/gitmesh.svg" alt="Star Graph for Project GitMesh" width="600"/> <br/> <sub>✨ GitHub star history of <strong><a href="https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh" target="_blank">LF-Decentralized-Trust-Mentorships/gitmesh</a></strong></sub> </div>
 

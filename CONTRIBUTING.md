@@ -60,7 +60,7 @@ Below is the GitMesh project workflow:
 
 1. **Locate the Fork Button**: In the top-right corner of the repository page, find and click the "Fork" button.
 
-<img src="images/fork_repo.png" alt="git status" width="800"/>
+<img src="public/fork_repo.png" alt="git status" width="800"/>
 
 
 2. **Configure Fork Settings**: 
@@ -74,7 +74,7 @@ Below is the GitMesh project workflow:
    https://github.com/YOUR_USERNAME/gitmesh
    ```
 
-<img src="images/fork_settings.png" alt="git status" width="800"/>
+<img src="public/fork_settings.png" alt="git status" width="800"/>
 
 
 #### Step 3: Clone the Repository Locally
@@ -98,7 +98,7 @@ Below is the GitMesh project workflow:
    
    Replace `YOUR_USERNAME` with your actual GitHub username.
 
-![clone repo](images/clone_repo.png)
+![clone repo](public/clone_repo.png)
 
 4. **Verify Cloning Success**:
    - You should see output indicating the repository was cloned successfully
@@ -111,7 +111,7 @@ Below is the GitMesh project workflow:
    cd gitmesh
    ```
 
-![change directory](images/cd.png)
+![change directory](public/cd.png)
 
 2. **Verify Repository Structure**:
    ```bash
@@ -142,7 +142,7 @@ Below is the GitMesh project workflow:
    git branch -a
    ```
 
-![list branches](images/list_branches.png)
+![list branches](public/list_branches.png)
 
 2. **Understanding Branch Structure**:
    - `main`: Production-ready code
@@ -190,7 +190,7 @@ Below is the GitMesh project workflow:
    git status
    ```
 
-![create branch](images/create_branch.png)
+![create branch](public/create_branch.png)
 
 #### Step 9: Make Your Changes
 
@@ -214,7 +214,7 @@ For development setup instructions, please refer to [Readme.md](README.md).
    - New files (red)
    - Files ready to commit (green)
 
-<img src="images/git_status.png" alt="git status" width="800"/>
+<img src="public/git_status.png" alt="git status" width="800"/>
 
 
 2. **Review Changes**:
@@ -236,7 +236,7 @@ For development setup instructions, please refer to [Readme.md](README.md).
    git add .
    ```
 
-![fit add](images/git_add.png)
+![fit add](public/git_add.png)
 
 2. **Verify Staged Changes**:
    ```bash
@@ -260,7 +260,7 @@ For development setup instructions, please refer to [Readme.md](README.md).
    **Important**: The `-s` flag is mandatory for Linux Foundation projects as it adds a "Signed-off-by" line.
 
 
-![commit](images/commit.png)
+![commit](public/commit.png)
 
 #### Step 13: Push to Your Fork
 
@@ -271,7 +271,7 @@ For development setup instructions, please refer to [Readme.md](README.md).
    
    The `-u` flag sets up tracking between your local and remote branch.
 
-<img src="images/push.png" alt="git status" width="800"/>
+<img src="public/push.png" alt="git status" width="800"/>
 
 
 2. **Verify Push Success**:
@@ -286,7 +286,7 @@ For development setup instructions, please refer to [Readme.md](README.md).
    - Go to your fork on GitHub: `https://github.com/YOUR_USERNAME/gitmesh`
    - GitHub should display a banner suggesting to create a pull request
 
-<img src="images/new_branch.png" alt="git status" width="800"/>
+<img src="public/new_branch.png" alt="git status" width="800"/>
 
 
 2. **Initiate Pull Request**:
@@ -298,7 +298,7 @@ For development setup instructions, please refer to [Readme.md](README.md).
    - Select your feature branch as the source
    - Select `lfdt-gitmesh/gitmesh:dev` as the destination
 
-<img src="images/pull_request.png" alt="git status" width="800"/>
+<img src="public/pull_request.png" alt="git status" width="800"/>
 
 
 3. **Configure Pull Request Details**:
