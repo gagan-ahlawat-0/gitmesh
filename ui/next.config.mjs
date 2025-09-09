@@ -15,6 +15,10 @@ const nextConfig = {
         source: '/api/github/:path*',
         destination: 'http://localhost:8000/api/github/:path*',
       },
+      {
+        source: '/api/v1/:path*',
+        destination: 'http://localhost:8000/api/v1/:path*',
+      },
     ]
   },
 }

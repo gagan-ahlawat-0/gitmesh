@@ -210,7 +210,7 @@ class GitHubAPI {
     }
   }
 
-  private async request(endpoint: string, options: RequestInit = {}) {
+  private async request(endpoint: string, options: RequestInit = {}, retries = 3, backoff = 1000) {
     console.log(`Making request to: ${API_BASE_URL}${endpoint}`);
     console.log('Token:', this.token);
     
@@ -254,6 +254,12 @@ class GitHubAPI {
       return data;
     } catch (error) {
       console.error('Request failed:', error);
+
+      if (retries > 0) {
+        console.log(`Retrying request... ${retries} attempts left.`);
+        await new Promise(resolve => setTimeout(resolve, backoff));
+        return this.request(endpoint, options, retries - 1, backoff * 2);
+      }
       
       // Provide more specific error information
       if (error instanceof TypeError && error.message.includes('fetch')) {

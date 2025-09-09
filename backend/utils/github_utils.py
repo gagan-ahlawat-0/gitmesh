@@ -457,14 +457,19 @@ class GitHubService:
     ) -> Dict[str, Any]:
         """Search organizations."""
         auth_token = token or self.get_token()
+        
+        # Add type:org qualifier to the query
+        qualified_query = f"{query} type:org"
+        
         params = {
-            'q': query,
+            'q': qualified_query,
             'sort': sort,
             'order': order,
             'page': page,
             'per_page': per_page
         }
-        return await self.client.get('/search/organizations', auth_token, params)
+        # Use the /search/users endpoint
+        return await self.client.get('/search/users', auth_token, params)
 
     # Trending Repositories
 

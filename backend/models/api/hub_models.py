@@ -22,3 +22,8 @@ class HubOverviewResponse(BaseModel):
     projects: List[Project]
     insights: List[Insight]
     analytics: Analytics
+
+class SearchResult(BaseModel):
+    repositories: List[Dict[str, Any]]
+    users: List[Dict[str, Any]]
+    organizations: List[Dict[str, Any]]

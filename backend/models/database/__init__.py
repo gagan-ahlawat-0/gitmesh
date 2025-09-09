@@ -23,6 +23,7 @@ __all__ = [
     "SessionMessageModel",
     "FileContextModel",
     "WebhookEventModel",
-    "WebhookSecurityLogModel"
+    "WebhookSecurityLogModel",
+    "SearchCache"
 ]
 

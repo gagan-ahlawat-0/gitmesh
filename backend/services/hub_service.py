@@ -3,6 +3,10 @@ from typing import Dict, Any, List
 from models.api.hub_models import HubOverviewResponse, Project, Insight, Analytics
 from utils.caching import cache
 from utils.github_utils import github_service
+from models.database.search_cache import SearchCache
+from config.database import get_db_session
+import asyncio
+from sqlalchemy import select
 
 class HubService:
     def __init__(self, user: Dict[str, Any]):

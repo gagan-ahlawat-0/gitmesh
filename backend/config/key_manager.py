@@ -41,8 +41,8 @@ class KeyManager:
 
     def get_github_token(self) -> str | None:
         # In a real application, this would fetch the key from a secure store
-        # For now, we'll use a hardcoded token
-        github_token = "ghp_H7gCgK9k7JqZ6X8wF4Y4q3E2bA1v0C3B9D1"
+        # For now, we'll use an environment variable
+        github_token = os.environ.get("GTM_GITHUB_TOKEN")
         if github_token:
             if "github_token" not in self.keys:
                 self.set_key("github_token", github_token)
