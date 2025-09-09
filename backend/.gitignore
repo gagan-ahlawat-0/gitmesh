@@ -35,6 +35,7 @@
 # All .env environment variable files
 .env
 .env.*
+master.key
 
 # Keep .env.example files for documentation
 !.env.example

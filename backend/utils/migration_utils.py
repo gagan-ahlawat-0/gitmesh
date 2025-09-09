@@ -374,13 +374,14 @@ if __name__ == "__main__":
     
     if len(sys.argv) > 1 and sys.argv[1] == "status":
         status = get_migration_status()
-        print(json.dumps(status, indent=2))
+        # print(json.dumps(status, indent=2))
     elif len(sys.argv) > 1 and sys.argv[1] == "migrate":
         backup_file = sys.argv[2] if len(sys.argv) > 2 else "migration_backup.json"
         results = asyncio.run(run_migration(backup_file))
-        print(json.dumps(results, indent=2))
+        # print(json.dumps(results, indent=2))
     else:
-        print("Usage:")
-        print("  python migration_utils.py status    - Check migration status")
-        print("  python migration_utils.py migrate [backup_file] - Run migration")
+        pass
+        # print("Usage:")
+        # print("  python migration_utils.py status    - Check migration status")
+        # print("  python migration_utils.py migrate [backup_file] - Run migration")
 

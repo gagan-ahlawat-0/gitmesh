@@ -113,7 +113,7 @@ async def github_oauth_callback(
         # Exchange code for token
         token_response = await github_oauth.exchange_code_for_token(code)
         access_token = token_response['access_token']
-        print(f"Access token from GitHub: {access_token}")
+        # print(f"Access token from GitHub: {access_token}")
         
         # Get user profile
         user_profile = await github_oauth.get_user_profile(access_token)

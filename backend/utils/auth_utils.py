@@ -94,9 +94,9 @@ class GitHubOAuth:
         self.client_id = os.getenv('GITHUB_CLIENT_ID')
         self.client_secret = os.getenv('GITHUB_CLIENT_SECRET')
         self.callback_url = os.getenv('GITHUB_CALLBACK_URL')
-        print('GITHUB_CLIENT_ID:', self.client_id)
-        print('GITHUB_CLIENT_SECRET:', self.client_secret)
-        print('GITHUB_CALLBACK_URL:', self.callback_url)
+        # print('GITHUB_CLIENT_ID:', self.client_id)
+        # print('GITHUB_CLIENT_SECRET:', self.client_secret)
+        # print('GITHUB_CALLBACK_URL:', self.callback_url)
         self.security_utils = SecurityUtils()
         
         if not all([self.client_id, self.client_secret, self.callback_url]):

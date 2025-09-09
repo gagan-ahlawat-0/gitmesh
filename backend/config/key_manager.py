@@ -59,12 +59,12 @@ if __name__ == "__main__":
     # The token is fetched from the environment variable and stored securely
     retrieved_token = key_manager.get_github_token()
     
-    print(f"Retrieved GitHub Token: {retrieved_token}")
+    # print(f"Retrieved GitHub Token: {retrieved_token}")
     
     # Verify that the key is stored in an encrypted format
-    if "github_token" in key_manager.keys:
-        print(f"Encrypted GitHub Token: {key_manager.keys['github_token']}")
+    # if "github_token" in key_manager.keys:
+    #     print(f"Encrypted GitHub Token: {key_manager.keys['github_token']}")
 
     # The token can be retrieved again without accessing the environment variable
     retrieved_token_again = key_manager.get_github_token()
-    print(f"Retrieved GitHub Token Again: {retrieved_token_again}")
+    # print(f"Retrieved GitHub Token Again: {retrieved_token_again}")

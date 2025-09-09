@@ -52,7 +52,7 @@ def get_github_token(user: Optional[User] = Depends(get_current_user)) -> str:
 
     try:
         token = security_utils.decrypt_token(user.access_token)
-        print(f"Decrypted token: {token}")
+        # print(f"Decrypted token: {token}")
         if not token:
             raise HTTPException(status_code=500, detail="Failed to decrypt token")
         return token
