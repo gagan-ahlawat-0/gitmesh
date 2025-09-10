@@ -60,7 +60,6 @@ class DatabaseSettings(BaseSettings):
     create_tables: bool = Field(default=True, env="DB_CREATE_TABLES")
     
     class Config:
-        env_prefix = "DB_"
         case_sensitive = False
     
     @validator('database_provider')
@@ -87,30 +86,37 @@ class DatabaseSettings(BaseSettings):
         return self.database_provider == DatabaseProvider.SQLITE
     
     def get_connection_string(self) -> str:
-        """Get the appropriate connection string."""
-        # If database_url is provided, use it directly
+        """Get connection string based on provider."""
+        
         if self.database_url:
             return self.database_url
+            
+        provider = DatabaseProvider(self.database_provider.lower())
         
-        # Auto-detect provider based on available settings
-        if self.is_supabase and self.supabase_url:
-            # Extract PostgreSQL connection from Supabase URL
-            supabase_host = self.supabase_url.replace('https://', '').replace('http://', '')
-            return (f"postgresql://{self.postgres_user}:{self.postgres_password}@"
-                   f"db.{supabase_host}:5432/{self.postgres_db}?sslmode=require")
-        
-        elif self.is_postgresql:
-            # Standard PostgreSQL connection
-            return (f"postgresql://{self.postgres_user}:{self.postgres_password}@"
-                   f"{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-                   f"?sslmode={self.postgres_ssl}")
-        
-        elif self.is_sqlite:
-            # SQLite for development
-            return f"sqlite:///{self.sqlite_path}"
-        
+        if provider == DatabaseProvider.SUPABASE or provider == DatabaseProvider.POSTGRESQL:
+            # URL encode the password to handle special characters like @
+            from urllib.parse import quote_plus
+            encoded_password = quote_plus(self.postgres_password)
+            
+            conn_str = (
+                f"postgresql://{self.postgres_user}:{encoded_password}@"
+                f"{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+                f"?sslmode={self.postgres_ssl}"
+            )
+            logger.info("Generated PostgreSQL connection string", 
+                       host=self.postgres_host, 
+                       user=self.postgres_user,
+                       db=self.postgres_db)
+            return conn_str
+            
+        elif provider == DatabaseProvider.SQLITE:
+            # Default SQLite for development
+            conn_str = f"sqlite:///./beetle_dev.db"
+            logger.info("Using SQLite database", path="./beetle_dev.db")
+            return conn_str
+            
         else:
-            raise ValueError("No valid database configuration found")
+            raise ValueError(f"Unsupported database provider: {provider}")
     
     def get_async_connection_string(self) -> str:
         """Get async connection string."""
@@ -118,10 +124,15 @@ class DatabaseSettings(BaseSettings):
         if conn_str.startswith('postgresql://'):
             # Replace sslmode with ssl parameter for asyncpg
             async_str = conn_str.replace('postgresql://', 'postgresql+asyncpg://')
+            # Replace sslmode parameter for asyncpg compatibility
             if '?sslmode=' in async_str:
                 async_str = async_str.replace('?sslmode=prefer', '?ssl=prefer')
-                async_str = async_str.replace('?sslmode=require', '?ssl=require')
+                async_str = async_str.replace('?sslmode=require', '?ssl=require') 
                 async_str = async_str.replace('?sslmode=disable', '?ssl=disable')
+            elif '&sslmode=' in async_str:
+                async_str = async_str.replace('&sslmode=prefer', '&ssl=prefer')
+                async_str = async_str.replace('&sslmode=require', '&ssl=require')
+                async_str = async_str.replace('&sslmode=disable', '&ssl=disable')
             return async_str
         elif conn_str.startswith('sqlite://'):
             return conn_str.replace('sqlite://', 'sqlite+aiosqlite://')

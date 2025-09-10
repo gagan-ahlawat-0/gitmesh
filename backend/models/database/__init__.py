@@ -8,6 +8,7 @@ from .user_models import UserModel, UserSessionModel, UserNoteModel, UserSavedFi
 from .project_models import ProjectModel, ProjectBranchModel
 from .session_models import ChatSessionModel, SessionMessageModel, FileContextModel
 from .webhook_models import WebhookEventModel, WebhookSecurityLogModel
+from .search_cache import SearchCache
 
 __all__ = [
     "Base",
