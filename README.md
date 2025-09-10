@@ -170,7 +170,7 @@ cp ui/.env.example ui/.env
    uvicorn app:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-2. **Start Frontend** (in third terminal)
+2. **Start Frontend** (in second terminal)
    ```bash
    cd ui
    npm run dev
