@@ -1074,7 +1074,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   const handleFolderToggle = useCallback((item: FileSystemItem, path: string[]) => {
     if (item.type !== 'folder') return;
     
-    const branch = selectedBranches[0] || 'main';
+    const branch = selectedBranches[0] || repository?.default_branch || '';
     const currentStructure = branchFileStructures[branch] || [];
     
     // Update the structure to toggle the folder's expanded state
@@ -1105,7 +1105,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
 
   // File and folder selection handler
   const handleFileSelect = useCallback(async (item: FileSystemItem, path: string[]) => {
-    const branch = selectedBranches[0] || 'main';
+    const branch = selectedBranches[0] || repository?.default_branch || '';
     
     if (item.type === 'file') {
       const filePath = path.join('/');

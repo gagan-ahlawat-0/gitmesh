@@ -87,7 +87,7 @@ export const Search: React.FC = () => {
       const response = await aiService.chat({
         message: userQuery,
         repository_id: repository?.full_name || 'default',
-        branch: selectedBranch || 'main'
+        branch: selectedBranch || repository?.default_branch || ''
       });
       
       if (response.success && response.answer) {

@@ -200,7 +200,7 @@ export default function Home() {
                 >
                   <div className="flex items-center gap-2 text-sm">
                     <div className="w-2 h-2 bg-green-500 rounded-full" />
-                    <span className="font-medium">main</span>
+                    <span className="font-medium">default</span>
                   </div>
                 </motion.div>
 

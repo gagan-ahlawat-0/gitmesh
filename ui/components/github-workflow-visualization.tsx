@@ -219,7 +219,7 @@ const workflowSteps = [
 ]
 
 const recentCommits = [
-  { message: "feat: add user authentication system", author: "RAWx18", time: "2m ago", branch: "main" },
+  { message: "feat: add user authentication system", author: "RAWx18", time: "2m ago", branch: repository?.default_branch || "" },
   { message: "fix: resolve memory leak in parser", author: "Parvm1102", time: "5m ago", branch: "bugfix" },
   { message: "docs: update API documentation", author: "Ronit-Raj9", time: "8m ago", branch: "docs" },
 ]
@@ -228,4 +228,6 @@ const activePRs = [
   { title: "Optimize database queries", author: "RAWx18", time: "1h ago", status: "approved" },
   { title: "Add dark mode support", author: "Parvm1102", time: "3h ago", status: "review" },
   { title: "Implement user dashboard", author: "Ronit-Raj9", time: "5h ago", status: "draft" },
+]
+ent user dashboard", author: "Ronit-Raj9", time: "5h ago", status: "draft" },
 ]

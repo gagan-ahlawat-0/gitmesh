@@ -12,10 +12,20 @@ interface ApiResponse<T> {
 
 class ApiService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('gitmesh_token');
+    const GTMESH_DATA_KEY = 'gitmesh_data';
+    const storedData = localStorage.getItem(GTMESH_DATA_KEY);
+    let token: string | null = null;
+    if (storedData) {
+      try {
+        const parsedData = JSON.parse(storedData);
+        token = parsedData.gitmesh_token;
+      } catch (error) {
+        console.error('Failed to parse gitmesh_data from localStorage:', error);
+      }
+    }
     return {
       'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` })
+      ...(token && { 'Authorization': `Bearer ${token}` }),
     };
   }
 
@@ -82,7 +92,8 @@ class ApiService {
   }
 
   async getRepositoryBranches(owner: string, repo: string): Promise<ApiResponse<{ branches: any[]; total: number }>> {
-    return this.request<{ branches: any[]; total: number }>(`/github/repositories/${owner}/${repo}/branches`);
+    console.log('Fetching branches for', owner, repo);
+    return this.request<{ branches: any[]; total: number }>(`/github/test-branches/${owner}/${repo}`);
   }
 
   async getRepositoryIssues(owner: string, repo: string, state = 'open', page = 1): Promise<ApiResponse<{ issues: any[]; pagination: any }>> {

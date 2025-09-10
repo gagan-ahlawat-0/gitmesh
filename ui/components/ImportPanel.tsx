@@ -1288,8 +1288,7 @@ export const ImportPanel: React.FC = () => {
   // Function to get the branch color
   const getBranchColorClass = (branch: string): string => {
     switch(branch) {
-      case 'main': return 'text-green-600';
-      case 'master': return 'text-green-600';
+      
       case 'dev': return 'text-blue-600';
       case 'develop': return 'text-blue-600';
       case 'agents': return 'text-emerald-600';
@@ -2002,6 +2001,13 @@ export const ImportPanel: React.FC = () => {
               Add to Chat
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ImportPanel; </div>
         </div>
       )}
     </div>

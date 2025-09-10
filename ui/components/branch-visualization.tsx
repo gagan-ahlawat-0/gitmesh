@@ -229,6 +229,12 @@ export function BranchVisualization() {
   )
 }
 
+
+nt>
+    </Card>
+  )
+}
+
 const branches = [
   {
     name: "feature/user-dashboard",
@@ -241,6 +247,24 @@ const branches = [
   },
   {
     name: "fix/auth-bug",
+    description: "Fix authentication token expiry",
+    commits: 3,
+    status: "draft",
+    author: "Parvm1102",
+    lastUpdate: "4h ago",
+    color: "bg-yellow-500",
+  },
+  {
+    name: "feature/api-v2",
+    description: "REST API version 2 implementation",
+    commits: 12,
+    status: "review",
+    author: "Ronit-Raj9",
+    lastUpdate: "1d ago",
+    color: "bg-blue-500",
+  },
+]
+,
     description: "Fix authentication token expiry",
     commits: 3,
     status: "draft",

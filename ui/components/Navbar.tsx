@@ -139,12 +139,6 @@ export const Navbar = () => {
   const { branchList } = useBranch();
   const projectName = repository?.name || 'Project';
   
-  // Debug logging
-  console.log('🧭 Navbar - repository:', repository?.full_name);
-  console.log('🧭 Navbar - branchList:', branchList);
-  console.log('🧭 Navbar - selectedBranch:', selectedBranch);
-  console.log('🧭 Navbar - branchList.length:', branchList.length);
-  
   const handleOpenAuthModal = useCallback(() => {
     setIsAuthModalOpen(true);
   }, []);
@@ -200,10 +194,10 @@ export const Navbar = () => {
             </NavItem>
 
             {/* Branch Dropdown - Always show for any project */}
-            {branchList.length > 0 && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenu>
+            {isOnContributionPage && branchList.length > 0 && (
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
@@ -213,39 +207,37 @@ export const Navbar = () => {
                         <span className="font-medium">{selectedBranch}</span>
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="bg-background border border-border shadow-lg">
-                      {branchList.map((branch) => (
-                        <DropdownMenuItem
-                          key={branch}
-                          onClick={() => setSelectedBranch(branch)}
-                          className={cn(
-                            "flex flex-col items-start gap-1 cursor-pointer hover:bg-accent p-3",
-                            selectedBranch === branch && "bg-accent"
-                          )}
-                        >
-                          <div className="flex items-center gap-2 w-full">
-                            <div className={cn("w-2 h-2 rounded-full", 
-                              branch === 'main' || branch === 'dev' ? 'bg-blue-500' : 
-                              branch === 'agents' ? 'bg-emerald-500' : 
-                              branch === 'snowflake' ? 'bg-cyan-500' : 'bg-gray-500'
-                            )}></div>
-                            <span className="text-primary font-medium">{branch}</span>
-                            {branch === repository?.default_branch && (
-                              <span className="text-xs text-muted-foreground ml-auto">Default</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground pl-4">
-                            {branch === repository?.default_branch ? 'Default branch' : ''}
-                          </p>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Select Branch ({branchList.length} available)</p>
-                </TooltipContent>
-              </Tooltip>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Select Branch ({branchList.length} available)</p>
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent className="bg-background border border-border shadow-lg">
+                  {branchList.map((branch) => (
+                    <DropdownMenuItem
+                      key={branch}
+                      onClick={() => setSelectedBranch(branch)}
+                      className={cn(
+                        "flex flex-col items-start gap-1 cursor-pointer hover:bg-accent p-3",
+                        selectedBranch === branch && "bg-accent"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <div className={cn("w-2 h-2 rounded-full",
+                          branch === repository?.default_branch ? 'bg-blue-500' : 'bg-gray-500'
+                        )}></div>
+                        <span className="text-primary font-medium">{branch}</span>
+                        {branch === repository?.default_branch && (
+                          <span className="text-xs text-muted-foreground ml-auto">Default</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground pl-4">
+                        {branch === repository?.default_branch ? 'Default branch' : ''}
+                      </p>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
 
             {/* Contribution Button - Only show when not on contribution pages */}

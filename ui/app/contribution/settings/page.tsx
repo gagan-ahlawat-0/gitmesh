@@ -72,7 +72,7 @@ export default function SettingsPage() {
         branchNotifications: formData.branchNotifications,
         autoSync: formData.autoSync,
         autoSave: formData.autoSave,
-        defaultBranch: selectedBranch || 'main'
+        defaultBranch: selectedBranch || repository?.default_branch || ''
       },
       notifications: {
         emailNotifications: formData.emailNotifications,

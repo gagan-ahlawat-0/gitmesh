@@ -1,4 +1,4 @@
-print('RELOADING GITHUB_UTILS.PY')
+# print('RELOADING GITHUB_UTILS.PY')
 """GitHub API utilities and helper functions"""
 
 import os
@@ -289,7 +289,8 @@ class GitHubService:
         auth_token = token or self.get_token()
         if not auth_token:
             raise ValueError("GitHub token not provided and not found in KeyManager")
-        return await self.client.get(f'/repos/{owner}/{repo}/branches', auth_token)
+        logger.info(f"GitHub API response for branches: {{response}}")
+        return response
 
     async def get_repository_commits(
         self, 

@@ -72,7 +72,7 @@ export default function ChatPage() {
         forks_count: 8,
         html_url: 'https://github.com/demo-user/beetle-app',
         clone_url: 'https://github.com/demo-user/beetle-app.git',
-        default_branch: 'main',
+        default_branch: '',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: new Date().toISOString(),
         private: false,

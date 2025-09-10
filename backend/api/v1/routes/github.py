@@ -71,6 +71,20 @@ async def get_repository_details(
         raise HTTPException(status_code=404, detail="Repository not found")
 
 
+@router.get("/test-branches/{owner}/{repo}")
+async def test_branches(owner: str, repo: str, token: str = Depends(require_auth)):
+    import httpx
+    url = f"https://api.github.com/repos/{owner}/{repo}/branches"
+    headers = {"Authorization": f"token {token}"}
+    # print(f"Request headers: {headers}")
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
+        # print(f"Response status code: {response.status_code}")
+        # print(f"Response headers: {response.headers}")
+        # print(f"Response content: {response.text}")
+        return response.json()
+
+
 @router.get("/repositories/{owner}/{repo}/branches", response_model=BranchesResponse)
 async def get_repository_branches(
     owner: str,

@@ -3,11 +3,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRepository } from './RepositoryContext';
 import { apiService } from '../lib/api';
-import { useLocalStorage } from '@/contexts/LocalStorageContext';
+
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
-export type BranchType = string; // Now any branch name
+export type BranchType = string;
 
 interface BranchInfo {
   name: string;
@@ -24,6 +24,7 @@ interface BranchContextType {
   branchList: string[];
   branchInfoMap: Record<string, BranchInfo>;
   getBranchInfo: () => BranchInfo;
+  isLoadingBranches: boolean;
 }
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
@@ -42,95 +43,76 @@ interface BranchProviderProps {
 
 export const BranchProvider: React.FC<BranchProviderProps> = ({ children }) => {
   const { repository } = useRepository();
-  const [branchList, setBranchList] = useState<string[]>(['main']);
-  const [selectedBranch, setSelectedBranch] = useState<BranchType>('main');
+  const [branchList, setBranchList] = useState<string[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState<BranchType>('');
   const [branchInfoMap, setBranchInfoMap] = useState<Record<string, BranchInfo>>({});
   const [isLoadingBranches, setIsLoadingBranches] = useState(false);
-  const { getItem } = useLocalStorage();
-
   useEffect(() => {
-    console.log('🔍 BranchContext: Repository changed:', repository?.full_name);
-    console.log('🔍 BranchContext: isLoadingBranches:', isLoadingBranches);
-    if (repository && !isLoadingBranches) {
-      // Fetch branches for the current repository
+    if (repository?.full_name) {
       const fetchBranches = async () => {
+        setIsLoadingBranches(true);
         try {
-          setIsLoadingBranches(true);
-          
-          // Debug: Check authentication status
-          const token = getItem('gitmesh_token');
-          console.log('🔍 Fetching branches for repository:', repository.full_name);
-          console.log('🔍 Using token:', token ? 'Available' : 'Not available');
-          console.log('🔍 Token type:', token === 'demo-token' ? 'Demo' : 'Real GitHub');
-          
           const response = await apiService.getRepositoryBranches(repository.owner.login, repository.name);
-          
+
           if (response.error) {
-            console.error('❌ API error:', response.error);
-            setBranchList([repository.default_branch || 'main']);
+            console.error('API error:', response.error);
+            // Fallback to default branch from repository object if API fails
+            const defaultBranch = repository.default_branch;
+            setBranchList(defaultBranch ? [defaultBranch] : []);
+            setSelectedBranch(defaultBranch || '');
             return;
           }
+
+          const fetchedBranches = response.data || [];
+          const branchNames = fetchedBranches.map((b: any) => b.name);
           
-          console.log('🔍 BranchContext: API response:', response);
-          
-          const branches = response.data?.branches?.map((b: any) => b.name) || [repository.default_branch || 'main'];
-          console.log('🔍 Fetched branches:', branches);
-          
-          if (branches.length > 1) {
-            console.log('✅ Successfully loaded', branches.length, 'branches for', repository.full_name);
+          setBranchList(branchNames);
+
+          if (branchNames.length > 0) {
+            // Set selected branch to default branch or first branch
+            const defaultBranch = repository.default_branch;
+            setSelectedBranch(branchNames.includes(defaultBranch) ? defaultBranch : branchNames[0]);
+          } else {
+            setSelectedBranch('');
           }
-          
-          // Only update if the branch list has actually changed
-          setBranchList(prevBranches => {
-            if (JSON.stringify(prevBranches) !== JSON.stringify(branches)) {
-              return branches;
-            }
-            return prevBranches;
-          });
-          
-          // Set selected branch to default if it's not in the new branch list
-          setSelectedBranch(prevBranch => {
-            if (branches.includes(prevBranch)) {
-              return prevBranch;
-            }
-            const newBranch = repository.default_branch || branches[0] || 'main';
-            return newBranch;
-          });
-          
-          // Update branch info map
+
           const infoMap: Record<string, BranchInfo> = {};
-          branches.forEach((branch: any) => {
+          fetchedBranches.forEach((branch: any) => {
             infoMap[branch.name] = {
               name: branch.name,
               sha: branch.commit.sha,
-              color: branch.name === 'main' || branch.name === 'dev' ? 'text-blue-600' : branch.name === 'agents' ? 'text-emerald-600' : branch.name === 'snowflake' ? 'text-cyan-600' : 'text-gray-600',
+              color: branch.name === repository.default_branch ? 'text-blue-600' : 'text-gray-600',
               description: branch.name === repository.default_branch ? 'Default branch' : '',
               maintainer: '',
               githubUrl: `${repository.html_url}/tree/${branch.name}`,
             };
           });
           setBranchInfoMap(infoMap);
+
         } catch (e) {
-          console.error('❌ Error fetching branches:', e);
-          setBranchList([repository.default_branch || 'main']);
+          console.error('Error fetching branches:', e);
+          const defaultBranch = repository.default_branch;
+          setBranchList(defaultBranch ? [defaultBranch] : []);
+          setSelectedBranch(defaultBranch || '');
         } finally {
           setIsLoadingBranches(false);
         }
       };
       fetchBranches();
     }
-  }, [repository]); // Changed dependency to repository object instead of just full_name
+  }, [repository?.full_name, repository?.default_branch]);
 
   const getBranchInfo = () => branchInfoMap[selectedBranch] || {
     name: selectedBranch,
+    sha: '',
     color: 'text-gray-600',
-    description: '',
+    description: 'Branch details not available.',
     maintainer: '',
     githubUrl: repository ? `${repository.html_url}/tree/${selectedBranch}` : '',
   };
 
   return (
-    <BranchContext.Provider value={{ selectedBranch, setSelectedBranch, branchList, branchInfoMap, getBranchInfo }}>
+    <BranchContext.Provider value={{ selectedBranch, setSelectedBranch, branchList, branchInfoMap, getBranchInfo, isLoadingBranches }}>
       {children}
     </BranchContext.Provider>
   );
