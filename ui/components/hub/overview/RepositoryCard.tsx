@@ -414,7 +414,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                 {contributors.slice(0, 12).map((contributor: any, index: number) => (
                   <a
                     key={contributor.id}
-                    href={contributor.html_url}
+                    href={`/hub/profile/${contributor.login}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="group flex flex-col items-center p-4 rounded-xl bg-black-700 hover:bg-black-600 transition-all duration-300 transform hover:scale-105"

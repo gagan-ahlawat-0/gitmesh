@@ -51,6 +51,12 @@ const navigationItems = [
     href: '/hub/insights',
     icon: BarChart3,
     description: 'Analytics and contribution insights'
+  },
+  {
+    name: 'Profile',
+    href: '/hub/profile/me',
+    icon: User,
+    description: 'Your profile and GitHub information'
   }
 ];
 
@@ -72,6 +78,10 @@ export function HubNavigation() {
   };
 
   const isActive = (href: string) => {
+    // Special handling for profile routes
+    if (href === '/hub/profile/me') {
+      return pathname.startsWith('/hub/profile');
+    }
     return pathname === href;
   };
 
@@ -167,11 +177,10 @@ export function HubNavigation() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
-                {/* implement /hub/profile */}
-                {/* <DropdownMenuItem onClick={() => router.push('/hub/settings')}> 
+                <DropdownMenuItem onClick={() => router.push('/hub/profile/me')}> 
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
-                </DropdownMenuItem> */}
+                </DropdownMenuItem>
                 
                 <DropdownMenuItem onClick={() => router.push('/hub/settings')}>
                   <Settings className="mr-2 h-4 w-4" />

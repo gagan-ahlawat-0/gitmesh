@@ -30,6 +30,58 @@ export interface UserProfile {
   projects?: Project[];
 }
 
+// GitHub User Profile Types
+export interface GitHubUser {
+  id: number;
+  login: string;
+  name: string;
+  bio: string;
+  avatar_url: string;
+  html_url: string;
+  followers: number;
+  following: number;
+  public_repos: number;
+  company: string;
+  location: string;
+  email: string;
+  blog: string;
+  twitter_username: string;
+  created_at: string;
+  updated_at: string;
+  organizations?: GitHubOrganization[];
+}
+
+export interface GitHubOrganization {
+  id: number;
+  login: string;
+  name: string;
+  description: string;
+  avatar_url: string;
+  html_url: string;
+}
+
+export interface GitHubUserActivity {
+  id: string;
+  type: string;
+  actor: {
+    login: string;
+    avatar_url: string;
+  };
+  repo: {
+    name: string;
+  };
+  created_at: string;
+  payload: any;
+}
+
+export interface GitHubAchievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  earnedAt: string;
+}
+
 export interface ImportSource {
   id: string;
   name: string;
