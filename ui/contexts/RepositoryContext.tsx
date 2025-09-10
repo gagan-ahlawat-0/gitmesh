@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useRef, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { apiService } from '@/lib/api';
 
 interface RepositoryData {
   name: string;
@@ -45,53 +47,67 @@ export const RepositoryProvider: React.FC<RepositoryProviderProps> = ({ children
   const [repository, setRepository] = useState<RepositoryData | null>(null);
   const [isRepositoryLoaded, setIsRepositoryLoaded] = useState(false);
   const prevRepositoryRef = useRef<RepositoryData | null>(null);
+  const searchParams = useSearchParams();
 
-  // Load repository from sessionStorage on initialization
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const storedRepo = sessionStorage.getItem(REPOSITORY_STORAGE_KEY);
-        if (storedRepo) {
-          const parsedRepo = JSON.parse(storedRepo);
-          setRepository(parsedRepo);
-          prevRepositoryRef.current = parsedRepo;
-          console.log('🔍 RepositoryContext: Restored repository from storage:', parsedRepo.full_name);
-        }
-      } catch (error) {
-        console.error('Error loading repository from storage:', error);
-        // Clear invalid data
-        sessionStorage.removeItem(REPOSITORY_STORAGE_KEY);
+    const repoName = searchParams.get('repo');
+    const ownerName = searchParams.get('owner');
+
+    const fetchRepository = async (owner: string, repo: string) => {
+      setIsRepositoryLoaded(false);
+      const { data, error } = await apiService.getRepositoryDetails(owner, repo);
+      if (data) {
+        handleSetRepository(data.repository);
+      } else {
+        console.error("Failed to fetch repository details:", error);
+        // Fallback to session storage or clear if invalid
+        loadFromSession();
       }
-      // Always mark as loaded after initialization attempt
+      setIsRepositoryLoaded(true);
+    };
+
+    const loadFromSession = () => {
+      if (typeof window !== 'undefined') {
+        try {
+          const storedRepo = sessionStorage.getItem(REPOSITORY_STORAGE_KEY);
+          if (storedRepo) {
+            const parsedRepo = JSON.parse(storedRepo);
+            setRepository(parsedRepo);
+            prevRepositoryRef.current = parsedRepo;
+          }
+        } catch (error) {
+          console.error('Error loading repository from storage:', error);
+          sessionStorage.removeItem(REPOSITORY_STORAGE_KEY);
+        }
+      }
+    };
+
+    if (ownerName && repoName) {
+      fetchRepository(ownerName, repoName);
+    } else {
+      loadFromSession();
       setIsRepositoryLoaded(true);
     }
-  }, []);
+  }, [searchParams]);
 
   const handleSetRepository = useCallback((repo: RepositoryData | null) => {
-    // Compare only essential properties to avoid issues with timestamps
     const prevKey = prevRepositoryRef.current ? `${prevRepositoryRef.current.owner.login}/${prevRepositoryRef.current.name}` : null;
     const newKey = repo ? `${repo.owner.login}/${repo.name}` : null;
     
     if (prevKey !== newKey) {
       prevRepositoryRef.current = repo;
       setRepository(repo);
-      setIsRepositoryLoaded(true);
       
-      // Persist to sessionStorage
       if (typeof window !== 'undefined') {
         try {
           if (repo) {
             sessionStorage.setItem(REPOSITORY_STORAGE_KEY, JSON.stringify(repo));
-            console.log('🔍 RepositoryContext: Repository stored and set to:', newKey);
           } else {
             sessionStorage.removeItem(REPOSITORY_STORAGE_KEY);
-            console.log('🔍 RepositoryContext: Repository cleared from storage');
           }
         } catch (error) {
           console.error('Error saving repository to storage:', error);
         }
-      } else {
-        console.log('🔍 RepositoryContext: Repository set to:', newKey);
       }
     }
   }, []);

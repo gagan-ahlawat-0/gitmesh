@@ -145,7 +145,7 @@ async def get_repository_pull_requests(
         pull_requests = await github_service.get_repository_pull_requests(owner, repo, state, page, per_page, token=token)
         
         return PullRequestsResponse(
-            pull_requests=pull_requests,
+            pullRequests=pull_requests,
             pagination={
                 'state': state,
                 'page': page,

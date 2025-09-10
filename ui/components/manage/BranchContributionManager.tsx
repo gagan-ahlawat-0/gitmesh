@@ -28,6 +28,7 @@ import {
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
+import { transformGitHubData } from './contribution-data';
 import { apiService } from '@/lib/api';
 
 interface BranchContributionManagerProps {
@@ -117,6 +118,14 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
     
     console.log('[Beetle Overview] beetleData structure:', beetleData);
     
+    const transformedData = transformGitHubData(
+      beetleData.activity || [],
+      allRepoPRs || [],
+      beetleData.issues || [],
+      beetleData.commits || [],
+      user
+    );
+
     // Transform commits to activity items
     const activity = (beetleData.commits || []).map((commit: any) => ({
       id: commit.sha || commit.id || Math.random().toString(36).slice(2),
@@ -128,7 +137,7 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
     }));
 
     // Filter PRs by status and labels
-    let filteredPRs = allRepoPRs || [];
+    let filteredPRs = transformedData.pullRequests || [];
     if (prFilters.status && prFilters.status !== 'all') {
       filteredPRs = filteredPRs.filter((pr: any) => (pr.status || pr.state) === prFilters.status);
     }
@@ -138,7 +147,7 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
 
     return {
       pullRequests: filteredPRs,
-      issues: beetleData.issues || [],
+      issues: transformedData.issues || [],
       activity,
     };
   }, [beetleData, allRepoPRs, selectedBranch, prFilters]);

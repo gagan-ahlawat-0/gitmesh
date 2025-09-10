@@ -289,6 +289,7 @@ class GitHubService:
         auth_token = token or self.get_token()
         if not auth_token:
             raise ValueError("GitHub token not provided and not found in KeyManager")
+        response = await self.client.get(f'/repos/{owner}/{repo}/branches', auth_token)
         logger.info(f"GitHub API response for branches: {{response}}")
         return response
 
