@@ -291,10 +291,21 @@ class GitHubAPI {
            message.includes('Too many requests');
   }
 
-  // Get user repositories
+  // Get user repositories (current user)
   async getUserRepositories(page = 1, per_page = 100): Promise<Repository[]> {
     const response = await this.request(`/github/repositories?page=${page}&per_page=${per_page}`);
     return response.repositories;
+  }
+
+  // Get any user's repositories with pagination and sorting
+  async getPublicUserRepositories(username: string, page = 1, per_page = 30, sort = 'updated') {
+    try {
+      const response = await this.request(`/github/users/${username}/repos?page=${page}&per_page=${per_page}&sort=${sort}`);
+      return response;
+    } catch (error) {
+      console.error('Failed to fetch user repositories:', error);
+      throw error;
+    }
   }
 
   // Get repository details
@@ -496,6 +507,108 @@ class GitHubAPI {
     } catch (error) {
       console.error('Failed to fetch rate limit status:', error);
       throw error;
+    }
+  }
+
+  // Get GitHub user profile
+  async getGitHubUserProfile(username: string) {
+    try {
+      const response = await this.request(`/github/users/${username}`);
+      return response.user;
+    } catch (error) {
+      console.error('Failed to fetch GitHub user profile:', error);
+      throw error;
+    }
+  }
+
+  // Get user activities
+  async getUserActivities(username: string, page = 1, per_page = 30) {
+    try {
+      const response = await this.request(`/github/users/${username}/events?page=${page}&per_page=${per_page}`);
+      return response.events;
+    } catch (error) {
+      console.error('Failed to fetch user activities:', error);
+      throw error;
+    }
+  }
+
+  // Get user starred repositories with pagination
+  async getUserStarredRepos(username: string, page = 1, per_page = 30) {
+    try {
+      const response = await this.request(`/github/users/${username}/starred?page=${page}&per_page=${per_page}`);
+      return response;
+    } catch (error) {
+      console.error('Failed to fetch user starred repositories:', error);
+      throw error;
+    }
+  }
+
+  // Get user pinned repositories
+  async getUserPinnedRepos(username: string) {
+    try {
+      const response = await this.request(`/github/users/${username}/pinned`);
+      return response.repositories;
+    } catch (error) {
+      console.error('Failed to fetch user pinned repositories:', error);
+      return [];
+    }
+  }
+
+  // Get user README (profile README)
+  async getUserReadme(username: string) {
+    try {
+      const response = await this.request(`/github/users/${username}/readme`);
+      return response.content;
+    } catch (error) {
+      console.error('Failed to fetch user README:', error);
+      return null;
+    }
+  }
+
+  // Follow/Unfollow user
+  async followUser(username: string) {
+    try {
+      const response = await this.request(`/github/users/${username}/follow`, {
+        method: 'PUT'
+      });
+      return response;
+    } catch (error) {
+      console.error('Failed to follow user:', error);
+      throw error;
+    }
+  }
+
+  async unfollowUser(username: string) {
+    try {
+      const response = await this.request(`/github/users/${username}/follow`, {
+        method: 'DELETE'
+      });
+      return response;
+    } catch (error) {
+      console.error('Failed to unfollow user:', error);
+      throw error;
+    }
+  }
+
+  // Check if following user
+  async isFollowingUser(username: string) {
+    try {
+      const response = await this.request(`/github/users/${username}/following`);
+      return response.isFollowing;
+    } catch (error) {
+      console.error('Failed to check if following user:', error);
+      return false;
+    }
+  }
+
+  // Get user organizations
+  async getUserOrganizations(username: string) {
+    try {
+      const response = await this.request(`/github/users/${username}/orgs`);
+      return response.organizations || [];
+    } catch (error) {
+      console.error('Failed to fetch user organizations:', error);
+      return [];
     }
   }
 }

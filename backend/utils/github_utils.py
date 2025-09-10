@@ -568,6 +568,128 @@ class GitHubService:
         """Clear API response cache."""
         self.client.cache_manager.clear()
 
+    # User Profile Methods
+    async def get_user_profile_by_username(self, username: str, token: Optional[str] = None) -> Dict[str, Any]:
+        """Get any user's public profile by username."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        return await self.client.get(f'/users/{username}', auth_token)
+    
+    async def get_user_public_repositories(self, username: str, token: Optional[str] = None, page: int = 1, per_page: int = 30, sort: str = 'updated') -> List[Dict[str, Any]]:
+        """Get public repositories for a specific user."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        params = {'page': page, 'per_page': per_page, 'sort': sort, 'type': 'all'}
+        return await self.client.get(f'/users/{username}/repos', auth_token, params)
+    
+    async def get_user_starred_repositories(self, username: str, token: Optional[str] = None, page: int = 1, per_page: int = 30) -> List[Dict[str, Any]]:
+        """Get starred repositories for a specific user."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        params = {'page': page, 'per_page': per_page}
+        return await self.client.get(f'/users/{username}/starred', auth_token, params)
+    
+    async def get_user_pinned_repositories(self, username: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get pinned repositories for a user."""
+        # GitHub doesn't have a direct API for pinned repos, so we'll simulate with recent popular repos
+        try:
+            repos = await self.get_user_public_repositories(username, token, page=1, per_page=6, sort='updated')
+            # Sort by stars and return top 6
+            sorted_repos = sorted(repos, key=lambda x: x.get('stargazers_count', 0), reverse=True)
+            return sorted_repos[:6]
+        except Exception as e:
+            logger.warning(f"Failed to get pinned repositories for {username}: {e}")
+            return []
+    
+    async def get_user_readme(self, username: str, token: Optional[str] = None) -> Optional[str]:
+        """Get user profile README content."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        try:
+            # GitHub profile README is in a repo with the same name as the username
+            response = await self.client.get(f'/repos/{username}/{username}/contents/README.md', auth_token)
+            if 'content' in response:
+                import base64
+                content = base64.b64decode(response['content']).decode('utf-8')
+                return content
+            return None
+        except Exception as e:
+            logger.debug(f"No README found for user {username}: {e}")
+            return None
+    
+    async def follow_user(self, username: str, token: Optional[str] = None) -> Dict[str, Any]:
+        """Follow a user."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                'Authorization': f'token {auth_token}',
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'GitMesh/1.0'
+            }
+            async with session.put(f'https://api.github.com/user/following/{username}', headers=headers) as response:
+                if response.status == 204:
+                    return {"success": True, "message": f"Successfully followed {username}"}
+                else:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to follow user: {error_text}")
+    
+    async def unfollow_user(self, username: str, token: Optional[str] = None) -> Dict[str, Any]:
+        """Unfollow a user."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                'Authorization': f'token {auth_token}',
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'GitMesh/1.0'
+            }
+            async with session.delete(f'https://api.github.com/user/following/{username}', headers=headers) as response:
+                if response.status == 204:
+                    return {"success": True, "message": f"Successfully unfollowed {username}"}
+                else:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to unfollow user: {error_text}")
+    
+    async def is_following_user(self, username: str, token: Optional[str] = None) -> bool:
+        """Check if the current user is following a specific user."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    'Authorization': f'token {auth_token}',
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'GitMesh/1.0'
+                }
+                async with session.get(f'https://api.github.com/user/following/{username}', headers=headers) as response:
+                    return response.status == 204
+        except Exception as e:
+            logger.debug(f"Error checking if following {username}: {e}")
+            return False
+
+    async def get_user_organizations(self, username: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get organizations for a user."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        
+        try:
+            return await self.client.get(f'/users/{username}/orgs', auth_token)
+        except Exception as e:
+            logger.debug(f"Error fetching organizations for {username}: {e}")
+            return []
+
 
 # Global GitHub service instance
 github_service = GitHubService()

@@ -632,3 +632,196 @@ async def clear_github_cache(
     except Exception as e:
         logger.error(f"Error clearing cache: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# User Profile Endpoints
+@router.get("/users/{username}")
+async def get_github_user_profile(
+    username: str,
+    token: str = Depends(require_auth)
+):
+    """Get GitHub user profile."""
+    try:
+        user_profile = await github_service.get_user_profile_by_username(username, token=token)
+        return {"user": user_profile}
+    except Exception as e:
+        logger.error(f"Error fetching user profile for {username}: {e}")
+        raise HTTPException(status_code=404, detail="User not found")
+
+
+@router.get("/users/{username}/repos")
+async def get_user_public_repositories(
+    username: str,
+    token: str = Depends(require_auth),
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(30, ge=1, le=100, description="Items per page"),
+    sort: str = Query("updated", description="Sort by: updated, created, pushed, full_name")
+):
+    """Get public repositories for a specific user."""
+    try:
+        result = await github_service.get_user_public_repositories(
+            username, page=page, per_page=per_page, sort=sort, token=token
+        )
+        repositories = result[0] if isinstance(result, tuple) else result
+        
+        # Check if there are more pages by attempting to fetch one more
+        has_next_page = False
+        try:
+            next_page_result = await github_service.get_user_public_repositories(
+                username, page=page + 1, per_page=1, sort=sort, token=token
+            )
+            has_next_page = len(next_page_result[0] if isinstance(next_page_result, tuple) else next_page_result) > 0
+        except:
+            has_next_page = False
+        
+        return {
+            "repositories": repositories,
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": len(repositories)
+            },
+            "has_next_page": has_next_page
+        }
+    except Exception as e:
+        logger.error(f"Error fetching repositories for user {username}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users/{username}/events")
+async def get_user_activity_events(
+    username: str,
+    token: str = Depends(require_auth),
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(30, ge=1, le=100, description="Items per page")
+):
+    """Get activity events for a specific user."""
+    try:
+        events = await github_service.get_user_activity(username, page=page, per_page=per_page, token=token)
+        return {"events": events}
+    except Exception as e:
+        logger.error(f"Error fetching activity for user {username}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users/{username}/starred")
+async def get_user_starred_repositories(
+    username: str,
+    token: str = Depends(require_auth),
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(30, ge=1, le=100, description="Items per page")
+):
+    """Get starred repositories for a specific user."""
+    try:
+        result = await github_service.get_user_starred_repositories(
+            username, page=page, per_page=per_page, token=token
+        )
+        repositories = result[0] if isinstance(result, tuple) else result
+        
+        # Check if there are more pages
+        has_next_page = False
+        try:
+            next_page_result = await github_service.get_user_starred_repositories(
+                username, page=page + 1, per_page=1, token=token
+            )
+            has_next_page = len(next_page_result[0] if isinstance(next_page_result, tuple) else next_page_result) > 0
+        except:
+            has_next_page = False
+        
+        return {
+            "repositories": repositories,
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": len(repositories)
+            },
+            "has_next_page": has_next_page
+        }
+    except Exception as e:
+        logger.error(f"Error fetching starred repositories for user {username}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users/{username}/pinned")
+async def get_user_pinned_repositories(
+    username: str,
+    token: str = Depends(require_auth)
+):
+    """Get pinned repositories for a specific user."""
+    try:
+        repositories = await github_service.get_user_pinned_repositories(username, token=token)
+        return {"repositories": repositories}
+    except Exception as e:
+        logger.error(f"Error fetching pinned repositories for user {username}: {e}")
+        # Return empty array if pinned repos can't be fetched
+        return {"repositories": []}
+
+
+@router.get("/users/{username}/readme")
+async def get_user_readme(
+    username: str,
+    token: str = Depends(require_auth)
+):
+    """Get user profile README."""
+    try:
+        readme_content = await github_service.get_user_readme(username, token=token)
+        return {"content": readme_content}
+    except Exception as e:
+        logger.error(f"Error fetching README for user {username}: {e}")
+        return {"content": None}
+
+
+@router.put("/users/{username}/follow")
+async def follow_user(
+    username: str,
+    token: str = Depends(require_auth)
+):
+    """Follow a user."""
+    try:
+        result = await github_service.follow_user(username, token=token)
+        return {"message": f"Successfully followed {username}", "result": result}
+    except Exception as e:
+        logger.error(f"Error following user {username}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/users/{username}/follow")
+async def unfollow_user(
+    username: str,
+    token: str = Depends(require_auth)
+):
+    """Unfollow a user."""
+    try:
+        result = await github_service.unfollow_user(username, token=token)
+        return {"message": f"Successfully unfollowed {username}", "result": result}
+    except Exception as e:
+        logger.error(f"Error unfollowing user {username}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users/{username}/following")
+async def check_if_following_user(
+    username: str,
+    token: str = Depends(require_auth)
+):
+    """Check if the current user is following a specific user."""
+    try:
+        is_following = await github_service.is_following_user(username, token=token)
+        return {"isFollowing": is_following}
+    except Exception as e:
+        logger.error(f"Error checking if following user {username}: {e}")
+        return {"isFollowing": False}
+
+
+@router.get("/users/{username}/orgs")
+async def get_user_organizations(
+    username: str,
+    token: str = Depends(require_auth)
+):
+    """Get organizations for a specific user."""
+    try:
+        organizations = await github_service.get_user_organizations(username, token=token)
+        return {"organizations": organizations}
+    except Exception as e:
+        logger.error(f"Error fetching organizations for user {username}: {e}")
+        return {"organizations": []}

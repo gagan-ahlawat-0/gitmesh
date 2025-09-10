@@ -253,7 +253,7 @@ export interface InsightsFilters {
 /**
  * Hub view types
  */
-export type HubView = 'overview' | 'projects' | 'activity' | 'insights';
+export type HubView = 'overview' | 'projects' | 'activity' | 'insights' | 'profile';
 export type ContributionView = 'what' | 'why' | 'how' | 'overview' | 'chat' | 'contribute' | 'import' | 'manage' | 'profile' | 'search' | 'settings';
 export type AllViews = HubView | ContributionView;
 
