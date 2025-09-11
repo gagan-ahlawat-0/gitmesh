@@ -38,7 +38,7 @@ llm:
   ollama:
     base_url: "http://localhost:11434"  # Ollama default URL
   gemini:
-    model: "gemini/gemini-1.5-flash"
+    model: "google/gemini-1.5-flash"
     temperature: 0.7
     max_tokens: 1000
 
@@ -81,7 +81,7 @@ ai_pipeline:
   max_documents: 1000
   batch_size: 32
   embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
-  chat_model: "gemini/gemini-1.5-flash"
+  chat_model: "google/gemini-1.5-flash"
   
   # Web Scraping
   max_pages: 10

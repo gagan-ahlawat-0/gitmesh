@@ -290,7 +290,7 @@ class GitHubService:
         if not auth_token:
             raise ValueError("GitHub token not provided and not found in KeyManager")
         response = await self.client.get(f'/repos/{owner}/{repo}/branches', auth_token)
-        logger.info(f"GitHub API response for branches: {{response}}")
+        logger.info(f"GitHub API response for branches: {response}")
         return response
 
     async def get_repository_commits(
@@ -525,7 +525,7 @@ class GitHubService:
             raise ValueError("GitHub token not provided and not found in KeyManager")
         try:
             branches = await self.get_repository_branches(owner, repo, auth_token)
-            trees_by_branch = {{}}
+            trees_by_branch = {}
             
             for branch in branches:
                 try:
@@ -533,12 +533,12 @@ class GitHubService:
                     trees_by_branch[branch['name']] = tree
                 except Exception as e:
                     logger.error(f"Failed to get tree for branch {branch['name']}: {e}")
-                    trees_by_branch[branch['name']] = {{'error': str(e)}}
+                    trees_by_branch[branch['name']] = {'error': str(e)}
             
             return trees_by_branch
         except Exception as e:
             logger.error(f"Failed to get trees for all branches: {e}")
-            return {{}}
+            return {}
 
     def is_valid_owner(self, owner: str) -> bool:
         """Validate repository owner name."""

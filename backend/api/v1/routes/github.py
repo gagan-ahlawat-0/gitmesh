@@ -580,7 +580,7 @@ async def get_branches_with_trees(
         
         result = BranchesWithTreesResponse(
             branches=branches,
-            trees_by_branch=trees_by_branch,
+            treesByBranch=trees_by_branch,
             summary={
                 'totalBranches': len(branches),
                 'branchesWithTrees': len([t for t in trees_by_branch.values() if not isinstance(t, dict) or 'error' not in t]),

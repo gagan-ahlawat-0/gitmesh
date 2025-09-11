@@ -90,13 +90,6 @@ const importSources: ImportSource[] = [
     description: 'Import data from Manage page controls'
   },
   {
-    id: 'api',
-    name: 'API Integration',
-    type: 'api',
-    icon: 'Database',
-    description: 'Connect to external APIs and services'
-  },
-  {
     id: 'url',
     name: 'Web URL',
     type: 'url',
@@ -2007,11 +2000,6 @@ export const ImportPanel: React.FC = () => {
   );
 };
 
-export default ImportPanel; </div>
-        </div>
-      )}
-    </div>
-  );
-};
+
 
 export default ImportPanel;
