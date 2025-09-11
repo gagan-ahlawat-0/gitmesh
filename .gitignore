@@ -152,6 +152,7 @@ node_modules/
 jspm_packages/
 bower_components
 web_modules/
+package-lock.json
 
 # Yarn
 .pnp/
