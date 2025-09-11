@@ -1,32 +1,60 @@
 # Core dependencies
-fastapi>=0.103.1
-uvicorn>=0.23.2
-pydantic>=2.3.0
-starlette>=0.27.0
-python-dotenv>=1.0.0
-requests>=2.31.0
-httpx>=0.24.1
-websockets>=11.0.3
+fastapi
+uvicorn
+pydantic
+starlette
+python-dotenv
+requests
+httpx
+websockets
 
 # Database
-sqlalchemy>=2.0.20
-alembic>=1.12.0
-aiosqlite>=0.19.0
+sqlalchemy
+alembic
+aiosqlite
 
 # Authentication
-python-jose>=3.3.0
-passlib>=1.7.4
-python-multipart>=0.0.6
+python-jose
+passlib
+python-multipart
 
 # Github API
-PyGithub>=2.1.1
+PyGithub
 
 # Utilities
-structlog>=23.1.0
-python-dateutil>=2.8.2
-ujson>=5.8.0
-pyyaml>=6.0.1
-Jinja2>=3.1.2
+structlog
+python-dateutil
+ujson
+pyyaml
+Jinja2
 
 # File handling
-aiofiles>=23.2.1
+aiofiles
+
+# Core framework
+rich
+tiktoken
+
+# AI & LLM
+openai
+litellm
+mcp
+
+# Memory & Knowledge (Supabase + Qdrant hybrid architecture)
+supabase
+psycopg2-binary
+qdrant-client
+
+# Free embeddings (sentence-transformers instead of OpenAI)
+sentence-transformers
+
+# Data processing
+pandas
+matplotlib
+numpy
+
+cachetools
+asyncpg
+unstructured
+markdown
+docx

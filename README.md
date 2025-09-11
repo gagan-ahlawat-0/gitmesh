@@ -155,11 +155,6 @@ cp ui/.env.example ui/.env
    npm install
    ```
 
-3. **Setup Database**
-   ```bash
-   # SQLite database will be created automatically
-   ```
-
 ### 👾 Running the Application
 
 1. **Start Python Backend** (in first terminal)
