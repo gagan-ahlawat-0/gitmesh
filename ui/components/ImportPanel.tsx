@@ -2007,11 +2007,6 @@ export const ImportPanel: React.FC = () => {
   );
 };
 
-export default ImportPanel; </div>
-        </div>
-      )}
-    </div>
-  );
-};
+
 
 export default ImportPanel;

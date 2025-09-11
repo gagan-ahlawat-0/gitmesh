@@ -7,7 +7,7 @@
 
 **The Next-Generation Git Collaboration Platform**
 
-*Transforming Open Source Development with AI-Powered Branch Intelligence*
+*Transforming Open Source Development with Branch-Level Collaboration*
 
 [![OpenSource License](https://img.shields.io/badge/License-Apache%20License-orange.svg?style=for-the-badge)](LICENSE.md)
 [![Contributors](https://img.shields.io/github/contributors/LF-Decentralized-Trust-Mentorships/gitmesh.svg?style=for-the-badge&logo=git)](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/graphs/contributors)
@@ -25,11 +25,11 @@
 
 ## </> What is GitMesh?
 
-**GitMesh** revolutionizes Git-based collaboration by introducing **Branch-Level Intelligence** — a paradigm shift that transforms how teams plan, develop, and contribute to open-source projects. Unlike traditional project management tools, GitMesh understands your codebase at the branch level, providing contextual AI assistance, intelligent contribution tracking, and seamless workflow orchestration.
+**GitMesh** revolutionizes Git-based collaboration by introducing **Branch-Level Management** — a paradigm shift that transforms how teams plan, develop, and contribute to open-source projects. Unlike traditional project management tools, GitMesh organizes your codebase at the branch level, providing streamlined contribution tracking and seamless workflow orchestration.
 
 Our friendly mascot here represents the core philosophy of GitMesh: small, efficient, but incredibly powerful when working together in a team!
 
-Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here — ready to revolutionize the open source world like never before.
+GitMesh is ready to revolutionize the open source world with improved collaboration and branch management.
 
 [Waitlist website](gitmesh.vercel.app)
 
@@ -39,15 +39,15 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here �
 
 <div align="center">
 
-### 👾 **AI-Powered Intelligence**
+### 👾 **Git Collaboration Platform**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│     Contextual Code Assistant                               │
-│     Smart PR Summaries                                      │
-│     Intelligent Issue Triage                                │
-│     Code Review Assistance                                  │
-│     Suggestions on which issues to work                     │
-│     Which project best to contribute to and all             │
+│     Branch Management                                       │
+│     PR Visualization                                        │
+│     Issue Management                                        │
+│     Code Collaboration Tools                                │
+│     Repository Organization                                 │
+│     Open Source Contribution Management                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -77,7 +77,7 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here �
 ┌─────────────────────────────────────────────────────────────┐
 │     Multi-Platform Support (GitHub, GitLab, Bitbucket)      │
 │     SSO Authentication                                      │
-│     Multi Agent FAQ agent integrated                        │
+│     Team Collaboration Features                             │
 │     Webhook Automation                                      │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -90,10 +90,10 @@ Cursor wrapped VS Code. Hugging Face wrapped Git. Now, GitHub Wrapper is here �
 
 ## </> **Why Choose Our Platform?**
 
-| **Smart** | **Fast** | **Collaborative** | **Secure** |
+| **Efficient** | **Fast** | **Collaborative** | **Secure** |
 |:---:|:---:|:---:|:---:|
-| AI-driven insights | Lightning fast responses | Team-first approach | Enterprise-grade security |
-| Contextual recommendations | Real-time updates | Conflict-free workflows | SSO & compliance ready |
+| Data-driven insights | Lightning fast responses | Team-first approach | Enterprise-grade security |
+| Branch visualization | Real-time updates | Conflict-free workflows | SSO & compliance ready |
 
 </div>
 
@@ -155,9 +155,9 @@ cp ui/.env.example ui/.env
    npm install
    ```
 
-3. **Setup Qdrant**
+3. **Setup Database**
    ```bash
-   docker run -p 6333:6333 -p 6334:6334 -v $(pwd)/qdrant_storage:/qdrant/storage:z qdrant/qdrant
+   # SQLite database will be created automatically
    ```
 
 ### 👾 Running the Application
@@ -186,13 +186,11 @@ cp ui/.env.example ui/.env
 ## </> Roadmap
 
 ### 👾 **Q4 2025 - Production Goals**
-- ✅ ~~Implement Retrieval-Augmented Generation (RAG)~~
-- ✅ ~~Refactor and rebase codebase with proper routing architecture~~
+- ✅ Refactor and rebase codebase with proper routing architecture
 - ⏳ Enhance user interface (UI) for improved usability and aesthetics
-- ⏳ Integrate AIFAQ LFDT module
-- ⏳ Implement efficient indexing for the RAG codebase
+- ⏳ Implement advanced branch visualization
 - ⏳ Shift complete database to cloud
-- ⏳ Develop AI-powered suggestion and recommendation system
+- ⏳ Develop contribution tracking system
 - ⏳ Strengthen security and optimize rate-limiting mechanisms
 - ⏳ Containerize the application using Docker
 - ⏳ Deploy the complete website to production environment

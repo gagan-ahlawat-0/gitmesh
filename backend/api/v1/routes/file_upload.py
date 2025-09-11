@@ -1,6 +1,5 @@
 """
 File upload routes for handling file imports and processing.
-Replicates the JavaScript backend multer file upload functionality.
 """
 
 import os
@@ -14,7 +13,7 @@ import structlog
 from datetime import datetime
 
 from .auth import get_current_user
-from utils.file_utils import get_file_processor, detect_file_type, detect_language
+from utils.file_utils import detect_file_type, detect_language
 from core.orchestrator import get_orchestrator
 from models.api.auth_models import User
 from models.api.file_models import FileMetadata, FileUploadResponse, FileType
@@ -98,266 +97,83 @@ async def save_uploaded_file(file: UploadFile, user_id: str) -> tuple[str, FileM
     
     return str(file_path), metadata
 
-@router.post("/import", response_model=FileUploadResponse)
-async def import_files(
-    files: List[UploadFile] = File(..., description="Files to upload and import"),
-    repository_id: str = Form(default="default", description="Repository identifier"),
-    branch: str = Form(default="main", description="Git branch"),
-    source_type: str = Form(default="file", description="Source type"),
+@router.post("/import/file", response_model=FileUploadResponse)
+async def upload_file(
+    file: UploadFile = File(...),
+    filename: str = Form(None),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Import files and embed them in vector database
-    
-    Equivalent to JavaScript backend: POST /api/ai/import
-    
-    - Accepts multiple file uploads (like multer.array('files'))
-    - Processes files for AI/RAG functionality
-    - Returns processing results
-    """
-    if not files:
-        raise HTTPException(status_code=400, detail="No files provided")
-    
-    if len(files) > 20:  # Limit number of files
-        raise HTTPException(status_code=400, detail="Too many files. Maximum 20 files per upload")
-    
-    logger.info("Starting file import", 
-                user_id=current_user.id, 
-                file_count=len(files),
-                repository_id=repository_id)
-    
-    uploaded_files = []
-    failed_files = []
-    processing_jobs = []
-    
+    """Upload and process a single file."""
     try:
-        # Get orchestrator for processing
+        user_id = current_user.id if current_user else "anonymous"
+        
+        # Override filename if provided in form
+        if filename:
+            file.filename = filename
+        
+        # Save file and get metadata
+        file_path, metadata = await save_uploaded_file(file, user_id)
+        
+        # Process the file with the orchestrator
         orchestrator = get_orchestrator()
-        if not orchestrator:
-            raise HTTPException(status_code=503, detail="AI system not initialized")
         
-        # Process each file
-        for file in files:
-            try:
-                # Save file to disk
-                file_path, metadata = await save_uploaded_file(file, current_user.id)
-                
-                # Read file content for processing
-                async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = await f.read()
-                
-                # Process file with orchestrator
-                try:
-                    # Create file data for processing
-                    file_data = {
-                        "path": file.filename or metadata.filename,
-                        "content": content,
-                        "branch": branch,
-                        "size": metadata.size,
-                        "repository_id": repository_id,
-                        "language": metadata.language,
-                        "file_type": metadata.file_type.value if metadata.file_type else "text",
-                        "is_public": True,
-                        "uploaded_at": metadata.uploaded_at.isoformat()
-                    }
-                    
-                    # Process with RAG system
-                    processing_result = await orchestrator.process_session_files(
-                        session_id=f"upload_{current_user.id}_{uuid.uuid4()}",
-                        files=[file_data]
-                    )
-                    
-                    if processing_result:
-                        processing_jobs.append(f"processed_{metadata.file_id}")
-                        logger.info("File processed successfully", 
-                                   filename=metadata.filename, 
-                                   file_id=metadata.file_id)
-                    else:
-                        logger.warning("File processing returned no result", 
-                                     filename=metadata.filename)
-                
-                except Exception as processing_error:
-                    logger.error("File processing failed", 
-                               filename=metadata.filename, 
-                               error=str(processing_error))
-                    # Still mark as uploaded, just note processing failed
-                    failed_files.append({
-                        "filename": metadata.filename,
-                        "error": f"Processing failed: {str(processing_error)}"
-                    })
-                
-                uploaded_files.append(metadata)
-                
-                # Clean up temporary file after processing
-                try:
-                    os.remove(file_path)
-                except OSError:
-                    pass  # File cleanup is not critical
-                    
-            except Exception as file_error:
-                logger.error("File upload failed", 
-                           filename=file.filename, 
-                           error=str(file_error))
-                failed_files.append({
-                    "filename": file.filename or "unknown",
-                    "error": str(file_error)
-                })
+        # Read file content
+        async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = await f.read()
         
-        # Return results
-        response = FileUploadResponse(
-            uploaded_files=uploaded_files,
-            failed_files=failed_files,
-            processing_jobs=processing_jobs,
-            total_files=len(files),
-            successful_uploads=len(uploaded_files)
+        # Process the file (simplified without AI)
+        result = await orchestrator.process_file(metadata, content)
+        
+        return FileUploadResponse(
+            success=True,
+            message="File uploaded and processed successfully",
+            file_id=metadata.file_id,
+            filename=metadata.filename,
+            status=result.status,
+            size=metadata.size,
+            file_type=metadata.file_type,
+            language=metadata.language,
+            processed_at=result.processed_at
         )
         
-        logger.info("File import completed", 
-                   user_id=current_user.id,
-                   successful=len(uploaded_files),
-                   failed=len(failed_files))
-        
-        return response
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("File import error", 
-                    user_id=current_user.id, 
-                    error=str(e))
-        raise HTTPException(status_code=500, detail=f"File import failed: {str(e)}")
+        logger.error(f"Error processing file upload: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"File upload failed: {str(e)}"
+        )
 
-@router.post("/import-github")
-async def import_from_github(
-    repository_id: str = Form(..., description="Repository name (owner/repo)"),
-    branch: str = Form(default="main", description="Git branch"),
-    files: List[str] = Form(..., description="File paths to import"),
+@router.get("/import/status/{file_id}")
+async def get_file_status(
+    file_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Import files from GitHub repository
-    
-    Equivalent to JavaScript backend: POST /api/ai/import-github
-    """
-    if not repository_id or '/' not in repository_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid repository format. Expected format: owner/repo"
-        )
-    
-    if not files:
-        raise HTTPException(status_code=400, detail="No files specified for import")
-    
-    logger.info("Starting GitHub import", 
-                user_id=current_user.id,
-                repository_id=repository_id,
-                branch=branch,
-                file_count=len(files))
-    
+    """Get the processing status of an uploaded file."""
     try:
-        # Get orchestrator
         orchestrator = get_orchestrator()
-        if not orchestrator:
-            raise HTTPException(status_code=503, detail="AI system not initialized")
+        result = await orchestrator.get_file_processing_status(file_id)
         
-        # Import files from GitHub using the GitHub utils
-        from utils.github_utils import github_service
-        
-        # Fetch files from GitHub and process them
-        processed_files = []
-        for file_path in files:
-            try:
-                # Get file content from GitHub
-                file_content_data = await github_service.get_file_content(
-                    repository_id.split('/')[0],  # owner
-                    repository_id.split('/')[1],  # repo
-                    file_path,
-                    branch
-                )
-                
-                # Decode base64 content
-                import base64
-                content = base64.b64decode(file_content_data.get('content', '')).decode('utf-8')
-                
-                processed_files.append({
-                    "path": file_path,
-                    "content": content,
-                    "branch": branch,
-                    "size": len(content),
-                    "repository_id": repository_id,
-                    "is_public": True
-                })
-                
-            except Exception as file_error:
-                logger.error("Failed to fetch file from GitHub", 
-                           file_path=file_path, 
-                           error=str(file_error))
-        
-        # Process files with orchestrator
-        if processed_files:
-            processing_result = await orchestrator.process_session_files(
-                session_id=f"github_import_{current_user.id}_{uuid.uuid4()}",
-                files=processed_files
+        if not result:
+            raise HTTPException(
+                status_code=404,
+                detail=f"File with ID {file_id} not found"
             )
-            
-            result = {
-                "files_processed": len(processed_files),
-                "processing_successful": bool(processing_result)
-            }
-        else:
-            result = {"files_processed": 0, "processing_successful": False}
         
         return {
             "success": True,
-            "message": f"Successfully imported {len(files)} files from GitHub",
-            "data": result
+            "file_id": file_id,
+            "status": result.status,
+            "processed_at": result.processed_at,
+            "error": result.error
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("GitHub import error", 
-                    user_id=current_user.id,
-                    repository_id=repository_id,
-                    error=str(e))
-        raise HTTPException(status_code=500, detail=f"GitHub import failed: {str(e)}")
-
-@router.get("/upload/health")
-async def upload_health_check():
-    """Health check for file upload service"""
-    upload_dir_exists = UPLOAD_DIR.exists()
-    upload_dir_writable = os.access(UPLOAD_DIR, os.W_OK) if upload_dir_exists else False
-    
-    return {
-        "status": "healthy" if upload_dir_exists and upload_dir_writable else "unhealthy",
-        "upload_directory": str(UPLOAD_DIR),
-        "directory_exists": upload_dir_exists,
-        "directory_writable": upload_dir_writable,
-        "max_file_size_mb": MAX_FILE_SIZE // (1024 * 1024),
-        "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
-        "timestamp": datetime.now().isoformat()
-    }
-
-@router.get("/upload/stats")
-async def upload_stats():
-    """Get upload statistics"""
-    try:
-        total_size = 0
-        file_count = 0
-        
-        if UPLOAD_DIR.exists():
-            for user_dir in UPLOAD_DIR.iterdir():
-                if user_dir.is_dir():
-                    for file_path in user_dir.glob("*"):
-                        if file_path.is_file():
-                            file_count += 1
-                            total_size += file_path.stat().st_size
-        
-        return {
-            "total_files": file_count,
-            "total_size_bytes": total_size,
-            "total_size_mb": round(total_size / (1024 * 1024), 2),
-            "upload_directory": str(UPLOAD_DIR),
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
+        logger.error(f"Error checking file status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to check file status: {str(e)}"
+        )
