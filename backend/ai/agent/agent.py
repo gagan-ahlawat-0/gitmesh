@@ -18,6 +18,7 @@ from ai.llm import (
     ToolCall,
     process_stream_chunks
 )
+# Import context manager dynamically to avoid circular imports
 from ..main import (
     display_error,
     display_tool_call,
@@ -394,7 +395,17 @@ class Agent:
                     self.llm_instance = LLM(**llm_config)
                 else:
                     # Create LLM with model string and base_url
-                    model_name = llm or os.getenv('OPENAI_MODEL_NAME', 'gpt-5-nano')
+                    try:
+                        # Dynamic import to avoid circular dependencies
+                        import sys
+                        import os
+                        sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                        from core.context_manager import get_default_model
+                        model_info = get_default_model()
+                        model_name = llm or model_info['model']
+                    except Exception:
+                        model_name = llm or 'gpt-4o'
+                    
                     self.llm_instance = LLM(
                         model=model_name,
                         base_url=base_url,
@@ -444,9 +455,21 @@ class Agent:
                 raise ImportError(
                     "LLM features requested but dependencies not installed. "
                 ) from e
-        # Otherwise, fall back to OpenAI environment/name
+        # Otherwise, fall back to enhanced model detection
         else:
-            self.llm = llm or os.getenv('OPENAI_MODEL_NAME', 'gpt-5-nano')
+            if llm:
+                self.llm = llm
+            else:
+                try:
+                    # Dynamic import to avoid circular dependencies
+                    import sys
+                    import os
+                    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                    from core.context_manager import get_default_model
+                    model_info = get_default_model()
+                    self.llm = model_info['model']
+                except Exception:
+                    self.llm = 'gpt-4o'
         # Handle tools parameter - ensure it's always a list
         if callable(tools):
             # If a single function/callable is passed, wrap it in a list
@@ -483,7 +506,19 @@ class Agent:
         self.min_reflect = min_reflect
         self.reflect_prompt = reflect_prompt
         # Use the same model selection logic for reflect_llm
-        self.reflect_llm = reflect_llm or os.getenv('OPENAI_MODEL_NAME', 'gpt-5-nano')
+        if reflect_llm:
+            self.reflect_llm = reflect_llm
+        else:
+            try:
+                # Dynamic import to avoid circular dependencies
+                import sys
+                import os
+                sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                from core.context_manager import get_default_model
+                model_info = get_default_model()
+                self.reflect_llm = model_info['model']
+            except Exception:
+                self.reflect_llm = 'gpt-4o'
         self._console = None  # Lazy load console when needed
         
         # Initialize system prompt

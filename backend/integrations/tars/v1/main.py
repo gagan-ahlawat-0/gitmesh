@@ -134,9 +134,22 @@ class TarsMain:
         }
     
     def _get_default_llm_config(self) -> Dict[str, Any]:
-        """Get default LLM configuration."""
+        """Get default LLM configuration using enhanced model detection."""
+        # Get model from enhanced configuration system
+        model_name = None
+        try:
+            # Dynamic import to avoid circular dependencies
+            import sys
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            from core.context_manager import get_default_model
+            model_info = get_default_model()
+            model_name = model_info['model']
+        except Exception as e:
+            logging.warning(f"Could not get default model from context manager: {e}")
+            model_name = 'gpt-4o-mini'  # final fallback
+        
         return {
-            "model": "gpt-4o",
+            "model": model_name,
             "temperature": 0.7,
             "max_tokens": 4000,
             "stream": True,

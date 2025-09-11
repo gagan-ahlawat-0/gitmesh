@@ -30,14 +30,25 @@ DEFAULT_MEMORY_CONFIGS = {
     }
 }
 
+def get_default_model_from_env():
+    """Get default model using enhanced model detection from .env"""
+    try:
+        # Dynamic import to avoid circular dependencies
+        import sys
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        from core.context_manager import get_default_model
+        model_info = get_default_model()
+        return model_info['model']
+    except Exception:
+        return "gpt-4o-mini"  # final fallback
+
 DEFAULT_LLM_CONFIGS = {
-    "openai": {
-        "model": "gpt-4o",
+    "default": {
+        "model": None,  # Will be set dynamically from .env configuration
         "temperature": 0.7,
         "max_tokens": 4000,
         "stream": True,
-        "metrics": True,
-        "api_key": "${OPENAI_API_KEY}"
+        "metrics": True
     },
     
     "openai_turbo": {
@@ -46,7 +57,7 @@ DEFAULT_LLM_CONFIGS = {
         "max_tokens": 2000,
         "stream": True,
         "metrics": True,
-        "api_key": "${OPENAI_API_KEY}"
+        "api_key": "${MODEL_KEY}"
     },
     
     "local_llm": {

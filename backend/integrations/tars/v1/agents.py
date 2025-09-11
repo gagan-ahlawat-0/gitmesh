@@ -19,6 +19,47 @@ from ai.session import Session
 import ai.tools as tools
 from . import tools as tars_tools
 
+# Helper function to get default model from AI framework configuration
+def get_default_model() -> str:
+    """
+    Get the default model from environment configuration with automatic provider detection.
+    
+    This function uses the enhanced context manager's model detection capabilities.
+    
+    Returns:
+        str: The model name to use, following AI framework conventions
+    """
+    try:
+        # Import the enhanced model detection from context manager
+        from core.context_manager import get_default_model as get_enhanced_model
+        return get_enhanced_model()
+    except ImportError:
+        # Fallback to basic detection if context manager is not available
+        model_name = os.getenv('MODEL_NAME')
+        if model_name:
+            # Check if this is an Ollama configuration
+            base_url = os.getenv('OPENAI_BASE_URL', '')
+            # Check for Ollama by URL pattern (word 'ollama' or default port 11434)
+            is_ollama = ('ollama' in base_url.lower() or ':11434' in base_url)
+            
+            # If Ollama is configured, ensure proper format
+            if is_ollama and not model_name.startswith('ollama/'):
+                return f"ollama/{model_name}"
+            return model_name
+        
+        # Fallback to AI framework default
+        # Use enhanced model detection from core context manager
+        try:
+            # Dynamic import to avoid circular dependencies
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            from core.context_manager import get_default_model
+            model_info = get_default_model()
+            return model_info['model']
+        except Exception:
+            return 'gpt-4o-mini'  # final fallback
+
 # Data models for complex responses
 from .models import (
     ComparisonResult,
@@ -57,7 +98,7 @@ class WebCrawlerAgent(Agent):
             "backstory": "Expert in web scraping, content extraction, and URL analysis with advanced filtering capabilities",
             "tools": agent_tools,
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 15),
             **kwargs
@@ -127,7 +168,7 @@ class CodebaseAnalyzerAgent(Agent):
             "backstory": "Expert in code analysis, git operations, and software architecture with deep understanding of development patterns",
             "tools": agent_tools,
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 15),
             **kwargs
@@ -218,7 +259,7 @@ class DocumentProcessorAgent(Agent):
             "backstory": "Expert in document parsing, content extraction, and format conversion with advanced text processing capabilities",
             "tools": agent_tools,
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 15),
             **kwargs
@@ -303,7 +344,7 @@ class DataAnalyzerAgent(Agent):
             "backstory": "Expert in statistical analysis, data science methodologies, and insight extraction with advanced analytical capabilities",
             "tools": agent_tools,
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 15),
             **kwargs
@@ -430,7 +471,7 @@ class ControlPanelMonitorAgent(Agent):
             "backstory": "Expert in project management, issue tracking, and development workflows with comprehensive monitoring capabilities",
             "tools": agent_tools,
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 15),
             **kwargs
@@ -503,7 +544,7 @@ class KnowledgeOrchestratorAgent(Agent):
             "tools": agent_tools,
             "handoffs": handoff_agents,
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 20),
             **kwargs
@@ -572,7 +613,7 @@ class CodeComparisonAgent(Agent):
             "backstory": "Expert in code diff analysis, version control, and code review with semantic understanding",
             "tools": [],  # Uses analysis from other agents
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 15),
             **kwargs
@@ -656,7 +697,7 @@ class DocumentationAnalyzerAgent(Agent):
             "backstory": "Expert in technical writing and documentation maintenance with understanding of code-doc relationships",
             "tools": [],
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 15),
             **kwargs
@@ -728,7 +769,7 @@ class ProjectInsightsAgent(Agent):
             "backstory": "Expert in open source project management and community analysis with strategic oversight",
             "tools": [],
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 15),
             **kwargs
@@ -817,7 +858,7 @@ class ReasoningAgent(Agent):
             "backstory": "Expert in strategic analysis, pattern recognition, and decision support with advanced reasoning capabilities",
             "tools": [],
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "reasoning_steps": kwargs.get("reasoning_steps", True),
             "max_iter": kwargs.get("max_iter", 20),
@@ -904,7 +945,7 @@ class ConversationOrchestratorAgent(Agent):
             "backstory": "Expert in conversation management and intelligent routing with comprehensive understanding of specialist capabilities",
             "handoffs": handoff_agents,
             "memory": kwargs.get("memory", True),
-            "llm": kwargs.get("llm", "gpt-4o"),
+            "llm": kwargs.get("llm", get_default_model()),
             "verbose": kwargs.get("verbose", True),
             "max_iter": kwargs.get("max_iter", 25),
             **kwargs

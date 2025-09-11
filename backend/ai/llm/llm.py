@@ -20,6 +20,7 @@ from ..main import (
 )
 from rich.console import Console
 from rich.live import Live
+# Import context manager dynamically to avoid circular imports
 
 # Import token tracking
 try:
@@ -221,7 +222,7 @@ class LLM:
 
     def __init__(
         self,
-        model: str,
+        model: Optional[str] = None,
         timeout: Optional[int] = None,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
@@ -254,6 +255,25 @@ class LLM:
                 "Please install with: pip install 'gitmesh[llm]'"
             )
 
+        # Use enhanced model detection if no model provided or if base_url not set
+        if not model or not base_url:
+            try:
+                # Dynamic import to avoid circular dependencies
+                import sys
+                import os
+                sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+                from core.context_manager import get_default_model
+                
+                model_info = get_default_model()
+                if not model:
+                    model = model_info['model']
+                if not base_url and model_info['base_url']:
+                    base_url = model_info['base_url']
+            except Exception as e:
+                logging.warning(f"Could not get default model info: {e}")
+                if not model:
+                    model = 'gpt-4o'  # Final fallback
+        
         self.model = model
         self.timeout = timeout
         self.temperature = temperature

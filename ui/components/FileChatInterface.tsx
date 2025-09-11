@@ -438,7 +438,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onCopy }) =
         )}>
           <div className="flex items-start justify-between gap-2 mb-2">
             <span className="text-sm font-medium">
-              {isUser ? 'You' : 'Beetle AI'}
+              {isUser ? 'You' : 'TARS'}
             </span>
             <div className="flex items-center gap-1 text-xs opacity-70">
               <ClockIcon size={12} />
@@ -1705,7 +1705,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
                   <h3 className="text-base font-medium mb-1">Start Chatting with Your Files</h3>
                   <p className="text-xs text-muted-foreground">
                     Import files or select from your repository to start chatting. 
-                    Beetle AI will analyze the selected files and provide context-aware responses.
+                    TARS will analyze the selected files and provide context-aware responses.
                   </p>
                 </div>
                 
@@ -1759,7 +1759,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
                   <div className="bg-muted rounded-lg p-4">
                     <div className="flex items-center gap-2">
                       <Loader2 size={16} className="animate-spin" />
-                      <span className="text-sm">Beetle AI is thinking...</span>
+                      <span className="text-sm">TARS is thinking...</span>
                     </div>
                   </div>
                 </div>

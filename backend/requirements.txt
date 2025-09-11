@@ -14,12 +14,14 @@ alembic
 aiosqlite
 
 # Authentication
-python-jose
-passlib
+python-jose[cryptography]
+passlib[bcrypt]
 python-multipart
+PyJWT
 
 # Github API
 PyGithub
+gitingest
 
 # Utilities
 structlog
@@ -58,3 +60,4 @@ asyncpg
 unstructured
 markdown
 docx
+psycopg2-binary

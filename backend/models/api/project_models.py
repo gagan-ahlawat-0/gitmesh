@@ -132,7 +132,7 @@ class BeetleBranchData(BaseModel):
     commits: List[Dict[str, Any]] = Field(..., description="Branch commits")
 
 class BeetleInsights(BaseModel):
-    """Beetle AI insights"""
+    """TARS AI insights"""
     productivity: Dict[str, Any] = Field(..., description="Productivity metrics")
     collaboration: Dict[str, Any] = Field(..., description="Collaboration insights")
     code_quality: Dict[str, Any] = Field(..., description="Code quality analysis")

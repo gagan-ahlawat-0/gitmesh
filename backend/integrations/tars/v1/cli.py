@@ -116,8 +116,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--llm-model",
         type=str,
-        default="gpt-4o",
-        help="LLM model to use (default: gpt-4o)"
+        default=None,
+        help="LLM model to use (uses MODEL_PROVIDER/MODEL_NAME from .env if not specified)"
     )
     
     parser.add_argument(

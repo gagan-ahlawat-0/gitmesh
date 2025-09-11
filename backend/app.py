@@ -119,6 +119,26 @@ app.include_router(file_upload_router, prefix="/api/v1", tags=["file_upload"])
 app.include_router(static_router, tags=["static_files"])
 app.include_router(hub_router, prefix="/api/v1/hub", tags=["hub"])
 
+# Include AI import routes (TARS v1 integration)
+try:
+    from api.v1.routes.ai_import import router as ai_import_router
+    app.include_router(ai_import_router, prefix="/api/ai", tags=["ai_import"])
+    logger.info("✅ AI Import routes (TARS v1) loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ AI Import routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading AI Import routes: {e}")
+
+# Include Chat routes (bridges to TARS v1)
+try:
+    from api.v1.routes.chat import router as chat_router
+    app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
+    logger.info("✅ Chat routes (TARS v1 bridge) loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Chat routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Chat routes: {e}")
+
 # Add a test endpoint to verify the connection
 @app.get("/test")
 async def test_connection():

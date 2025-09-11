@@ -284,3 +284,7 @@ qdrant_storage/
 /tmp/
 /local/
 /data/
+
+.gitmesh
+.tars
+tars_sessions

@@ -225,15 +225,15 @@ class GitMeshAgents:
                     mem_cfg = next((t.config.get('memory_config') for t in tasks if hasattr(t, 'config') and t.config), None)
                 # Set default memory config if none provided
                 if not mem_cfg:
-                    mem_cfg = {
-                        "provider": "rag",
-                        "use_embedding": True,
-                        "storage": {
-                            "type": "sqlite",
-                            "path": "./.praison/memory.db"
-                        },
-                        "rag_db_path": "./.praison/chroma_db"
-                    }
+                        mem_cfg = {
+                            "provider": "rag",
+                            "use_embedding": True,
+                            "storage": {
+                                "type": "sqlite",
+                                "path": ".gitmesh/memory.db"
+                            },
+                            "rag_db_path": ".gitmesh/chroma_db"
+                        }
                 # Add embedder config if provided
                 if embedder:
                     if isinstance(embedder, dict):

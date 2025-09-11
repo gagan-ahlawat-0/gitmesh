@@ -60,7 +60,7 @@ class ModelRouter:
             context_window=128000
         ),
         ModelProfile(
-            name="gemini/gemini-1.5-flash",
+            name="google/gemini-1.5-flash",
             provider="google",
             complexity_range=(TaskComplexity.SIMPLE, TaskComplexity.MODERATE),
             cost_per_1k_tokens=0.000125,  # Very cost-effective
@@ -100,7 +100,7 @@ class ModelRouter:
         
         # High-end models for complex tasks
         ModelProfile(
-            name="gemini/gemini-1.5-pro",
+            name="google/gemini-1.5-pro",
             provider="google",
             complexity_range=(TaskComplexity.COMPLEX, TaskComplexity.VERY_COMPLEX),
             cost_per_1k_tokens=0.00625,  # Average of $0.00125 input, $0.005 output

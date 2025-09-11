@@ -13,16 +13,34 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 import structlog
 
-from .auth import get_current_user
+from .dependencies import get_current_user
 from models.api.auth_models import User
 from models.api.ai_import_models import (
     ImportRequest, ImportResponse, TarsImportRequest, TarsImportResponse,
     ImportSourceType, ImportStatus
 )
-from config.settings import get_settings
-from config.database import get_database_manager
-from integrations.tars.v1.main import TarsMain
-from integrations.tars.v1.tars_wrapper import TarsWrapper
+
+# Safe imports for GitMesh components
+try:
+    from config.settings import get_settings
+    from config.database import get_database_manager
+    GITMESH_AVAILABLE = True
+    settings = get_settings()
+    db_manager = get_database_manager()
+except ImportError as e:
+    GITMESH_AVAILABLE = False
+    settings = None
+    db_manager = None
+
+# Safe imports for TARS v1
+try:
+    from integrations.tars.v1.main import TarsMain
+    from integrations.tars.v1.tars_wrapper import GitMeshTarsWrapper
+    TARS_AVAILABLE = True
+except ImportError as e:
+    TARS_AVAILABLE = False
+    TarsMain = None
+    GitMeshTarsWrapper = None
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -35,63 +53,34 @@ TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MAX_FILE_SIZE = 50 * 1024 * 1024
 
 class TarsImportService:
-    """Service for handling TARS v1 imports and database integration"""
+    """Service class for handling TARS v1 imports"""
     
-    def __init__(self, user: User):
-        self.user = user
-        self.settings = get_settings()
-        self.db_manager = get_database_manager()
-        self.temp_dir = TEMP_UPLOAD_DIR / f"user_{user.id}"
-        self.temp_dir.mkdir(exist_ok=True)
+    def __init__(self):
+        if not GITMESH_AVAILABLE:
+            raise HTTPException(status_code=500, detail="GitMesh backend not available")
+        if not TARS_AVAILABLE:
+            raise HTTPException(status_code=500, detail="TARS v1 integration not available")
+            
+        self.settings = settings
+        self.db_manager = db_manager
+        self.active_sessions: Dict[str, Any] = {}
     
-    async def create_tars_session(self, project_id: str, repository_id: Optional[str] = None) -> TarsMain:
-        """Create a new TARS session with Supabase/Qdrant integration"""
-        try:
-            # Configure TARS to use existing Supabase/Qdrant infrastructure
-            memory_config = {
-                "provider": "supabase",
-                "use_embedding": True,
-                "embedding_provider": "sentence_transformers",
-                "quality_scoring": True,
-                "advanced_memory": True,
-                # Use existing database connections
-                "supabase_url": self.settings.supabase_url,
-                "supabase_anon_key": self.settings.supabase_anon_key,
-                "qdrant_url": self.settings.qdrant_url_from_env,
-                "qdrant_api_key": self.settings.qdrant_connection_api_key,
-                "collection_name": f"tars_import_{self.user.id}_{project_id}"
-            }
-            
-            knowledge_config = {
-                "vector_store": {
-                    "provider": "qdrant",
-                    "config": {
-                        "url": self.settings.qdrant_url_from_env,
-                        "api_key": self.settings.qdrant_connection_api_key,
-                        "collection_name": f"gitmesh_knowledge_{self.user.id}_{project_id}",
-                        "vector_size": 384  # BGE-small embedding size
-                    }
-                }
-            }
-            
-            tars = TarsMain(
-                user_id=str(self.user.id),
-                project_id=project_id,
-                memory_config=memory_config,
-                knowledge_config=knowledge_config,
-                verbose=True
-            )
-            
-            # Initialize TARS system
-            if await tars.initialize():
-                logger.info(f"TARS session created for user {self.user.id}, project {project_id}")
-                return tars
-            else:
-                raise Exception("Failed to initialize TARS system")
-                
-        except Exception as e:
-            logger.error(f"Error creating TARS session: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create TARS session: {str(e)}")
+    async def create_tars_session(self, project_id: str, repository_id: Optional[str] = None):
+        """Create and configure a TARS session for import"""
+        session_id = str(uuid.uuid4())
+        
+        # Initialize TARS wrapper
+        wrapper = GitMeshTarsWrapper(
+            session_id=session_id,
+            project_id=project_id,
+            repository_id=repository_id
+        )
+        
+        # Create TARS session
+        tars_session = wrapper.create_session()
+        self.active_sessions[session_id] = tars_session
+        
+        return tars_session
     
     async def process_file_import(
         self, 
@@ -497,3 +486,85 @@ async def delete_import(
     except Exception as e:
         logger.error(f"Error deleting import: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete import: {str(e)}")
+
+
+@router.post("/knowledge/build")
+async def build_knowledge_base(
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Build knowledge base from imported content"""
+    try:
+        project_id = request.get("project_id", "default")
+        repository_id = request.get("repository_id")
+        branch = request.get("branch", "main")
+        force_rebuild = request.get("force_rebuild", False)
+        
+        # Create TARS wrapper for knowledge building
+        wrapper = GitMeshTarsWrapper(
+            user_id=str(current_user.id),
+            project_id=project_id,
+            repository_id=repository_id,
+            branch=branch
+        )
+        
+        # Build knowledge base
+        result = await wrapper.import_and_build_knowledge(
+            source_type="knowledge_build",
+            content="Building knowledge base from existing imports",
+            metadata={
+                "user_id": str(current_user.id),
+                "force_rebuild": force_rebuild,
+                "build_timestamp": datetime.now().isoformat()
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": "Knowledge base built successfully",
+            "knowledge_entries": result.get("knowledge_entries", 0),
+            "embeddings_created": result.get("embeddings_created", 0),
+            "project_id": project_id,
+            "repository_id": repository_id,
+            "branch": branch
+        }
+    
+    except Exception as e:
+        logger.error(f"Error building knowledge base: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to build knowledge base: {str(e)}")
+
+
+@router.get("/knowledge/stats")
+async def get_knowledge_stats(
+    project_id: Optional[str] = None,
+    repository_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Get knowledge base statistics"""
+    try:
+        # Create TARS wrapper for stats retrieval
+        wrapper = GitMeshTarsWrapper(
+            user_id=str(current_user.id),
+            project_id=project_id or "default",
+            repository_id=repository_id,
+            branch="main"
+        )
+        
+        # Get knowledge base stats (would be implemented in wrapper)
+        stats = {
+            "total_entries": 0,
+            "total_embeddings": 0,
+            "last_updated": None,
+            "project_id": project_id,
+            "repository_id": repository_id,
+            "user_id": str(current_user.id)
+        }
+        
+        return {
+            "success": True,
+            "stats": stats
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting knowledge stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get knowledge stats: {str(e)}")
