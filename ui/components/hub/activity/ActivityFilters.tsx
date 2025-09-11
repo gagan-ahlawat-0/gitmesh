@@ -20,12 +20,12 @@ export const ActivityFilters: React.FC<ActivityFiltersProps> = ({ repositories, 
   };
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-col md:flex-row items-center gap-4">
       <Select onValueChange={setSelectedRepo} defaultValue="all">
-        <SelectTrigger className="w-[280px]">
+        <SelectTrigger className="w-full md:w-[280px] bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-orange-500 focus:border-orange-500">
           <SelectValue placeholder="Select a repository" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-gray-800 text-white border-gray-700">
           <SelectItem value="all">All Repositories</SelectItem>
           {repositories.map((repo) => (
             <SelectItem key={repo.id} value={repo.full_name}>
@@ -35,7 +35,7 @@ export const ActivityFilters: React.FC<ActivityFiltersProps> = ({ repositories, 
         </SelectContent>
       </Select>
       <DateRangePicker onRangeChange={setDateRange} />
-      <Button onClick={handleFilterChange}>Apply Filters</Button>
+      <Button onClick={handleFilterChange} className="w-full md:w-auto bg-orange-500 text-black hover:bg-orange-600">Apply Filters</Button>
     </div>
   );
 };

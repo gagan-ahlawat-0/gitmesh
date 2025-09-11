@@ -40,10 +40,10 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold flex items-center gap-2">
             <Github className="w-5 h-5" />
-            Login to Beetle
+            Login to GitMesh
           </DialogTitle>
           <DialogDescription>
-            Connect your GitHub account or try the demo to access Beetle's branch-level intelligence features.
+            Connect your GitHub account or try the demo to access GitMesh's branch-level intelligence features.
           </DialogDescription>
         </DialogHeader>
         
@@ -64,7 +64,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           </div>
           
           <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md">
-            <strong>Note:</strong> Beetle will only access your public repositories and basic profile information. 
+            <strong>Note:</strong> GitMesh will only access your public repositories and basic profile information. 
             Your private data remains secure and is not stored on our servers.
           </div>
         </div>

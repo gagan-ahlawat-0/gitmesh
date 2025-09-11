@@ -95,13 +95,13 @@ export function HubNavigation() {
               <div className="w-8 h-8 rounded-lg overflow-hidden">
                 <Image 
                   src="/favicon.png" 
-                  alt="Beetle" 
+                  alt="GitMesh" 
                   width={32} 
                   height={32}
                   className="object-contain"
                 />
               </div>
-              <span className="text-xl font-bold">Beetle</span>
+              <span className="text-xl font-bold">GitMesh</span>
             </div>
 
             {/* Navigation Items */}

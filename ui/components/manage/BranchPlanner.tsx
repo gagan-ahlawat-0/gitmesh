@@ -74,7 +74,7 @@ const BranchPlanner = ({ branch }: BranchPlannerProps) => {
   const [showReviewConfirmation, setShowReviewConfirmation] = useState(false);
   const [pendingMove, setPendingMove] = useState<{ task: Task; targetStage: string } | null>(null);
 
-  const storageKey = `beetle-planner-${branch}`;
+  const storageKey = `GitMesh-planner-${branch}`;
 
   useEffect(() => {
     try {

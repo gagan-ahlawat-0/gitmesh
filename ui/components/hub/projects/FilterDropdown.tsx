@@ -7,16 +7,16 @@ interface FilterDropdownProps {
 
 export const FilterDropdown: React.FC<FilterDropdownProps> = ({ onFilterChange, languages }) => (
   <Select onValueChange={onFilterChange}>
-    <SelectTrigger className="w-[180px]">
+    <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-orange-500 focus:border-orange-500">
       <SelectValue placeholder="Filter by..." />
     </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="all">All</SelectItem>
-      <SelectItem value="owner">Owned</SelectItem>
-      <SelectItem value="member">Contributed</SelectItem>
-      <SelectItem value="fork">Forked</SelectItem>
+    <SelectContent className="bg-gray-800 text-white border-gray-700">
+      <SelectItem value="all" className="hover:bg-gray-700">All</SelectItem>
+      <SelectItem value="owner" className="hover:bg-gray-700">Owned</SelectItem>
+      <SelectItem value="member" className="hover:bg-gray-700">Contributed</SelectItem>
+      <SelectItem value="fork" className="hover:bg-gray-700">Forked</SelectItem>
       {languages.map((lang) => (
-        <SelectItem key={lang} value={lang}>{
+        <SelectItem key={lang} value={lang} className="hover:bg-gray-700">{
           lang
         }</SelectItem>
       ))}

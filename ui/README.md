@@ -1,6 +1,6 @@
-# Beetle Frontend
+# GitMesh Frontend
 
-Frontend for Beetle - a Git-based collaboration platform with AI-powered processing.
+Frontend for GitMesh - a Git-based collaboration platform with AI-powered processing.
 
 ## Setup
 

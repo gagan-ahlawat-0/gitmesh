@@ -71,8 +71,8 @@ export default function HubSettings() {
         const demoRepos: ConnectedRepository[] = [
           {
             id: '1',
-            name: 'beetle-app',
-            full_name: 'demo-user/beetle-app',
+            name: 'GitMesh-app',
+            full_name: 'demo-user/GitMesh-app',
             owner: {
               login: 'demo-user',
               avatar_url: 'https://github.com/github.png'
@@ -87,8 +87,8 @@ export default function HubSettings() {
           },
           {
             id: '2',
-            name: 'beetle-frontend',
-            full_name: 'demo-user/beetle-frontend',
+            name: 'GitMesh-frontend',
+            full_name: 'demo-user/GitMesh-frontend',
             owner: {
               login: 'demo-user',
               avatar_url: 'https://github.com/github.png'
@@ -351,7 +351,7 @@ export default function HubSettings() {
                 </Button>
               </CardTitle>
               <CardDescription>
-                Repositories you've connected to Beetle for contribution tracking
+                Repositories you've connected to GitMesh for contribution tracking
               </CardDescription>
             </CardHeader>
             <CardContent>

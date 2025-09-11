@@ -41,7 +41,7 @@ interface RepositoryProviderProps {
   children: ReactNode;
 }
 
-const REPOSITORY_STORAGE_KEY = 'beetle-selected-repository';
+const REPOSITORY_STORAGE_KEY = 'GitMesh-selected-repository';
 
 export const RepositoryProvider: React.FC<RepositoryProviderProps> = ({ children }) => {
   const [repository, setRepository] = useState<RepositoryData | null>(null);

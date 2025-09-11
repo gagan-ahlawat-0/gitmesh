@@ -27,7 +27,7 @@ async def get_user_projects(
     Get all projects for the current user
     
     Returns a list of projects including:
-    - Saved Beetle projects
+    - Saved GitMesh projects
     - User's GitHub repositories as potential projects
     - Basic analytics for each project
     """
@@ -110,7 +110,7 @@ async def create_new_project(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Create a new Beetle project
+    Create a new GitMesh project
     
     Request Body:
     - name: Project name (required)
@@ -283,7 +283,7 @@ async def import_repository_as_project(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Import a GitHub repository as a Beetle project
+    Import a GitHub repository as a GitMesh project
     
     Request Body:
     - repository_url: GitHub repository URL (required)
@@ -302,7 +302,7 @@ async def import_repository_as_project(
         )
         
         return RepositoryImportResponse(
-            message="Repository imported successfully as Beetle project",
+            message="Repository imported successfully as GitMesh project",
             project=project
         )
         
@@ -327,13 +327,13 @@ async def get_beetle_project_data_route(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get Beetle-specific project data for contribution page
+    Get GitMesh-specific project data for contribution page
     
     Path Parameters:
     - project_id: Project identifier
     
     Returns:
-    - Comprehensive Beetle project analysis
+    - Comprehensive GitMesh project analysis
     - Branch-level intelligence and insights
     - AI-powered recommendations
     - Project health metrics
@@ -346,7 +346,7 @@ async def get_beetle_project_data_route(
                 status_code=404,
                 detail={
                     "error": "Project not found",
-                    "message": f"Beetle project with ID '{project_id}' not found"
+                    "message": f"GitMesh project with ID '{project_id}' not found"
                 }
             )
         
@@ -356,7 +356,7 @@ async def get_beetle_project_data_route(
         raise
     except Exception as error:
         logger.error(
-            "Error getting Beetle project data", 
+            "Error getting GitMesh project data", 
             error=str(error), 
             project_id=project_id,
             user_id=current_user.id
@@ -364,7 +364,7 @@ async def get_beetle_project_data_route(
         raise HTTPException(
             status_code=500,
             detail={
-                "error": "Failed to fetch Beetle project data",
+                "error": "Failed to fetch GitMesh project data",
                 "message": str(error)
             }
         )

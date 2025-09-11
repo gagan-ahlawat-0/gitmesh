@@ -48,7 +48,7 @@ export function RepositoryCard({ repo }: { repo: any }) {
           size="sm" 
           onClick={handleOpenInBeetle}
         >
-          Open in Beetle
+          Open in GitMesh
         </Button>
       </CardFooter>
     </Card>

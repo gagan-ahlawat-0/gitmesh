@@ -1,19 +1,20 @@
 "use client";
 
 import { HubHeader } from "@/components/hub/HubHeader";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, lazy, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { InsightCard } from "@/components/hub/insights/InsightCard";
-import { Chart } from "@/components/hub/insights/Chart";
-import GitHubAPI, { Repository } from "@/lib/github-api";
 import { GitCommit, GitPullRequest, Star, Users } from "lucide-react";
 import { HubInsightsSkeleton } from "@/components/hub/insights/HubInsightsSkeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ContributorSpotlight } from "@/components/hub/insights/ContributorSpotlight";
-import { PullRequestVelocity } from "@/components/hub/insights/PullRequestVelocity";
+import { Repository } from "@/lib/github-api";
+
+const Chart = lazy(() => import("@/components/hub/insights/Chart"));
+const ContributorSpotlight = lazy(() => import("@/components/hub/insights/ContributorSpotlight"));
+const PullRequestVelocity = lazy(() => import("@/components/hub/insights/PullRequestVelocity"));
 
 export default function HubInsightsPage() {
-  const { token, user, githubApi } = useAuth();
+  const { user, githubApi } = useAuth();
   const [summary, setSummary] = useState<any>(null);
   const [languages, setLanguages] = useState<any[]>([]);
   const [commitHistory, setCommitHistory] = useState<any[]>([]);
@@ -25,12 +26,18 @@ export default function HubInsightsPage() {
 
   useEffect(() => {
     if (githubApi) {
+      setLoading(true);
+      githubApi.getUserRepositories().then((repos) => {
+        setRepositories(repos);
+        setLoading(false);
+      });
+    }
+  }, [githubApi]);
+
+  useEffect(() => {
+    if (githubApi) {
       const api = githubApi;
       setLoading(true);
-
-      api.getUserRepositories().then((repos) => {
-        setRepositories(repos);
-      });
 
       const fetchInsights = async () => {
         const [summary, repos] = await Promise.all([
@@ -89,39 +96,10 @@ export default function HubInsightsPage() {
 
       fetchInsights();
     }
-  }, [token, selectedRepo]);
+  }, [githubApi, selectedRepo]);
 
-  if (loading) {
-    return <HubInsightsSkeleton />;
-  }
-
-  return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <HubHeader
-        title="Insights"
-        subtitle="Explore insights and trends in your projects."
-      />
-      <div className="flex justify-end mb-4">
-        <Select onValueChange={setSelectedRepo} defaultValue="all">
-          <SelectTrigger className="w-[280px]">
-            <SelectValue placeholder="Select a repository" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Repositories</SelectItem>
-            {repositories.map((repo) => (
-              <SelectItem key={repo.id} value={repo.full_name}>
-                {repo.full_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-        <InsightCard title="Total Commits" value={summary?.totalCommits || 0} icon={<GitCommit className="h-4 w-4 text-gray-500" />} />
-        <InsightCard title="Open PRs" value={summary?.openPRs || 0} icon={<GitPullRequest className="h-4 w-4 text-gray-500" />} />
-        <InsightCard title="Total Stars" value={summary?.totalStars || 0} icon={<Star className="h-4 w-4 text-gray-500" />} />
-        <InsightCard title="Total Collaborators" value={summary?.totalCollaborators || 0} icon={<Users className="h-4 w-4 text-gray-500" />} />
-      </div>
+  const memoizedCharts = useMemo(() => (
+    <Suspense fallback={<HubInsightsSkeleton />}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <Chart data={languages} title="Language Distribution" />
         <Chart data={commitHistory} title="Commit History" />
@@ -129,6 +107,43 @@ export default function HubInsightsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         {selectedRepo !== 'all' && <ContributorSpotlight data={contributors} />}
         <PullRequestVelocity data={pullRequestVelocity} />
+      </div>
+    </Suspense>
+  ), [languages, commitHistory, contributors, pullRequestVelocity, selectedRepo]);
+
+  if (loading && !summary) {
+    return <HubInsightsSkeleton />;
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <HubHeader
+          title="Insights"
+          subtitle="Explore insights and trends in your projects."
+        />
+        <div className="flex justify-end mb-4 mt-8">
+          <Select onValueChange={setSelectedRepo} defaultValue="all">
+            <SelectTrigger className="w-full md:w-[280px] bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-orange-500 focus:border-orange-500">
+              <SelectValue placeholder="Select a repository" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 text-white border-gray-700">
+              <SelectItem value="all">All Repositories</SelectItem>
+              {repositories.map((repo) => (
+                <SelectItem key={repo.id} value={repo.full_name}>
+                  {repo.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+          <InsightCard title="Total Commits" value={summary?.totalCommits || 0} icon={<GitCommit className="h-6 w-6 text-orange-500" />} />
+          <InsightCard title="Open PRs" value={summary?.openPRs || 0} icon={<GitPullRequest className="h-6 w-6 text-orange-500" />} />
+          <InsightCard title="Total Stars" value={summary?.totalStars || 0} icon={<Star className="h-6 w-6 text-orange-500" />} />
+          <InsightCard title="Total Collaborators" value={summary?.totalCollaborators || 0} icon={<Users className="h-6 w-6 text-orange-500" />} />
+        </div>
+        {memoizedCharts}
       </div>
     </div>
   );

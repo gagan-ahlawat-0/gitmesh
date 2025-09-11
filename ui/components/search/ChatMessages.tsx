@@ -20,7 +20,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ activeChat }) => {
         className="h-full flex items-center justify-center"
       >
         <div className="text-center space-y-2 max-w-md">
-          <h3 className="text-xl font-medium">Chat with Beetle</h3>
+          <h3 className="text-xl font-medium">Chat with GitMesh</h3>
           <p className="text-muted-foreground">
             Ask questions to search across your branches, documents, and knowledge base.
           </p>

@@ -428,7 +428,7 @@ export const ErrorFallback: React.FC<ErrorFallbackProps> = ({
       onReport();
     } else {
       // Default reporting behavior
-      const issueUrl = `https://github.com/your-org/beetle/issues/new?title=Error%20Report&body=${encodeURIComponent(`
+      const issueUrl = `https://github.com/your-org/GitMesh/issues/new?title=Error%20Report&body=${encodeURIComponent(`
 **Error Type:** ${type}
 **Error Code:** ${errorCode || 'N/A'}
 **Status Code:** ${statusCode || 'N/A'}

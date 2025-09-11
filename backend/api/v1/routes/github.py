@@ -474,7 +474,7 @@ async def get_branch_data(
     token: str = Depends(require_auth),
     since: Optional[str] = Query(None, description="Since date for commits")
 ):
-    """Get branch-specific data for Beetle."""
+    """Get branch-specific data for GitMesh."""
     try:
         # Fetch branch-specific data
         branches = await github_service.get_repository_branches(owner, repo, token=token)

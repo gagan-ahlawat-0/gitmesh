@@ -168,7 +168,7 @@ class GitHubAPIClient:
         # Prepare headers
         headers = {
             'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'Beetle-AI'
+            'User-Agent': 'GitMesh-AI'
         }
         
         if token:

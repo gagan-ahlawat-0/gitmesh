@@ -1651,7 +1651,6 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <h2 className="font-medium">Chat with Files</h2>
                 {activeSession && (
                   <Badge variant="outline" className="text-xs">
                     {activeSession.title}
@@ -1675,20 +1674,6 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
                 <List size={16} />
                 <span className="hidden sm:inline">Sessions</span>
               </Button>
-              {!isSidebarCollapsed && (
-                <button
-                  onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-2 rounded-lg hover:bg-muted"
-                >
-                  <Maximize2 size={16} />
-                </button>
-              )}
-              <button
-                onClick={() => setIsSidebarCollapsed(false)}
-                className="p-2 rounded-lg hover:bg-muted"
-              >
-                <SettingsIcon size={16} />
-              </button>
             </div>
           </div>
         </div>

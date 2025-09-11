@@ -74,7 +74,7 @@ class Project(ProjectBase):
     updated_at: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     analytics: ProjectAnalytics = Field(default_factory=ProjectAnalytics, description="Project analytics")
     recent_activity: Optional[RecentActivity] = Field(None, description="Recent project activity")
-    is_beetle_project: bool = Field(default=False, description="Whether this is a Beetle-enhanced project")
+    is_beetle_project: bool = Field(default=False, description="Whether this is a GitMesh-enhanced project")
     
     # GitHub-specific fields (when imported from repository)
     full_name: Optional[str] = Field(None, description="Full repository name (owner/repo)")
@@ -96,7 +96,7 @@ class ProjectListItem(BaseModel):
     issues: int = Field(default=0, description="Issue count")
     updated_at: datetime = Field(..., description="Last update timestamp")
     html_url: Optional[HttpUrl] = Field(None, description="Repository URL")
-    is_beetle_project: bool = Field(default=False, description="Beetle project status")
+    is_beetle_project: bool = Field(default=False, description="GitMesh project status")
     analytics: ProjectAnalytics = Field(..., description="Basic analytics")
 
 # --- Repository Import Models ---
@@ -112,10 +112,10 @@ class RepositoryImportResponse(BaseModel):
     message: str = Field(..., description="Import status message")
     project: Project = Field(..., description="Imported project data")
 
-# --- Beetle-Specific Models ---
+# --- GitMesh-Specific Models ---
 
 class BeetleProjectSummary(BaseModel):
-    """Beetle project summary statistics"""
+    """GitMesh project summary statistics"""
     total_branches: int = Field(..., description="Total number of branches")
     total_issues: int = Field(..., description="Total number of issues")
     total_pull_requests: int = Field(..., description="Total number of pull requests")
@@ -123,7 +123,7 @@ class BeetleProjectSummary(BaseModel):
     active_branches: int = Field(..., description="Number of active branches")
 
 class BeetleBranchData(BaseModel):
-    """Beetle-specific branch data"""
+    """GitMesh-specific branch data"""
     name: str = Field(..., description="Branch name")
     protected: bool = Field(..., description="Protection status")
     last_commit: Dict[str, Any] = Field(..., description="Last commit info")
@@ -139,7 +139,7 @@ class BeetleInsights(BaseModel):
     branch_health: Dict[str, Any] = Field(..., description="Branch health assessment")
 
 class BeetleProjectData(BaseModel):
-    """Complete Beetle project data"""
+    """Complete GitMesh project data"""
     project: ProjectListItem = Field(..., description="Project information")
     branches: List[BeetleBranchData] = Field(..., description="Branch data")
     summary: BeetleProjectSummary = Field(..., description="Project summary")
@@ -191,8 +191,8 @@ class ProjectAnalyticsResponse(BaseModel):
     recent_activity: Optional[RecentActivity] = Field(None, description="Recent activity")
 
 class BeetleProjectResponse(BaseModel):
-    """Beetle project data response"""
-    beetle_data: BeetleProjectData = Field(..., description="Beetle project data")
+    """GitMesh project data response"""
+    beetle_data: BeetleProjectData = Field(..., description="GitMesh project data")
 
 # --- Validation Models ---
 

@@ -160,7 +160,6 @@ export const Navbar = () => {
   
   const authNavItems = [
     { to: '/contribution/manage', icon: <Table size={20} />, label: 'Manage', id: 'manage' },
-    { to: '/contribution/search', icon: <Search size={20} />, label: 'Search', id: 'search' },
     { to: '/contribution/import', icon: <Upload size={20} />, label: 'Import', id: 'import' },
     { to: '/contribution/profile', icon: <User size={20} />, label: 'Profile', id: 'profile' },
     { to: '/contribution/settings', icon: <Settings size={20} />, label: 'Settings', id: 'settings' },

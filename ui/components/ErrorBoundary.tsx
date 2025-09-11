@@ -184,7 +184,7 @@ Timestamp: ${new Date().toISOString()}
   };
 
   const reportIssue = () => {
-    const issueUrl = `https://github.com/your-org/beetle/issues/new?title=Error%20Report%20${errorId}&body=${encodeURIComponent(`
+    const issueUrl = `https://github.com/your-org/GitMesh/issues/new?title=Error%20Report%20${errorId}&body=${encodeURIComponent(`
 **Error ID:** ${errorId}
 **Message:** ${error.message}
 **Context:** ${context || 'Unknown'}

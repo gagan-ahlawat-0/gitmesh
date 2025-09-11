@@ -83,15 +83,15 @@ export const useGitHubData = () => {
     const mockRepos: Repository[] = [
       {
         id: 1,
-        name: "beetle-app",
-        full_name: "demo-user/beetle-app",
+        name: "GitMesh-app",
+        full_name: "demo-user/GitMesh-app",
         description: "AI-powered GitHub contribution manager with structured planning and branch-aware workflows",
         language: "TypeScript",
         stargazers_count: 15,
         forks_count: 3,
         updated_at: new Date().toISOString(),
         private: false,
-        html_url: "https://github.com/demo-user/beetle-app",
+        html_url: "https://github.com/demo-user/GitMesh-app",
         owner: {
           login: "demo-user",
           avatar_url: "https://github.com/github.png"
@@ -139,7 +139,7 @@ export const useGitHubData = () => {
           avatar_url: "https://github.com/github.png"
         },
         repo: {
-          name: "demo-user/beetle-app"
+          name: "demo-user/GitMesh-app"
         },
         created_at: new Date().toISOString(),
         payload: {
@@ -154,7 +154,7 @@ export const useGitHubData = () => {
           avatar_url: "https://github.com/github.png"
         },
         repo: {
-          name: "demo-user/beetle-app"
+          name: "demo-user/GitMesh-app"
         },
         created_at: new Date(Date.now() - 3600000).toISOString(),
         payload: {

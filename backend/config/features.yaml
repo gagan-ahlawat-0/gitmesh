@@ -2,7 +2,7 @@
 # APPLICATION SETTINGS
 # ========================
 app:
-  name: "Beetle RAG System"
+  name: "GitMesh RAG System"
   debug: true
   environment: "development"
   api_prefix: "/api/v1"

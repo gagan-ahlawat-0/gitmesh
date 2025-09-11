@@ -182,9 +182,9 @@ function getDemoSettings(): UserSettings {
   return {
     profile: {
       displayName: 'Demo User',
-      bio: 'This is a demo account showing Beetle functionality',
+      bio: 'This is a demo account showing GitMesh functionality',
       location: 'Demo City',
-      website: 'https://beetle-demo.com',
+      website: 'https://GitMesh-demo.com',
       company: 'Demo Company',
       twitter: 'demo_user'
     },

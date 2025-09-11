@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     # ========================
     @property
     def app_name(self) -> str:
-        return self.get_yaml_config("app.name", "Beetle RAG System")
+        return self.get_yaml_config("app.name", "GitMesh RAG System")
     
     @property
     def debug(self) -> bool:

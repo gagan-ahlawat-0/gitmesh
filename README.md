@@ -176,7 +176,7 @@ cp ui/.env.example ui/.env
   
 ### 👾 Static Demo
 
-[Deployed on Vercel](https://beetle-demo.vercel.app/)
+[Deployed on Vercel](https://GitMesh-demo.vercel.app/)
 
 ## </> Roadmap
 

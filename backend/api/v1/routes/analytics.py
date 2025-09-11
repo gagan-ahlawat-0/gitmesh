@@ -105,7 +105,7 @@ async def get_branch_analytics_route(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get branch-specific analytics for Beetle
+    Get branch-specific analytics for GitMesh
     
     Returns:
     - Branch information and protection status

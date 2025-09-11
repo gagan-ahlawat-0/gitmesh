@@ -63,7 +63,7 @@ export default function ContributionLayout({
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
         
-        toast.success(`Opened ${validatedRepoData.full_name} in Beetle`);
+        toast.success(`Opened ${validatedRepoData.full_name} in GitMesh`);
       } catch (error) {
         console.error('Error parsing repository data:', error);
         toast.error('Invalid repository data. Please try again.');
@@ -82,9 +82,9 @@ export default function ContributionLayout({
     // 4. Repository context has finished loading (to avoid overriding restored repository)
     if (isAuthenticated && token === 'demo-token' && !repository && !repoProcessedRef.current && isRepositoryLoaded) {
       const demoRepository = {
-        name: 'beetle-app',
-        full_name: 'demo-user/beetle-app',
-        description: 'A demo repository for testing Beetle features',
+        name: 'GitMesh-app',
+        full_name: 'demo-user/GitMesh-app',
+        description: 'A demo repository for testing GitMesh features',
         owner: {
           login: 'demo-user',
           avatar_url: 'https://github.com/github.png',
@@ -93,8 +93,8 @@ export default function ContributionLayout({
         language: 'TypeScript',
         stargazers_count: 42,
         forks_count: 8,
-        html_url: 'https://github.com/demo-user/beetle-app',
-        clone_url: 'https://github.com/demo-user/beetle-app.git',
+        html_url: 'https://github.com/demo-user/GitMesh-app',
+        clone_url: 'https://github.com/demo-user/GitMesh-app.git',
         default_branch: '',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: new Date().toISOString(),

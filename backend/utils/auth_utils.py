@@ -138,7 +138,7 @@ class GitHubOAuth:
         
         headers = {
             'Accept': 'application/json',
-            'User-Agent': 'Beetle-AI'
+            'User-Agent': 'GitMesh-AI'
         }
         
         async with aiohttp.ClientSession() as session:
@@ -161,7 +161,7 @@ class GitHubOAuth:
         headers = {
             'Authorization': f'token {access_token}',
             'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'Beetle-AI'
+            'User-Agent': 'GitMesh-AI'
         }
         
         async with aiohttp.ClientSession() as session:
@@ -362,9 +362,9 @@ def get_demo_settings() -> Dict[str, Any]:
     return {
         'profile': {
             'display_name': 'Demo User',
-            'bio': 'This is a demo account showing Beetle functionality',
+            'bio': 'This is a demo account showing GitMesh functionality',
             'location': 'Demo City',
-            'website': 'https://beetle-demo.com',
+            'website': 'https://GitMesh-demo.com',
             'company': 'Demo Company',
             'twitter': 'demo_user'
         },

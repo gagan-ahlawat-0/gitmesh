@@ -163,10 +163,10 @@ class ProjectService:
         )
     
     def _is_beetle_project(self, repo: Dict[str, Any]) -> bool:
-        """Check if repository is a Beetle project"""
+        """Check if repository is a GitMesh project"""
         topics = repo.get('topics', [])
         name = repo.get('name', '').lower()
-        return 'beetle' in topics or 'beetle' in name
+        return 'GitMesh' in topics or 'GitMesh' in name
     
     async def get_project_details(
         self, 
@@ -448,7 +448,7 @@ class ProjectService:
         import_request: RepositoryImportRequest, 
         user_id: str
     ) -> Project:
-        """Import repository as Beetle project"""
+        """Import repository as GitMesh project"""
         try:
             logger.info("Importing repository", repository_url=str(import_request.repository_url), user_id=user_id)
             
@@ -528,7 +528,7 @@ class ProjectService:
         self, 
         project_id: str
     ) -> Optional[BeetleProjectData]:
-        """Get Beetle-specific project data"""
+        """Get GitMesh-specific project data"""
         cache_key = f"beetle_project:{project_id}"
         
         # Check cache first
@@ -537,14 +537,14 @@ class ProjectService:
             return BeetleProjectData(**cached_data)
         
         try:
-            logger.info("Getting Beetle project data", project_id=project_id)
+            logger.info("Getting GitMesh project data", project_id=project_id)
             
             project = await self.db.get_project(project_id)
             
             if not project or not project.repository_url:
                 return None
             
-            # Fetch comprehensive data for Beetle analysis
+            # Fetch comprehensive data for GitMesh analysis
             url_parts = str(project.repository_url).split('/')
             owner = url_parts[-2]
             repo = url_parts[-1]
@@ -624,11 +624,11 @@ class ProjectService:
             return beetle_data
             
         except Exception as error:
-            logger.error("Error getting Beetle project data", error=str(error), project_id=project_id)
+            logger.error("Error getting GitMesh project data", error=str(error), project_id=project_id)
             raise
     
     def _generate_beetle_insights(self) -> BeetleInsights:
-        """Generate static Beetle insights"""
+        """Generate static GitMesh insights"""
         return BeetleInsights(
             productivity={
                 "score": 85,
@@ -812,7 +812,7 @@ async def import_repository(import_request: RepositoryImportRequest, user_id: st
     return await project_service.import_repository(import_request, user_id)
 
 async def get_beetle_project_data(project_id: str) -> Optional[BeetleProjectData]:
-    """Get Beetle project data"""
+    """Get GitMesh project data"""
     return await project_service.get_beetle_project_data(project_id)
 
 async def get_smart_suggestions(project_id: str, branch: str) -> List[SmartSuggestion]:

@@ -189,10 +189,7 @@ export default function ChatPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <MessageSquare size={16} className="text-primary" />
-                </div>
-                <h1 className="text-xl font-semibold">Unified Chat Interface</h1>
+                <h1 className="text-xl font-semibold">Chat</h1>
               </div>
               
               {repository && (
@@ -207,14 +204,6 @@ export default function ChatPage() {
             </div>
             
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Sparkles size={12} />
-                AI Powered
-              </Badge>
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Shield size={12} />
-                Secure
-              </Badge>
               <Button
                 variant="ghost"
                 size="icon"

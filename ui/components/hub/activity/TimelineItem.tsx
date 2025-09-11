@@ -8,12 +8,12 @@ interface TimelineItemProps {
 }
 
 const eventIcons: { [key: string]: React.ReactNode } = {
-  PushEvent: <GitCommit className="w-5 h-5 text-blue-500" />,
-  PullRequestEvent: <GitPullRequest className="w-5 h-5 text-green-500" />,
-  CreateEvent: <GitBranch className="w-5 h-5 text-purple-500" />,
-  WatchEvent: <Star className="w-5 h-5 text-yellow-500" />,
-  IssuesEvent: <AlertCircle className="w-5 h-p text-red-500" />,
-  ForkEvent: <Book className="w-5 h-5 text-gray-500" />,
+  PushEvent: <GitCommit className="w-5 h-5 text-gray-400" />,
+  PullRequestEvent: <GitPullRequest className="w-5 h-5 text-gray-400" />,
+  CreateEvent: <GitBranch className="w-5 h-5 text-gray-400" />,
+  WatchEvent: <Star className="w-5 h-5 text-gray-400" />,
+  IssuesEvent: <AlertCircle className="w-5 h-5 text-gray-400" />,
+  ForkEvent: <Book className="w-5 h-5 text-gray-400" />,
 };
 
 const renderContent = (activity: UserActivity) => {
@@ -21,19 +21,19 @@ const renderContent = (activity: UserActivity) => {
     case 'PushEvent':
       return (
         <div>
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+          <p className="text-sm text-gray-300">
             Pushed {activity.payload.commits.length} commit(s) to{" "}
-            <span className="font-semibold">{activity.payload.ref.replace('refs/heads/', '')}</span>
+            <span className="font-semibold text-white">{activity.payload.ref.replace('refs/heads/', '')}</span>
           </p>
           <ul className="mt-2 space-y-1">
             {activity.payload.commits.map((commit: any) => (
               <li key={commit.sha} className="flex items-center gap-2">
-                <GitCommit className="w-4 h-4" />
+                <GitCommit className="w-4 h-4 text-gray-500" />
                 <a
                   href={`https://github.com/${activity.repo.name}/commit/${commit.sha}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-500 hover:underline"
+                  className="text-sm text-orange-500 hover:underline"
                 >
                   {commit.message}
                 </a>
@@ -45,65 +45,65 @@ const renderContent = (activity: UserActivity) => {
     case 'PullRequestEvent':
       return (
         <div>
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+          <p className="text-sm text-gray-300">
             {activity.payload.action} pull request{" "}
             <a
               href={activity.payload.pull_request.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-blue-500 hover:underline"
+              className="font-semibold text-orange-500 hover:underline"
             >
               #{activity.payload.pull_request.number}
             </a>
           </p>
-          <p className="mt-1 text-sm">{activity.payload.pull_request.title}</p>
+          <p className="mt-1 text-sm text-gray-400">{activity.payload.pull_request.title}</p>
         </div>
       );
     case 'CreateEvent':
       return (
-        <p className="text-sm text-gray-700 dark:text-gray-300">
-          Created a {activity.payload.ref_type} named <span className="font-semibold">{activity.payload.ref}</span>
+        <p className="text-sm text-gray-300">
+          Created a {activity.payload.ref_type} named <span className="font-semibold text-white">{activity.payload.ref}</span>
         </p>
       );
     case 'WatchEvent':
       return (
-        <p className="text-sm text-gray-700 dark:text-gray-300">
+        <p className="text-sm text-gray-300">
           Starred the repository
         </p>
       );
     case 'IssuesEvent':
       return (
         <div>
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+          <p className="text-sm text-gray-300">
             {activity.payload.action} issue{" "}
             <a
               href={activity.payload.issue.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-blue-500 hover:underline"
+              className="font-semibold text-orange-500 hover:underline"
             >
               #{activity.payload.issue.number}
             </a>
           </p>
-          <p className="mt-1 text-sm">{activity.payload.issue.title}</p>
+          <p className="mt-1 text-sm text-gray-400">{activity.payload.issue.title}</p>
         </div>
       );
     case 'ForkEvent':
       return (
-        <p className="text-sm text-gray-700 dark:text-gray-300">
+        <p className="text-sm text-gray-300">
           Forked the repository to{" "}
           <a
             href={activity.payload.forkee.html_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-blue-500 hover:underline"
+            className="font-semibold text-orange-500 hover:underline"
           >
             {activity.payload.forkee.full_name}
           </a>
         </p>
       );
     default:
-      return <p className="text-sm text-gray-700 dark:text-gray-300">Unhandled event type: {activity.type}</p>;
+      return <p className="text-sm text-gray-300">Unhandled event type: {activity.type}</p>;
   }
 };
 
@@ -111,20 +111,20 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({ activity, isLast }) 
   const icon = eventIcons[activity.type] || <AlertCircle className="w-5 h-5 text-gray-500" />;
 
   return (
-    <div className={`relative mb-8 pl-8 ${isLast ? '' : 'after:absolute after:left-6 after:top-10 after:h-[calc(100%-2.5rem)] after:w-px after:bg-gray-200 dark:after:bg-gray-700'}`}>
-      <div className="absolute -left-1.5 top-1.5 flex h-10 w-10 items-center justify-center rounded-full bg-white dark:bg-gray-800">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-900">
+    <div className={`relative mb-8 pl-12 ${isLast ? '' : 'after:absolute after:left-6 after:top-12 after:h-[calc(100%-3rem)] after:w-px after:bg-gray-700'}`}>
+      <div className="absolute left-0 top-2 flex h-12 w-12 items-center justify-center rounded-full bg-gray-800">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900">
           {icon}
         </div>
       </div>
-      <Card>
+      <Card className="bg-gray-800 border-gray-700 shadow-md">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">
+          <CardTitle className="text-base font-semibold text-white">
             <a href={`https://github.com/${activity.repo.name}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
               {activity.repo.name}
             </a>
           </CardTitle>
-          <CardDescription>{new Date(activity.created_at).toLocaleString()}</CardDescription>
+          <CardDescription className="text-gray-400">{new Date(activity.created_at).toLocaleString()}</CardDescription>
         </CardHeader>
         <CardContent>{renderContent(activity)}</CardContent>
       </Card>

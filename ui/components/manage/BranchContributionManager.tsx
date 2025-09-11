@@ -65,7 +65,7 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
     }
   };
 
-  // Fetch Beetle project data from backend
+  // Fetch GitMesh project data from backend
   useEffect(() => {
     const fetchBranchAndRepoData = async () => {
       if (!repository || !token || token === 'demo-token') {
@@ -116,7 +116,7 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
       return { pullRequests: [], issues: [], activity: [] };
     }
     
-    console.log('[Beetle Overview] beetleData structure:', beetleData);
+    console.log('[GitMesh Overview] beetleData structure:', beetleData);
     
     const transformedData = transformGitHubData(
       beetleData.activity || [],

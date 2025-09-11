@@ -68,7 +68,7 @@ export default function Home() {
                 <div className="w-60 h-30 rounded-2xl flex items-center overflow-hidden">
                   <Image 
                     src="/favicon.png" 
-                    alt="Beetle Logo" 
+                    alt="GitMesh Logo" 
                     width={240} 
                     height={120}
                     className="object-contain"
@@ -95,7 +95,7 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.4 }}
                 >
-                  Beetle is an open-source tool to track, organize, and collaborate across multiple branches. 
+                  GitMesh is an open-source tool to track, organize, and collaborate across multiple branches. 
                   With AI-powered assistance and contributor dashboards.
                 </motion.p>
               </div>

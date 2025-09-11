@@ -38,7 +38,7 @@ const BotLogs = ({ activities, branch }: { activities: any[], branch: string }) 
   const [loading, setLoading] = useState(true);
 
   const isOwner = user?.login === repository?.owner?.login;
-  const storageKey = `beetle-bots-${repository?.owner?.login}-${repository?.name}`;
+  const storageKey = `GitMesh-bots-${repository?.owner?.login}-${repository?.name}`;
 
   // Load bot settings from local storage for the owner
   useEffect(() => {
