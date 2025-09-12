@@ -495,9 +495,55 @@ const BranchFileItem: React.FC<BranchFileItemProps> = ({ item, level, selectedFi
 interface ChatMessageProps {
   message: ChatMessage;
   onCopy: (content: string) => void;
+  messageStatus?: {
+    id: string;
+    status: 'sending' | 'sent' | 'failed' | 'retrying';
+    retryCount: number;
+    error?: string;
+  };
 }
 
-const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onCopy }) => {
+// Message status indicator component
+const MessageStatusIndicator: React.FC<{
+  status: 'sending' | 'sent' | 'failed' | 'retrying';
+  retryCount?: number;
+  error?: string;
+}> = ({ status, retryCount = 0, error }) => {
+  switch (status) {
+    case 'sending':
+      return (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Loader2 size={10} className="animate-spin" />
+          <span>Sending...</span>
+        </div>
+      );
+    case 'retrying':
+      return (
+        <div className="flex items-center gap-1 text-xs text-amber-600">
+          <RefreshCw size={10} className="animate-spin" />
+          <span>Retrying ({retryCount}/3)...</span>
+        </div>
+      );
+    case 'failed':
+      return (
+        <div className="flex items-center gap-1 text-xs text-red-500" title={error}>
+          <AlertCircle size={10} />
+          <span>Failed to send</span>
+        </div>
+      );
+    case 'sent':
+      return (
+        <div className="flex items-center gap-1 text-xs text-green-600">
+          <CheckSquare size={10} />
+          <span>Sent</span>
+        </div>
+      );
+    default:
+      return null;
+  }
+};
+
+const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onCopy, messageStatus }) => {
   const isUser = message.type === 'user';
   
   return (
@@ -526,9 +572,10 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onCopy }) =
             <span className="text-sm font-medium">
               {isUser ? 'You' : 'TARS'}
             </span>
-            <div className="flex items-center gap-1 text-xs opacity-70">
+            <div className="flex items-center gap-2 text-xs opacity-70">
               <ClockIcon size={12} />
               {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {messageStatus && <MessageStatusIndicator {...messageStatus} />}
               <button
                 onClick={() => onCopy(message.content)}
                 className="ml-2 hover:opacity-100 opacity-70 transition-opacity"
@@ -675,6 +722,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
     getActiveSession,
     addMessage,
     sendMessage,
+    sendMessageWithRetry,
     setSelectedFiles,
     addSelectedFile,
     removeSelectedFile,
@@ -686,7 +734,10 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
     clearErrors,
     getFileCacheKey,
     getFileHash,
-    createSession
+    createSession,
+    setMessageStatus,
+    updateMessageStatus,
+    getMessageStatus
   } = useChat();
   
   const githubAPI = githubApi;
@@ -761,139 +812,10 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   const [showImportSuccess, setShowImportSuccess] = useState(false);
   const [hasShownWelcome, setHasShownWelcome] = useState(false);
   
-  // Demo mode state
-  const [useDemoMode, setUseDemoMode] = useState(false);
-  
-  // Demo/Mock data for when backend is not available
-  const demoFileStructure = [
-    {
-      name: 'src',
-      type: 'folder' as const,
-      children: [
-        {
-          name: 'components',
-          type: 'folder' as const,
-          children: [
-            { name: 'Button.tsx', type: 'file' as const, size: 1024, path: 'src/components/Button.tsx' },
-            { name: 'Modal.tsx', type: 'file' as const, size: 2048, path: 'src/components/Modal.tsx' },
-            { name: 'Header.tsx', type: 'file' as const, size: 1536, path: 'src/components/Header.tsx' }
-          ]
-        },
-        {
-          name: 'utils',
-          type: 'folder' as const,
-          children: [
-            { name: 'helpers.ts', type: 'file' as const, size: 512, path: 'src/utils/helpers.ts' },
-            { name: 'constants.ts', type: 'file' as const, size: 256, path: 'src/utils/constants.ts' }
-          ]
-        },
-        { name: 'index.tsx', type: 'file' as const, size: 3072, path: 'src/index.tsx' },
-        { name: 'App.tsx', type: 'file' as const, size: 2560, path: 'src/App.tsx' }
-      ]
-    },
-    {
-      name: 'docs',
-      type: 'folder' as const,
-      children: [
-        { name: 'README.md', type: 'file' as const, size: 4096, path: 'docs/README.md' },
-        { name: 'CONTRIBUTING.md', type: 'file' as const, size: 2048, path: 'docs/CONTRIBUTING.md' }
-      ]
-    },
-    { name: 'package.json', type: 'file' as const, size: 1024, path: 'package.json' },
-    { name: 'tsconfig.json', type: 'file' as const, size: 512, path: 'tsconfig.json' }
-  ];
+  // Demo mode state - REMOVED - no demo mode
+  // const [useDemoMode, setUseDemoMode] = useState(false); // Always false - no demo mode
 
-  const demoFiles: Record<string, string> = {
-    'src/components/Button.tsx': `import React from 'react';
-import { cn } from '@/lib/utils';
-
-interface ButtonProps {
-  children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-}
-
-export const Button: React.FC<ButtonProps> = ({
-  children,
-  variant = 'primary',
-  size = 'md',
-  onClick,
-  disabled = false,
-  className
-}) => {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        'rounded-lg font-medium transition-colors',
-        {
-          'bg-blue-600 text-white hover:bg-blue-700': variant === 'primary',
-          'bg-gray-600 text-white hover:bg-gray-700': variant === 'secondary',
-          'border border-gray-300 text-gray-700 hover:bg-gray-50': variant === 'outline',
-          'px-2 py-1 text-sm': size === 'sm',
-          'px-4 py-2': size === 'md',
-          'px-6 py-3 text-lg': size === 'lg',
-          'opacity-50 cursor-not-allowed': disabled
-        },
-        className
-      )}
-    >
-      {children}
-    </button>
-  );
-};`,
-    'src/App.tsx': `import React from 'react';
-import { Button } from './components/Button';
-
-function App() {
-  const handleClick = () => {
-    console.log('Button clicked!');
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <main className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          Welcome to GitMesh Demo
-        </h1>
-        <div className="space-y-4">
-          <Button variant="primary" onClick={handleClick}>
-            Primary Button
-          </Button>
-          <Button variant="secondary" onClick={handleClick}>
-            Secondary Button
-          </Button>
-          <Button variant="outline" onClick={handleClick}>
-            Outline Button
-          </Button>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-export default App;`,
-    'package.json': `{
-  "name": "gitmesh-demo",
-  "version": "1.0.0",
-  "description": "A demo repository for GitMesh",
-  "main": "src/index.tsx",
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "typescript": "^4.9.5"
-  }
-}`
-  };
+  // Demo content - REMOVED
   
   // Get active session and its data
   const activeSession = getActiveSession();
@@ -932,36 +854,10 @@ export default App;`,
   selectedFilesRef.current = selectedFiles;
 
   // Fetch file content function - moved before useEffect that uses it
-  const fetchFileContent = useCallback(async (branch: string, filePath: string) => {
-    if (!repository?.owner?.login || !repository?.name) return;
+  const fetchFileContent = useCallback(async (branch: string, filePath: string): Promise<string | null> => {
+    if (!repository?.owner?.login || !repository?.name) return null;
     
-    // Use demo data if in demo mode
-    if (useDemoMode) {
-      const content = demoFiles[filePath] || `// Demo content for ${filePath}
-// This is placeholder content since backend is not available
-
-function demoFunction() {
-  console.log('This is demo content for ${filePath}');
-}
-
-export default demoFunction;`;
-      
-      const contentHash = getFileHash(content);
-      const contentKey = getFileCacheKey(branch, filePath);
-      cacheFileContent(contentKey, content, contentHash);
-      
-      // Update selected files with demo content
-      const currentFiles = selectedFilesRef.current;
-      const updatedFiles = currentFiles.map(file => 
-        file.branch === branch && file.path === filePath 
-          ? { ...file, content, contentHash: contentHash || undefined }
-          : file
-      );
-      setSelectedFiles(updatedFiles);
-      
-      console.log(`Using demo content for ${filePath} (${content.length} characters)`);
-      return;
-    }
+    // Removed demo mode logic - only use real repository content
     
     const contentKey = getFileCacheKey(branch, filePath);
     
@@ -971,63 +867,58 @@ export default demoFunction;`;
     }
     
     // Debounce the fetch request
-    const timeoutId = setTimeout(async () => {
-      setLoadingState('files', contentKey, true);
-      
-      try {
-        if (!githubAPI) {
-          throw new Error('GitHub API not available');
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(async () => {
+        setLoadingState('files', contentKey, true);
+        
+        try {
+          if (!githubAPI) {
+            throw new Error('GitHub API not available');
+          }
+          
+          const content = await githubAPI.getFileContent(
+            repository.owner.login, 
+            repository.name, 
+            filePath, 
+            branch
+          );
+          
+          const contentHash = getFileHash(content);
+          cacheFileContent(contentKey, content, contentHash);
+          
+          // Update selected files with content using ref to avoid circular dependency
+          const currentFiles = selectedFilesRef.current;
+          const updatedFiles = currentFiles.map(file => 
+            file.branch === branch && file.path === filePath 
+              ? { ...file, content, contentHash: contentHash || undefined }
+              : file
+          );
+          setSelectedFiles(updatedFiles);
+          
+          console.log(`Successfully fetched content for ${filePath} (${content.length} characters)`);
+          resolve(content);
+          
+        } catch (err) {
+          console.error(`Failed to fetch content for ${filePath} in ${branch}:`, err);
+          
+          // Don't add files without real content to avoid confusing developers
+          console.warn(`Skipping file ${filePath} - GitHub API failed and no demo content available`);
+          resolve(null);
+        } finally {
+          setLoadingState('files', contentKey, false);
+          // Clear the timeout reference
+          setFetchTimeouts(prev => {
+            const newTimeouts = { ...prev };
+            delete newTimeouts[contentKey];
+            return newTimeouts;
+          });
         }
-        
-        const content = await githubAPI.getFileContent(
-          repository.owner.login, 
-          repository.name, 
-          filePath, 
-          branch
-        );
-        
-        const contentHash = getFileHash(content);
-        cacheFileContent(contentKey, content, contentHash);
-        
-        // Update selected files with content using ref to avoid circular dependency
-        const currentFiles = selectedFilesRef.current;
-        const updatedFiles = currentFiles.map(file => 
-          file.branch === branch && file.path === filePath 
-            ? { ...file, content, contentHash: contentHash || undefined }
-            : file
-        );
-        setSelectedFiles(updatedFiles);
-        
-        console.log(`Successfully fetched content for ${filePath} (${content.length} characters)`);
-        
-      } catch (err) {
-        console.error(`Failed to fetch content for ${filePath} in ${branch}:`, err);
-        const errorMessage = 'Error loading file content';
-        cacheFileContent(contentKey, '', '', errorMessage);
-        setError('files', contentKey, 'Failed to load file content');
-        
-        // Update selected files with error using ref
-        const currentFiles = selectedFilesRef.current;
-        const errorFiles = currentFiles.map(file => 
-          file.branch === branch && file.path === filePath 
-            ? { ...file, content: errorMessage }
-            : file
-        );
-        setSelectedFiles(errorFiles);
-      } finally {
-        setLoadingState('files', contentKey, false);
-        // Clear the timeout reference
-        setFetchTimeouts(prev => {
-          const newTimeouts = { ...prev };
-          delete newTimeouts[contentKey];
-          return newTimeouts;
-        });
-      }
-    }, 300); // 300ms debounce
-    
-    // Store the timeout reference
-    setFetchTimeouts(prev => ({ ...prev, [contentKey]: timeoutId }));
-  }, [repository, getFileCacheKey, setLoadingState, cacheFileContent, getFileHash, setSelectedFiles, setError, fetchTimeouts, useDemoMode, demoFiles]); // Removed selectedFiles dependency
+      }, 300); // 300ms debounce
+      
+      // Store the timeout reference
+      setFetchTimeouts(prev => ({ ...prev, [contentKey]: timeoutId }));
+    });
+  }, [repository, getFileCacheKey, setLoadingState, cacheFileContent, getFileHash, setSelectedFiles, setError, fetchTimeouts]);
 
   // Handle imported data with enhanced workflow
   useEffect(() => {
@@ -1183,9 +1074,25 @@ export default demoFunction;`;
           setSelectedBranches(data.branches.map((b: { name: string }) => b.name));
           
           Object.entries(data.treesByBranch).forEach(([branchName, branchData]) => {
-            const typedBranchData = branchData as { tree?: Array<{ path: string; type: string; size?: number }>; error?: string };
-            if (typedBranchData.tree && !typedBranchData.error) {
-              const fileStructure = convertTreeToFileStructure(typedBranchData.tree);
+            // Handle both formats: direct array or object with tree property
+            let treeData: Array<{ path: string; type: string; size?: number }>;
+            
+            if (Array.isArray(branchData)) {
+              // Direct array format (from local file service or some API responses)
+              treeData = branchData as Array<{ path: string; type: string; size?: number }>;
+            } else {
+              // Object format with tree property
+              const typedBranchData = branchData as { tree?: Array<{ path: string; type: string; size?: number }>; error?: string };
+              if (typedBranchData.tree && !typedBranchData.error) {
+                treeData = typedBranchData.tree;
+              } else {
+                console.error(`Branch ${branchName} has error:`, typedBranchData.error);
+                return; // Skip this branch
+              }
+            }
+            
+            if (treeData && treeData.length > 0) {
+              const fileStructure = convertTreeToFileStructure(treeData);
               console.log(`Setting file structure for branch ${branchName}:`, fileStructure);
               
               // Set in both places to ensure compatibility
@@ -1196,7 +1103,7 @@ export default demoFunction;`;
               }));
             }
           });
-          setUseDemoMode(false); // Backend is working, disable demo mode
+          // Backend is working - no need for demo mode
         })
         .catch(err => {
           console.error('Failed to fetch branches with trees:', err);
@@ -1227,70 +1134,31 @@ export default demoFunction;`;
                     console.error(`Failed to fetch tree for branch ${branch.name}:`, treeErr);
                   }
                 });
-                setUseDemoMode(false); // Backend is working, disable demo mode
+                // Backend is working - no need for demo mode
               })
               .catch(branchErr => {
                 console.error('Failed to fetch branches (fallback):', branchErr);
-                console.log('Enabling demo mode due to backend connection issues');
+                console.log('Backend connection issues - showing error');
                 
-                // Enable demo mode when backend is not available
-                setUseDemoMode(true);
-                setSelectedBranches(['main', 'development']);
-                
-                // Set demo file structure for main branch
-                setFileStructure('main', demoFileStructure);
-                setBranchFileStructures(prev => ({
-                  ...prev,
-                  main: demoFileStructure,
-                  development: demoFileStructure
-                }));
-                
-                // Clear errors since we're using demo mode
-                setError('sessions', undefined, null);
-                
-                toast.info('Using demo mode - backend connection not available');
+                // Show error message when backend is not available
+                setError('sessions', undefined, 'Failed to connect to repository. Please check your connection and try again.');
+                toast.error('Failed to connect to repository');
               });
           } else {
-            // No githubAPI available, enable demo mode immediately
-            console.log('Enabling demo mode - GitHub API not available');
-            setUseDemoMode(true);
-            setSelectedBranches(['main', 'development']);
-            
-            setFileStructure('main', demoFileStructure);
-            setBranchFileStructures(prev => ({
-              ...prev,
-              main: demoFileStructure,
-              development: demoFileStructure
-            }));
-            
-            setError('sessions', undefined, null);
-            toast.info('Using demo mode - GitHub API not available');
+            // No githubAPI available
+            console.log('GitHub API not available');
+            setError('sessions', undefined, 'GitHub API not available. Please check configuration.');
+            toast.error('GitHub API not available');
           }
         })
         .finally(() => setLoadingState('sessions', undefined, false));
     }
   }, [repository, token, setLoadingState, setFileStructure, setError]);
   
-  // Populate demo files when demo mode is enabled
-  useEffect(() => {
-    if (useDemoMode && selectedFiles.length === 0) {
-      console.log('Populating demo files...');
-      // Add some initial demo files to showcase the functionality
-      const initialDemoFiles = [
-        { branch: 'main', path: 'src/App.tsx', content: demoFiles['src/App.tsx'] },
-        { branch: 'main', path: 'src/components/Button.tsx', content: demoFiles['src/components/Button.tsx'] },
-        { branch: 'main', path: 'package.json', content: demoFiles['package.json'] }
-      ];
-      
-      // Use setTimeout to avoid state update during render
-      setTimeout(() => {
-        initialDemoFiles.forEach(file => {
-          addSelectedFile(file);
-        });
-        toast.success('Demo files loaded! You can now chat with the sample code.');
-      }, 100);
-    }
-  }, [useDemoMode, selectedFiles.length, addSelectedFile, demoFiles]);
+  // Demo files initialization removed - no demo mode
+  // useEffect(() => {
+  //   // Demo files population removed
+  // }, []);
   
   // Get filtered file structure for a branch
   const getFilteredStructure = (branch: string): FileSystemItem[] => {
@@ -1576,36 +1444,25 @@ export default demoFunction;`;
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !activeSession) return;
     
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const userMessage = {
       type: 'user' as const,
       content: inputMessage,
       files: selectedFiles.map(f => f.path)
     };
-    addMessage(activeSession.id, userMessage);
-    setInputMessage('');
-    setLoadingState('chat', undefined, true);
     
-    // Set message status to sending
-    setMessageStatuses(prev => ({ ...prev, [messageId]: 'sending' }));
+    // Add user message immediately for better UX
+    addMessage(activeSession.id, userMessage);
+    const messageToSend = inputMessage;
+    setInputMessage('');
     
     try {
-      // Use the sendMessage function from context
-      await sendMessage(activeSession.id, inputMessage);
-      
-      // Update message status to sent
-      setMessageStatuses(prev => ({ ...prev, [messageId]: 'sent' }));
-      
+      // Use the enhanced sendMessage with retry logic from context
+      await sendMessageWithRetry(activeSession.id, messageToSend, 3);
       toast.success('Message sent successfully!');
     } catch (error) {
       console.error('Chat error:', error);
-      toast.error('Failed to send message. Please try again.');
+      toast.error('Failed to send message after multiple attempts. Please check your connection and try again.');
       setError('chat', undefined, 'Failed to send message');
-      
-      // Update message status to failed
-      setMessageStatuses(prev => ({ ...prev, [messageId]: 'failed' }));
-    } finally {
-      setLoadingState('chat', undefined, false);
     }
   };
   
@@ -1767,34 +1624,24 @@ export default demoFunction;`;
               try {
                 let content = '';
                 
-                // Check if we're in demo mode or if this is a demo file
-                if (useDemoMode || selectedBranches.includes('main') && demoFiles[filePath]) {
-                  content = demoFiles[filePath] || `// Demo content for ${filePath}
-// This file is part of the demo branch import
-
-export default function ${filePath.split('/').pop()?.replace(/\.[^/.]+$/, "") || 'demoFunction'}() {
-  return 'Hello from ${filePath}';
-}`;
-                } else {
-                  // Fetch real content if not in demo mode
-                  if (githubAPI && repository) {
-                    try {
-                      content = await githubAPI.getFileContent(
-                        repository.owner.login,
-                        repository.name,
-                        filePath,
-                        importFormData.selectedBranch
-                      );
-                    } catch (fetchError) {
-                      console.error(`Failed to fetch content for ${filePath}:`, fetchError);
-                      content = `// Error loading content for ${filePath}
+                // Only fetch real content - no demo mode
+                if (githubAPI && repository) {
+                  try {
+                    content = await githubAPI.getFileContent(
+                      repository.owner.login,
+                      repository.name,
+                      filePath,
+                      importFormData.selectedBranch
+                    );
+                  } catch (fetchError) {
+                    console.error(`Failed to fetch content for ${filePath}:`, fetchError);
+                    content = `// Error loading content for ${filePath}
 // File exists but content could not be fetched
 console.log('File: ${filePath}');`;
-                    }
-                  } else {
-                    content = `// Content not available for ${filePath}
-// GitHub API not available`;
                   }
+                } else {
+                  content = `// Content not available for ${filePath}
+// GitHub API not available`;
                 }
 
                 branchFiles.push({
@@ -1882,6 +1729,14 @@ console.log('File: ${filePath}');`;
     }
   };
 
+  // Debug effect to monitor context selectedFiles changes
+  useEffect(() => {
+    console.log('Context selectedFiles changed:', state.selectedFiles?.length || 0, 'files');
+    state.selectedFiles?.forEach((file, index) => {
+      console.log(`  File ${index + 1}:`, file.path, 'branch:', file.branch, 'content length:', file.content?.length);
+    });
+  }, [state.selectedFiles]);
+
   // Debug effect to monitor branchFileStructures changes
   useEffect(() => {
     console.log('branchFileStructures state changed:', branchFileStructures);
@@ -1894,10 +1749,6 @@ console.log('File: ${filePath}');`;
   // Handle branch selection for import
   const handleBranchSelectForImport = async (branchName: string) => {
     console.log('Branch selected for import:', branchName);
-    console.log('useDemoMode:', useDemoMode);
-    console.log('demoFileStructure available:', !!demoFileStructure);
-    console.log('demoFileStructure length:', demoFileStructure?.length);
-    console.log('demoFileStructure content:', demoFileStructure);
     
     setImportFormData({...importFormData, selectedBranch: branchName});
     setSelectedBranchFiles([]);
@@ -1908,45 +1759,20 @@ console.log('File: ${filePath}');`;
       if (!branchFileStructures[branchName] || branchFileStructures[branchName].length === 0) {
         console.log('Loading file structure for branch:', branchName);
         
-        // For branch import, always try to use demo structure if backend/API is not available
-        // or if we don't have real data
-        if (useDemoMode || !githubAPI || !repository) {
-          console.log('Using demo file structure for branch import');
+        // Only use real GitHub API data - no demo fallback
+        if (githubAPI && repository) {
+          console.log('Fetching from GitHub API');
+          const tree = await githubAPI.getRepositoryTree(repository.owner.login, repository.name, branchName);
+          const processedStructure = convertTreeToFileStructure(tree.tree || []);
+          
           setBranchFileStructures(prev => ({
             ...prev,
-            [branchName]: demoFileStructure
+            [branchName]: processedStructure
           }));
-          console.log('Demo file structure set:', demoFileStructure);
+          console.log('GitHub file structure set:', processedStructure);
         } else {
-          // Load branch files if API is available
-          try {
-            console.log('Fetching from GitHub API');
-            const tree = await githubAPI.getRepositoryTree(repository.owner.login, repository.name, branchName);
-            const processedStructure = convertTreeToFileStructure(tree.tree || []);
-            
-            // If the processed structure is empty, fallback to demo
-            if (processedStructure.length === 0) {
-              console.log('GitHub API returned empty structure, using demo structure');
-              setBranchFileStructures(prev => ({
-                ...prev,
-                [branchName]: demoFileStructure
-              }));
-              toast.info('Using demo files - no files found in branch');
-            } else {
-              setBranchFileStructures(prev => ({
-                ...prev,
-                [branchName]: processedStructure
-              }));
-              console.log('GitHub file structure set:', processedStructure);
-            }
-          } catch (apiError) {
-            console.error('GitHub API error, falling back to demo:', apiError);
-            setBranchFileStructures(prev => ({
-              ...prev,
-              [branchName]: demoFileStructure
-            }));
-            toast.info('Using demo files - GitHub API error');
-          }
+          console.error('GitHub API or repository not available');
+          toast.error('Failed to load branch structure - GitHub API not available');
         }
       } else {
         console.log('File structure already exists for branch:', branchName);
@@ -1954,24 +1780,79 @@ console.log('File: ${filePath}');`;
       }
     } catch (error) {
       console.error('Error loading branch files:', error);
-      // Fallback to demo structure on error
-      setBranchFileStructures(prev => ({
-        ...prev,
-        [branchName]: demoFileStructure
-      }));
-      toast.error('Failed to load branch files, using demo files');
+      toast.error('Failed to load branch files');
     } finally {
       setBranchFilesLoading(false);
     }
   };
 
   // Handle file selection in branch import
-  const handleBranchFileToggle = (filePath: string) => {
+  const handleBranchFileToggle = async (filePath: string) => {
+    const branchName = importFormData.selectedBranch;
+    if (!branchName) return;
+
+    console.log('File toggle for:', filePath, 'in branch:', branchName);
+
     setSelectedBranchFiles(prev => {
-      if (prev.includes(filePath)) {
-        return prev.filter(path => path !== filePath);
+      const isCurrentlySelected = prev.includes(filePath);
+      
+      if (isCurrentlySelected) {
+        // Remove from selection
+        console.log('Removing file from selection:', filePath);
+        const newSelection = prev.filter(path => path !== filePath);
+        
+        // Also remove from context
+        removeSelectedFile(branchName, filePath);
+        console.log('Removed file from context:', filePath);
+        
+        return newSelection;
       } else {
-        return [...prev, filePath];
+        // Check if already in progress to prevent double-clicks
+        if (prev.includes(filePath)) {
+          console.log('File toggle already in progress for:', filePath);
+          return prev;
+        }
+        
+        // Add to selection
+        console.log('Adding file to selection:', filePath);
+        const newSelection = [...prev, filePath];
+        
+        // Fetch content and add to context (with debounce)
+        setTimeout(() => {
+          fetchFileContent(branchName, filePath).then((content) => {
+            console.log('Content fetched for:', filePath, 'length:', content?.length);
+            
+            // Handle case where content might be an object or string
+            let actualContent: string;
+            if (typeof content === 'string') {
+              actualContent = content;
+            } else if (content && typeof content === 'object' && 'content' in content) {
+              actualContent = (content as any).content;
+            } else {
+              actualContent = String(content || '');
+            }
+            
+            if (actualContent && actualContent.trim()) {
+              addSelectedFile({
+                branch: branchName,
+                path: filePath,
+                content: actualContent,
+                contentHash: getFileHash(actualContent)
+              });
+              console.log('Added file to context:', filePath, 'content preview:', actualContent.substring(0, 100) + '...');
+            } else {
+              console.warn('Failed to get valid content for file:', filePath, '- not adding to context');
+              // Remove from UI selection since we can't get content
+              setSelectedBranchFiles(prev => prev.filter(p => p !== filePath));
+            }
+          }).catch(error => {
+            console.error('Failed to fetch content for file:', filePath, error);
+            // Remove from UI selection since fetch failed
+            setSelectedBranchFiles(prev => prev.filter(p => p !== filePath));
+          });
+        }, 100); // 100ms debounce
+        
+        return newSelection;
       }
     });
   };
@@ -2010,18 +1891,7 @@ console.log('File: ${filePath}');`;
               </Button>
             </div>
             
-            {/* Demo Mode Indicator */}
-            {useDemoMode && (
-              <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <AlertCircle size={14} className="text-amber-600" />
-                  <span className="text-xs font-medium text-amber-800">Demo Mode</span>
-                </div>
-                <p className="text-xs text-amber-700 mt-1">
-                  Using sample files - backend not available
-                </p>
-              </div>
-            )}
+            {/* Demo Mode Indicator - REMOVED */}
             
             {/* Import Progress Indicator */}
             {importProgress.isImporting && (
@@ -2138,6 +2008,7 @@ console.log('File: ${filePath}');`;
                   key={message.id}
                   message={message}
                   onCopy={handleCopyMessage}
+                  messageStatus={getMessageStatus(message.id)}
                 />
               ))}
               
@@ -2162,6 +2033,63 @@ console.log('File: ${filePath}');`;
         
         {/* Input Area */}
         <div className="border-t border-border p-3">
+          {/* Enhanced Status Bar */}
+          <div className="mb-3 p-2 bg-muted/30 rounded-lg">
+            {selectedFiles.length > 0 ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <FileText size={12} />
+                      <span>{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} in context</span>
+                    </div>
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <MessageSquare size={12} />
+                      <span>{messages.length} message{messages.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {repository && (
+                      <Badge variant="outline" className="text-xs">
+                        {repository.owner.login}/{repository.name}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Show processing status if any */}
+                {isLoading && (
+                  <div className="flex items-center gap-2 text-xs text-amber-600">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span>Processing your message with {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}...</span>
+                  </div>
+                )}
+                
+                {/* Show error status if any */}
+                {state.errors.chat && (
+                  <div className="flex items-center gap-2 text-xs text-red-600">
+                    <AlertCircle size={12} />
+                    <span>Error: {state.errors.chat}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => clearErrors('chat')}
+                      className="h-auto p-0 text-xs underline"
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <AlertCircle size={12} />
+                <span>No files in context - Import files to start chatting with TARS</span>
+              </div>
+            )}
+          </div>
+          
           <div className="flex items-end gap-3">
             <div className="flex-1 relative">
               <textarea
@@ -2199,31 +2127,8 @@ console.log('File: ${filePath}');`;
               )}
             </Button>
           </div>
-          
-                      {/* Context Status and Quick Actions */}
-            <div className="mt-1 flex items-center justify-between">
-            {selectedFiles.length > 0 ? (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <FileText size={12} />
-                  <span>{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} in context</span>
-                </div>
-                <span>•</span>
-                <div className="flex items-center gap-1">
-                  <MessageSquare size={12} />
-                  <span>{messages.length} message{messages.length !== 1 ? 's' : ''}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <AlertCircle size={12} />
-                <span>No files in context</span>
-              </div>
-            )}
-          </div>
-          </div>
-          </div>
-          
+        </div>
+      </div>
 
 
       {/* Context Sidebar - Shows Selected Files and Context */}
@@ -2654,7 +2559,7 @@ console.log('File: ${filePath}');`;
                         <div className="p-4 text-center text-muted-foreground">
                           <p className="text-sm">No files found in this branch</p>
                           {/* Debug info */}
-                          <p className="text-xs mt-1">Debug: Branch {importFormData.selectedBranch}, useDemoMode: {useDemoMode ? 'true' : 'false'}</p>
+                          <p className="text-xs mt-1">Debug: Branch {importFormData.selectedBranch}</p>
                         </div>
                       )}
                     </div>

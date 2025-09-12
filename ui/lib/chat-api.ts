@@ -63,6 +63,9 @@ class ChatAPI {
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     
+    console.log(`ChatAPI: Making request to ${url}`);
+    console.log(`ChatAPI: Using token: ${this.token ? 'Token available' : 'No token'}`);
+    
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
@@ -75,8 +78,11 @@ class ChatAPI {
     try {
       const response = await fetch(url, config);
       
+      console.log(`ChatAPI: Response status: ${response.status}`);
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error(`ChatAPI: Error response:`, errorData);
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 

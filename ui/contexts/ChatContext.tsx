@@ -22,6 +22,13 @@ interface FileSystemItem {
   error?: string;
 }
 
+interface MessageStatus {
+  id: string;
+  status: 'sending' | 'sent' | 'failed' | 'retrying';
+  retryCount: number;
+  error?: string;
+}
+
 // ChatSession is now imported from chat-api.ts
 
 interface FileCache {
@@ -39,6 +46,7 @@ interface ChatState {
   fileCache: FileCache;
   selectedFiles: Array<{branch: string, path: string, content: string, contentHash?: string}>;
   fileStructures: Record<string, FileSystemItem[]>;
+  messageStatuses: Record<string, MessageStatus>;
   loadingStates: {
     files: Record<string, boolean>;
     chat: boolean;
@@ -49,7 +57,6 @@ interface ChatState {
     chat: string | null;
     sessions: string | null;
   };
-
 }
 
 // Action types
@@ -61,6 +68,9 @@ type ChatAction =
   | { type: 'SET_ACTIVE_SESSION'; payload: { sessionId: string } }
   | { type: 'ADD_MESSAGE'; payload: { sessionId: string; message: ChatMessage } }
   | { type: 'UPDATE_MESSAGE'; payload: { sessionId: string; messageId: string; updates: Partial<ChatMessage> } }
+  | { type: 'SET_MESSAGE_STATUS'; payload: { messageId: string; status: MessageStatus } }
+  | { type: 'UPDATE_MESSAGE_STATUS'; payload: { messageId: string; updates: Partial<MessageStatus> } }
+  | { type: 'REMOVE_MESSAGE_STATUS'; payload: { messageId: string } }
   | { type: 'SET_SELECTED_FILES'; payload: { files: Array<{branch: string, path: string, content: string, contentHash?: string}> } }
   | { type: 'ADD_SELECTED_FILE'; payload: { file: {branch: string, path: string, content: string, contentHash?: string} } }
   | { type: 'REMOVE_SELECTED_FILE'; payload: { branch: string; path: string } }
@@ -78,6 +88,7 @@ const initialState: ChatState = {
   fileCache: {},
   selectedFiles: [],
   fileStructures: {},
+  messageStatuses: {},
   loadingStates: {
     files: {},
     chat: false,
@@ -160,6 +171,35 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         )
       };
 
+    case 'SET_MESSAGE_STATUS':
+      return {
+        ...state,
+        messageStatuses: {
+          ...state.messageStatuses,
+          [action.payload.messageId]: action.payload.status
+        }
+      };
+
+    case 'UPDATE_MESSAGE_STATUS':
+      const currentStatus = state.messageStatuses[action.payload.messageId];
+      return {
+        ...state,
+        messageStatuses: {
+          ...state.messageStatuses,
+          [action.payload.messageId]: {
+            ...currentStatus,
+            ...action.payload.updates
+          }
+        }
+      };
+
+    case 'REMOVE_MESSAGE_STATUS':
+      const { [action.payload.messageId]: removed, ...remainingStatuses } = state.messageStatuses;
+      return {
+        ...state,
+        messageStatuses: remainingStatuses
+      };
+
     case 'SET_SELECTED_FILES':
       return {
         ...state,
@@ -167,6 +207,23 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       };
 
     case 'ADD_SELECTED_FILE':
+      // Check if file already exists to prevent duplicates
+      const existingFileIndex = state.selectedFiles.findIndex(
+        file => file.branch === action.payload.file.branch && file.path === action.payload.file.path
+      );
+      
+      if (existingFileIndex !== -1) {
+        console.log('File already exists in context, updating:', action.payload.file.path);
+        // Update existing file instead of adding duplicate
+        const updatedFiles = [...state.selectedFiles];
+        updatedFiles[existingFileIndex] = action.payload.file;
+        return {
+          ...state,
+          selectedFiles: updatedFiles
+        };
+      }
+      
+      console.log('Adding new file to context:', action.payload.file.path);
       return {
         ...state,
         selectedFiles: [...state.selectedFiles, action.payload.file]
@@ -285,7 +342,11 @@ interface ChatContextType {
   // Message management
   addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   sendMessage: (sessionId: string, message: string) => Promise<ChatMessage>;
+  sendMessageWithRetry: (sessionId: string, message: string, maxRetries?: number) => Promise<ChatMessage>;
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
+  setMessageStatus: (messageId: string, status: MessageStatus) => void;
+  updateMessageStatus: (messageId: string, updates: Partial<MessageStatus>) => void;
+  getMessageStatus: (messageId: string) => MessageStatus | null;
   
   // File management
   setSelectedFiles: (files: Array<{branch: string, path: string, content: string, contentHash?: string}>) => void;
@@ -315,7 +376,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [state, dispatch] = useReducer(chatReducer, initialState);
   const { token, user } = useAuth();
   const { repository } = useRepository();
-  const chatAPI = useMemo(() => token ? new ChatAPI(token) : null, [token]);
+  
+  console.log('ChatContext: Auth token available:', token ? 'Yes' : 'No');
+  console.log('ChatContext: User available:', user ? 'Yes' : 'No');
+  
+  // Temporary fallback to demo-token for testing
+  const effectiveToken = token || 'demo-token';
+  console.log('ChatContext: Using token:', effectiveToken === 'demo-token' ? 'Demo token' : 'Real token');
+  
+  const chatAPI = useMemo(() => effectiveToken ? new ChatAPI(effectiveToken) : null, [effectiveToken]);
 
   // Generate unique IDs
   const generateSessionId = useCallback(() => {
@@ -445,20 +514,48 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('No authentication token available');
     }
 
+    console.log('ChatContext: Sending message to session:', sessionId);
+    console.log('ChatContext: Message:', message);
+
     try {
       dispatch({ type: 'SET_LOADING_STATE', payload: { type: 'chat', loading: true } });
       
+      console.log('ChatContext sendMessage - selectedFiles:', state.selectedFiles);
+      console.log('ChatContext sendMessage - selectedFiles count:', state.selectedFiles?.length || 0);
+      state.selectedFiles?.forEach((file, index) => {
+        console.log(`  File ${index + 1}: ${file.path} - content length: ${file.content?.length || 0}`);
+        console.log(`  Content preview: ${file.content?.substring(0, 200) || 'NO CONTENT'}...`);
+      });
+      
       // Prepare files with repository information
-      const filesWithRepo = state.selectedFiles.map(file => ({
-        path: file.path,
-        content: file.content,
-        branch: file.branch,
-        repository_id: repository?.full_name || 'default',
-        owner: repository?.owner?.login || 'unknown',
-        repo: repository?.name || 'repo',
-        url: repository ? `https://github.com/${repository.owner.login}/${repository.name}/blob/${file.branch}/${file.path}` : undefined,
-        raw_url: repository ? `https://raw.githubusercontent.com/${repository.owner.login}/${repository.name}/${file.branch}/${file.path}` : undefined
-      }));
+      const filesWithRepo = state.selectedFiles.map(file => {
+        // Ensure content is always a string
+        let fileContent = file.content;
+        if (typeof fileContent !== 'string') {
+          console.warn('ChatContext: File content is not a string, converting:', typeof fileContent);
+          fileContent = String(fileContent || '');
+        }
+        
+        return {
+          path: file.path,
+          content: fileContent,
+          branch: file.branch,
+          repository_id: repository?.full_name || 'default',
+          owner: repository?.owner?.login || 'unknown',
+          repo: repository?.name || 'repo',
+          url: repository ? `https://github.com/${repository.owner.login}/${repository.name}/blob/${file.branch}/${file.path}` : undefined,
+          raw_url: repository ? `https://raw.githubusercontent.com/${repository.owner.login}/${repository.name}/${file.branch}/${file.path}` : undefined
+        };
+      });
+      
+      console.log('ChatContext sendMessage - filesWithRepo:', filesWithRepo);
+      console.log('ChatContext sendMessage - payload:', {
+        message,
+        context: {
+          files: filesWithRepo
+        },
+        repository_id: repository?.full_name || 'default'
+      });
       
       const response = await chatAPI.sendMessage(sessionId, {
         message,
@@ -487,6 +584,113 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateMessage = useCallback((sessionId: string, messageId: string, updates: Partial<ChatMessage>) => {
     dispatch({ type: 'UPDATE_MESSAGE', payload: { sessionId, messageId, updates } });
   }, []);
+
+  // Message status management
+  const setMessageStatus = useCallback((messageId: string, status: MessageStatus) => {
+    dispatch({ type: 'SET_MESSAGE_STATUS', payload: { messageId, status } });
+  }, []);
+
+  const updateMessageStatus = useCallback((messageId: string, updates: Partial<MessageStatus>) => {
+    dispatch({ type: 'UPDATE_MESSAGE_STATUS', payload: { messageId, updates } });
+  }, []);
+
+  const getMessageStatus = useCallback((messageId: string): MessageStatus | null => {
+    return state.messageStatuses[messageId] || null;
+  }, [state.messageStatuses]);
+
+  // Enhanced sendMessage with retry logic
+  const sendMessageWithRetry = useCallback(async (sessionId: string, message: string, maxRetries: number = 3): Promise<ChatMessage> => {
+    if (!chatAPI) {
+      throw new Error('No authentication token available');
+    }
+
+    const messageId = generateMessageId();
+    
+    // Set initial status
+    setMessageStatus(messageId, {
+      id: messageId,
+      status: 'sending',
+      retryCount: 0
+    });
+
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          updateMessageStatus(messageId, { 
+            status: 'retrying', 
+            retryCount: attempt 
+          });
+          
+          // Exponential backoff: wait 2^attempt seconds
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+
+        dispatch({ type: 'SET_LOADING_STATE', payload: { type: 'chat', loading: true } });
+        
+        console.log(`ChatContext sendMessageWithRetry - Attempt ${attempt + 1}/${maxRetries + 1}`);
+        console.log('ChatContext sendMessage - selectedFiles:', state.selectedFiles);
+        console.log('ChatContext sendMessage - selectedFiles count:', state.selectedFiles?.length || 0);
+        
+        // Prepare files with repository information
+        const filesWithRepo = state.selectedFiles.map(file => ({
+          path: file.path,
+          content: file.content,
+          branch: file.branch,
+          repository_id: repository?.full_name || 'default',
+          owner: repository?.owner?.login || 'unknown',
+          repo: repository?.name || 'repo',
+          url: repository ? `https://github.com/${repository.owner.login}/${repository.name}/blob/${file.branch}/${file.path}` : undefined,
+          raw_url: repository ? `https://raw.githubusercontent.com/${repository.owner.login}/${repository.name}/${file.branch}/${file.path}` : undefined
+        }));
+        
+        const response = await chatAPI.sendMessage(sessionId, {
+          message,
+          context: {
+            files: filesWithRepo
+          },
+          repository_id: repository?.full_name || 'default'
+        });
+        
+        if (response.success) {
+          // Update status to success and remove it after a delay
+          updateMessageStatus(messageId, { status: 'sent' });
+          setTimeout(() => {
+            dispatch({ type: 'REMOVE_MESSAGE_STATUS', payload: { messageId } });
+          }, 3000);
+          
+          // Add both user and assistant messages
+          dispatch({ type: 'ADD_MESSAGE', payload: { sessionId, message: response.userMessage } });
+          dispatch({ type: 'ADD_MESSAGE', payload: { sessionId, message: response.assistantMessage } });
+          return response.assistantMessage;
+        } else {
+          throw new Error('Failed to send message');
+        }
+      } catch (error) {
+        console.error(`Attempt ${attempt + 1} failed:`, error);
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        
+        if (attempt === maxRetries) {
+          // Final failure
+          updateMessageStatus(messageId, { 
+            status: 'failed', 
+            error: lastError.message 
+          });
+          dispatch({ type: 'SET_ERROR', payload: { 
+            type: 'chat', 
+            error: `Failed to send message after ${maxRetries + 1} attempts: ${lastError.message}` 
+          }});
+          throw lastError;
+        }
+      } finally {
+        dispatch({ type: 'SET_LOADING_STATE', payload: { type: 'chat', loading: false } });
+      }
+    }
+    
+    // This should never be reached, but TypeScript requires it
+    throw lastError || new Error('Unknown error occurred');
+  }, [chatAPI, state.selectedFiles, repository, generateMessageId, setMessageStatus, updateMessageStatus]);
 
   // File management
   const setSelectedFiles = useCallback((files: Array<{branch: string, path: string, content: string, contentHash?: string}>) => {
@@ -530,7 +734,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (chatAPI && user) {
       dispatch({ type: 'SET_LOADING_STATE', payload: { type: 'sessions', loading: true } });
-      chatAPI.getUserSessions(user.id).then(response => {
+      chatAPI.getUserSessions(user.id.toString()).then(response => {
         if (response.success) {
           dispatch({ type: 'SET_SESSIONS', payload: { sessions: response.sessions } });
         }
@@ -561,7 +765,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getSession,
     addMessage,
     sendMessage,
+    sendMessageWithRetry,
     updateMessage,
+    setMessageStatus,
+    updateMessageStatus,
+    getMessageStatus,
     setSelectedFiles,
     addSelectedFile,
     removeSelectedFile,

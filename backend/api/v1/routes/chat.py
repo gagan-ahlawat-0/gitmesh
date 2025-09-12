@@ -111,6 +111,15 @@ class ChatTarsService:
         if session.get("userId") != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
+        # Debug: Log the incoming request
+        logger.info(f"Chat request - session: {session_id}, message: {message[:100]}...")
+        logger.info(f"Chat context received: {context}")
+        if context and context.get("files"):
+            files = context.get("files", [])
+            logger.info(f"Files in context: {len(files)} files")
+            for i, file in enumerate(files[:3]):  # Log first 3 files
+                logger.info(f"  File {i+1}: {file.get('path', 'unknown')} - content length: {len(file.get('content', ''))}")
+        
         # Create user message
         user_message = {
             "id": str(uuid.uuid4()),

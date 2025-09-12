@@ -152,8 +152,7 @@ class GitMeshTarsWrapper:
         # Initialize GitIngest if available
         if GITINGEST_AVAILABLE:
             self.gitingest_tool = GitIngestTool(
-                github_pat=os.getenv("GITHUB_PAT") or os.getenv("GITHUB_TOKEN"),
-                verbose=True
+                github_token=os.getenv("GITHUB_PAT") or os.getenv("GITHUB_TOKEN")
             )
         
         logger.info(f"GitMeshTarsWrapper initialized for user {user_id}, project {project_id}")
@@ -646,17 +645,25 @@ class GitMeshTarsWrapper:
         5. Processes files sent with the message context
         """
         try:
+            logger.info(f"[TARS DEBUG] Processing chat message: {message[:100]}...")
+            logger.info(f"[TARS DEBUG] Context received: {context}")
+            if context and context.get("files"):
+                logger.info(f"[TARS DEBUG] Files in context: {len(context.get('files', []))} files")
+            
             # Initialize TARS if not already done
             if not self.tars:
                 await self.initialize()
             
             # If TARS is still not available, use intelligent fallback
             if not self.tars:
+                logger.warning("[TARS DEBUG] TARS not available, using fallback")
                 return await self._fallback_chat_processing(message, context, session_history)
             
             # Process any files sent with the message context immediately
             if context and context.get("files"):
+                logger.info("[TARS DEBUG] Processing context files...")
                 await self._process_context_files(context["files"])
+                logger.info("[TARS DEBUG] Context files processed")
             
             # Build comprehensive session context from knowledge base
             session_context = await self._build_session_context(message, context, session_history)
@@ -685,9 +692,9 @@ class GitMeshTarsWrapper:
     async def _process_context_files(self, files: List[Dict[str, Any]]) -> None:
         """Process files sent with the message context and add them to the knowledge base immediately."""
         try:
-            logger.info(f"Processing {len(files)} files from message context")
+            logger.info(f"[TARS DEBUG] Processing {len(files)} files from message context")
             
-            for file_data in files:
+            for i, file_data in enumerate(files):
                 try:
                     # Extract file information
                     file_path = file_data.get("path", "unknown_file")
@@ -695,8 +702,17 @@ class GitMeshTarsWrapper:
                     file_branch = file_data.get("branch", "main")
                     repository_id = file_data.get("repository_id", self.repository_id or "unknown")
                     
+                    # Ensure file_content is a string
+                    if not isinstance(file_content, str):
+                        logger.warning(f"[TARS DEBUG] File content is not a string, converting: {type(file_content)}")
+                        file_content = str(file_content) if file_content is not None else ""
+                    
+                    logger.info(f"[TARS DEBUG] File {i+1}: {file_path}")
+                    logger.info(f"[TARS DEBUG] Content length: {len(file_content)}")
+                    logger.info(f"[TARS DEBUG] Content preview: {file_content[:200] if len(file_content) > 200 else file_content}...")
+                    
                     if not file_content or file_content == "Loading...":
-                        logger.warning(f"Skipping file {file_path} - no content available")
+                        logger.warning(f"[TARS DEBUG] Skipping file {file_path} - no content available")
                         continue
                     
                     # Create metadata for the file
@@ -723,13 +739,18 @@ class GitMeshTarsWrapper:
                         
                         # Also create a summary entry if the file is large
                         if len(file_content) > 2000:
-                            summary = file_content[:500] + "\n...\n" + file_content[-500:]
-                            summary_metadata = {**metadata, "content_type": "summary"}
-                            self.qdrant_db.store_memory(
-                                text=f"File: {file_path}\nSummary: {summary}",
-                                memory_type="knowledge",
-                                metadata=summary_metadata
-                            )
+                            try:
+                                summary_start = file_content[:500] if len(file_content) > 500 else file_content
+                                summary_end = file_content[-500:] if len(file_content) > 500 else ""
+                                summary = summary_start + ("\n...\n" + summary_end if summary_end else "")
+                                summary_metadata = {**metadata, "content_type": "summary"}
+                                self.qdrant_db.store_memory(
+                                    text=f"File: {file_path}\nSummary: {summary}",
+                                    memory_type="knowledge",
+                                    metadata=summary_metadata
+                                )
+                            except Exception as summary_error:
+                                logger.warning(f"Could not create summary for {file_path}: {summary_error}")
                     
                     # Also store in Supabase if available
                     if self.memory:
@@ -883,19 +904,55 @@ class GitMeshTarsWrapper:
                 "current_context_files": context.get("files", []) if context else []
             }
             
-            # Get relevant knowledge base entries from Qdrant using semantic search
+            # FIRST: Add current context files directly (these were just processed)
+            if context and context.get("files"):
+                logger.info(f"[CONTEXT DEBUG] Adding {len(context['files'])} current context files directly")
+                for file_data in context["files"]:
+                    file_content = file_data.get("content", "")
+                    
+                    # Ensure file_content is a string
+                    if not isinstance(file_content, str):
+                        logger.warning(f"[CONTEXT DEBUG] File content is not a string, converting: {type(file_content)}")
+                        file_content = str(file_content) if file_content is not None else ""
+                    
+                    if file_content and file_content != "Loading...":
+                        # Add as knowledge entry with safe string slicing
+                        try:
+                            content_preview = file_content[:2000] if len(file_content) > 2000 else file_content
+                            
+                            knowledge_entry = {
+                                "content": content_preview,  # Safely limited content
+                                "metadata": {
+                                    "source_type": "current_context_file",
+                                    "file_path": file_data.get("path", "unknown"),
+                                    "branch": file_data.get("branch", "main"),
+                                    "source": "direct_context",
+                                    "priority": "high"
+                                }
+                            }
+                            session_context["knowledge_entries"].append(knowledge_entry)
+                            logger.info(f"[CONTEXT DEBUG] Added current file to knowledge: {file_data.get('path')}")
+                        except Exception as entry_error:
+                            logger.error(f"[CONTEXT DEBUG] Error processing file entry {file_data.get('path')}: {entry_error}")
+                            continue
+            
+            # THEN: Get additional relevant knowledge base entries from Qdrant using semantic search
             if self.qdrant_db:
                 try:
                     relevant_knowledge = self.qdrant_db.search_memory(
                         query=current_message,
                         memory_type="knowledge",
-                        limit=10,
+                        limit=8,  # Reduced to make room for current files
                         filter_params={"session_id": self.session_id}
                     )
-                    session_context["knowledge_entries"] = relevant_knowledge
-                    logger.info(f"Found {len(relevant_knowledge)} relevant knowledge entries for query")
+                    # Add to existing knowledge entries
+                    session_context["knowledge_entries"].extend(relevant_knowledge)
+                    logger.info(f"[CONTEXT DEBUG] Found {len(relevant_knowledge)} additional knowledge entries from vector search")
                 except Exception as e:
                     logger.warning(f"Could not search knowledge base: {e}")
+            
+            total_knowledge = len(session_context["knowledge_entries"])
+            logger.info(f"[CONTEXT DEBUG] Total knowledge entries for AI context: {total_knowledge}")
             
             # Get session conversation history from vector store
             if self.memory:

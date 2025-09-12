@@ -26,6 +26,7 @@ from models.api.github_models import (
     CacheResponse,
 )
 from utils.github_utils import github_service
+from utils.local_file_utils import local_file_service
 from models.api.auth_models import User
 
 router = APIRouter()
@@ -563,9 +564,18 @@ async def get_repository_tree(
     try:
         tree = await github_service.get_repository_tree(owner, repo, branch, token=token)
         return TreeResponse(tree=tree)
-    except Exception as e:
-        logger.error(f"Error fetching repository tree: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as github_error:
+        logger.warning(f"GitHub API failed for repository tree, trying local file system: {github_error}")
+        
+        try:
+            # Fallback to local file system
+            tree = local_file_service.get_repository_tree(owner, repo, branch)
+            logger.info(f"Successfully loaded repository tree from local filesystem for {owner}/{repo}")
+            return TreeResponse(tree=tree)
+            
+        except Exception as local_error:
+            logger.error(f"Both GitHub API and local filesystem failed: GitHub={github_error}, Local={local_error}")
+            raise HTTPException(status_code=500, detail=f"Failed to fetch repository tree: {str(github_error)}")
 
 
 @router.get("/repositories/{owner}/{repo}/trees", response_model=TreesByBranchResponse)
@@ -600,9 +610,20 @@ async def get_file_content(
     try:
         content = await github_service.get_file_content(owner, repo, path, ref, token=token)
         return FileContentResponse(content=content)
-    except Exception as e:
-        logger.error(f"Error fetching file content: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as github_error:
+        logger.warning(f"GitHub API failed for file content, trying local file system: {github_error}")
+        
+        try:
+            # Fallback to local file system
+            local_response = local_file_service.get_file_content(owner, repo, path, ref)
+            # Extract just the content string from the local service response
+            content = local_response.get('content', '') if isinstance(local_response, dict) else str(local_response)
+            logger.info(f"Successfully loaded file content from local filesystem for {owner}/{repo}/{path}")
+            return FileContentResponse(content=content)
+            
+        except Exception as local_error:
+            logger.error(f"Both GitHub API and local filesystem failed: GitHub={github_error}, Local={local_error}")
+            raise HTTPException(status_code=500, detail=f"Failed to fetch file content: {str(github_error)}")
 
 
 @router.get("/repositories/{owner}/{repo}/branches-with-trees", response_model=BranchesWithTreesResponse)
@@ -613,6 +634,7 @@ async def get_branches_with_trees(
 ):
     """Get all branches with their file trees (comprehensive endpoint)."""
     try:
+        # Try GitHub API first
         branches = await github_service.get_repository_branches(owner, repo, token=token)
         trees_by_branch = await github_service.get_repository_trees_for_all_branches(owner, repo, token=token)
         
@@ -627,9 +649,25 @@ async def get_branches_with_trees(
         )
         
         return result
-    except Exception as e:
-        logger.error(f"Error fetching branches with trees: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as github_error:
+        logger.warning(f"GitHub API failed, trying local file system: {github_error}")
+        
+        try:
+            # Fallback to local file system for development
+            local_data = local_file_service.get_branches_with_trees(owner, repo)
+            
+            result = BranchesWithTreesResponse(
+                branches=local_data["branches"],
+                treesByBranch=local_data["treesByBranch"],
+                summary=local_data["summary"]
+            )
+            
+            logger.info(f"Successfully loaded repository data from local filesystem for {owner}/{repo}")
+            return result
+            
+        except Exception as local_error:
+            logger.error(f"Both GitHub API and local filesystem failed: GitHub={github_error}, Local={local_error}")
+            raise HTTPException(status_code=500, detail=f"Failed to fetch repository data: {str(github_error)}")
 
 
 @router.get("/rate-limit", response_model=RateLimitResponse)
