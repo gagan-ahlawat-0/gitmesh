@@ -18,7 +18,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ repo }) => {
   };
 
   return (
-    <Card className="bg-gray-900 shadow-lg rounded-lg flex flex-col h-full hover:shadow-orange-500/20 transition-shadow duration-300">
+    <Card className="bg-black shadow-lg rounded-lg flex flex-col h-full hover:shadow-orange-500/20 transition-shadow duration-300">
       <CardHeader>
         <CardTitle className="text-xl font-bold text-orange-500">{repo.name}</CardTitle>
       </CardHeader>
@@ -37,7 +37,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ repo }) => {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={() => window.open(repo.html_url, '_blank')} className="bg-gray-800 text-white hover:bg-gray-700 border-gray-700">
+          <Button variant="outline" size="sm" onClick={() => window.open(repo.html_url, '_blank')} className="bg-black text-white hover:bg-gray-700 border-gray-700">
             <ExternalLink className="h-4 w-4" />
           </Button>
           <Button size="sm" onClick={handleOpenInBeetle} className="bg-orange-500 text-black hover:bg-orange-600">

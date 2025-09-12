@@ -23,18 +23,20 @@ export function SearchResults({ query }: SearchResultsProps) {
         setLoading(true);
         setError(null);
         try {
-          const response = await fetch(`/api/v1/search?q=${encodeURIComponent(query)}`, {
+          const response = await fetch(`/api/v1/github/search?q=${encodeURIComponent(query)}`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           });
           if (!response.ok) {
-            throw new Error('Failed to fetch search results');
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch search results: ${response.status} ${response.statusText}. ${errorText}`);
           }
           const data = await response.json();
           setResults(data);
         } catch (err) {
-          setError(err.message);
+          console.error('Search error:', err);
+          setError(err instanceof Error ? err.message : 'Unknown error occurred');
         } finally {
           setLoading(false);
         }

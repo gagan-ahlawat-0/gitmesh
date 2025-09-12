@@ -10,7 +10,7 @@ interface PullRequestVelocityProps {
 
 export default function PullRequestVelocity({ data }: PullRequestVelocityProps) {
   return (
-    <Card className="bg-gray-900 shadow-lg rounded-lg">
+    <Card className="bg-black shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="text-xl font-bold text-white">Pull Request Velocity</CardTitle>
       </CardHeader>

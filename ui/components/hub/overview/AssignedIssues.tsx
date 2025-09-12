@@ -22,14 +22,14 @@ export const AssignedIssues: React.FC<AssignedIssuesProps> = ({ issues, pullRequ
   );
 
   return (
-    <Card className="bg-gray-900 shadow-lg rounded-lg h-[400px] flex flex-col">
+    <Card className="bg-black shadow-lg rounded-lg h-[400px] flex flex-col">
       <CardHeader>
         <CardTitle className="text-xl font-bold text-gray-200">Assigned to You</CardTitle>
       </CardHeader>
       <CardContent className="flex-grow overflow-y-auto">
         <ul className="space-y-4">
           {paginatedItems.map((item) => (
-            <li key={item.id} className="p-4 bg-gray-800 rounded-lg shadow-sm">
+            <li key={item.id} className="p-4 bg-black rounded-lg shadow-sm">
               <div className="flex justify-between items-center">
                 <div>
                   <a href={item.html_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-orange-400 hover:underline">

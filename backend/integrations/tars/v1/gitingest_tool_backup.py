@@ -1,8 +1,14 @@
 """
-GitIngest Integration Tool for TARS v1 - Fixed Version
-=====================================================
+GitIngest Integration Tool for TARS v1
+=====================================
 
-Clean and simple GitIngest integration using the gitingest library.
+Clean and simple GitIngest integr            logger.info(f"🔄 Analyzing repository: {repo_url}")
+            if auth_token:
+                logger.info("🔐 Using GitHub authentication token")
+            else:
+                logger.info("🌐 Analyzing public repository (no authentication)")
+            
+            # Call gitingest libraryon using the gitingest library.
 Integrates with GitMesh's main authentication system via KeyManager.
 
 Features:
@@ -10,7 +16,6 @@ Features:
 - Support for token override for specific operations
 - Repository submodule support
 - Clean API with convenience functions
-- Proper async/sync handling to avoid event loop conflicts
 
 Authentication Integration:
 - Uses config.key_manager.KeyManager to get GitHub tokens stored by the main app
@@ -38,7 +43,6 @@ Usage Examples:
 import os
 import logging
 from typing import Dict, Any, Optional, Tuple
-from datetime import datetime
 
 try:
     from gitingest import ingest
@@ -77,7 +81,6 @@ class GitIngestTool:
     - GitHub PAT support using the main app's authentication system
     - Support for submodules
     - Simple and clean API
-    - Proper sync/async handling
     """
     
     def __init__(self, github_token: Optional[str] = None):
@@ -94,29 +97,15 @@ class GitIngestTool:
         if not self.github_token:
             self.github_token = self.key_manager.get_github_token()
         
-        # Clean up any placeholder environment tokens that might confuse gitingest
-        if os.environ.get("GITHUB_TOKEN") in ["your_github_token_here", "placeholder", "dummy", None]:
-            if "GITHUB_TOKEN" in os.environ:
-                del os.environ["GITHUB_TOKEN"]
-        
-        # Only set environment variable if we have a valid token
-        if self.github_token and self._is_valid_token(self.github_token):
+        # Set environment variable if token available
+        if self.github_token:
             os.environ["GITHUB_TOKEN"] = self.github_token
 
-    def _is_valid_token(self, token: str) -> bool:
-        """Check if token is valid (not a placeholder)."""
-        if not token or not token.strip():
-            return False
-        if len(token) < 10:
-            return False
-        if token.startswith("your_") or token in ["your_github_token_here", "placeholder", "dummy"]:
-            return False
-        return True
-    
     def get_token(self) -> Optional[str]:
         """Get GitHub token from instance or KeyManager."""
-        token = self.github_token or self.key_manager.get_github_token()
-        return token if self._is_valid_token(token) else None
+        if self.github_token:
+            return self.github_token
+        return self.key_manager.get_github_token()
     
     def analyze_repository(
         self, 
@@ -138,67 +127,36 @@ class GitIngestTool:
         result = {
             "success": False,
             "repo_url": repo_url,
-            "summary": "",
-            "tree": "",
-            "content": "",
-            "error": None,
-            "metadata": {
-                "repo_url": repo_url,
-                "timestamp": datetime.now().isoformat(),
-                "include_submodules": include_submodules
-            }
+            "summary": None,
+            "tree": None,
+            "content": None,
+            "error": None
         }
         
         try:
             # Use provided token, instance token, or get from KeyManager
             auth_token = token or self.get_token()
             
-            logger.info(f"🔄 Analyzing repository: {repo_url}")
+            logger.info(f"� Analyzing repository: {repo_url}")
             
-            # Call gitingest library (synchronous version only to avoid async conflicts)
-            auth_token = token or self.get_token()  # This now returns None for invalid tokens
-            
+            # Call gitingest library
             if auth_token:
-                logger.info("🔐 Using GitHub authentication token")
-                try:
-                    summary, tree, content = ingest(
-                        repo_url, 
-                        token=auth_token, 
-                        include_submodules=include_submodules
-                    )
-                except Exception as token_error:
-                    # If token fails, try without authentication
-                    logger.warning(f"Authentication failed, trying without token: {token_error}")
-                    summary, tree, content = ingest(
-                        repo_url, 
-                        include_submodules=include_submodules
-                    )
+                summary, tree, content = ingest(
+                    repo_url, 
+                    token=auth_token, 
+                    include_submodules=include_submodules
+                )
             else:
-                logger.info("🌐 Analyzing public repository (no authentication)")
                 summary, tree, content = ingest(
                     repo_url, 
                     include_submodules=include_submodules
                 )
             
-            # Ensure we have strings, not None
-            summary = summary or ""
-            tree = tree or ""
-            content = content or ""
-            
             result.update({
                 "success": True,
                 "summary": summary,
                 "tree": tree,
-                "content": content,
-                "metadata": {
-                    "repo_url": repo_url,
-                    "timestamp": datetime.now().isoformat(),
-                    "include_submodules": include_submodules,
-                    "summary_length": len(summary),
-                    "tree_length": len(tree),
-                    "content_length": len(content),
-                    "has_auth": bool(auth_token and auth_token.strip())
-                }
+                "content": content
             })
             
             logger.info(f"✅ Repository analysis completed successfully")
@@ -242,8 +200,7 @@ class GitIngestTool:
                 "summary": result["summary"],
                 "tree": result["tree"], 
                 "content": result["content"],
-                "repo_url": repo_url,
-                "metadata": result.get("metadata", {})
+                "repo_url": repo_url
             }
         else:
             return {
@@ -276,14 +233,14 @@ def extract_details(repo_url: str, github_token: Optional[str] = None) -> Tuple[
     """
     try:
         tool = GitIngestTool(github_token=github_token)
-        result = tool.analyze_repository(repo_url)
+        auth_token = tool.get_token()
         
-        if result["success"]:
-            return result["summary"], result["tree"], result["content"]
+        if auth_token:
+            summary, tree, content = ingest(repo_url, token=auth_token)
         else:
-            logger.error(f"Failed to extract repository details: {result['error']}")
-            return "", "", ""
-            
+            summary, tree, content = ingest(repo_url)
+        
+        return summary, tree, content
     except Exception as e:
         logger.error(f"Failed to extract repository details: {e}")
         return "", "", ""
@@ -298,7 +255,7 @@ if __name__ == "__main__":
     
     # Analyze a public repository
     print("\n📄 Analyzing public repository...")
-    result = tool.analyze_repository("https://github.com/octocat/Hello-World")
+    result = tool.analyze_repository("https://github.com/RAWx18/Beetle")
     if result["success"]:
         print(f"✅ Success!")
         print(f"📋 Summary: {result['summary'][:200]}...")
@@ -306,13 +263,13 @@ if __name__ == "__main__":
     else:
         print(f"❌ Error: {result['error']}")
     
-    # Example with convenience function
-    print("\n🔧 Using convenience function...")
-    summary, tree, content = extract_details("https://github.com/octocat/Hello-World")
-    if summary:
-        print(f"✅ Extracted details successfully!")
-        print(f"📋 Summary length: {len(summary)} characters")
-        print(f"🌳 Tree length: {len(tree)} characters") 
-        print(f"📄 Content length: {len(content)} characters")
-    else:
-        print("❌ Failed to extract details")
+    # # Example with convenience function
+    # print("\n🔧 Using convenience function...")
+    # summary, tree, content = extract_details("https://github.com/python/cpython")
+    # if summary:
+    #     print(f"✅ Extracted details successfully!")
+    #     print(f"📋 Summary length: {len(summary)} characters")
+    #     print(f"🌳 Tree length: {len(tree)} characters") 
+    #     print(f"📄 Content length: {len(content)} characters")
+    # else:
+    #     print("❌ Failed to extract details")

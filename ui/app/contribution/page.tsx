@@ -6,6 +6,7 @@ import { useAnimateIn } from '@/lib/animations';
 import { BranchWhat } from '@/components/branch-content/BranchWhat';
 import AnimatedTransition from '@/components/AnimatedTransition';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 export default function ContributionPage() {
   const [authProcessed, setAuthProcessed] = useState(false);
@@ -74,12 +75,10 @@ export default function ContributionPage() {
   }, [isAuthenticated, searchParams, authProcessed, router]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 pb-24 h-screen">
+    <div className="w-full h-full overflow-y-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <AnimatedTransition show={showContent} animation="fade" duration={800}>
-          <div className="h-full overflow-y-auto">
-            <BranchWhat />
-          </div>
+          <BranchWhat />
         </AnimatedTransition>
       </div>
     </div>

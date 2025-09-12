@@ -99,9 +99,6 @@ export default function HubActivityPage() {
               <Activity className="w-8 h-8 text-orange-500" />
               Activity Feed
             </h2>
-            <p className="text-gray-400 mt-2">
-              Recent activity across all your repositories.
-            </p>
           </div>
           <div className="flex items-center gap-4 w-full md:w-auto">
             <ActivityFilters repositories={repositories} onFilterChange={setFilters} />
@@ -110,20 +107,14 @@ export default function HubActivityPage() {
               size="sm"
               onClick={refreshActivities}
               disabled={refreshing}
-              className="flex items-center gap-2 bg-gray-800 text-white hover:bg-gray-700 border-gray-700"
+              className="flex items-center gap-2 bg-black text-white hover:bg-gray-700 border-gray-700"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
         </div>
-        <Card className="bg-gray-900 shadow-lg rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-white">Recent Activity</CardTitle>
-            <CardDescription className="text-gray-400">
-              Latest updates and changes from your repositories.
-            </CardDescription>
-          </CardHeader>
+        <Card className="bg-black shadow-lg rounded-lg">
           <CardContent>
             {paginatedDates.length > 0 ? (
               paginatedDates.map((date) => (

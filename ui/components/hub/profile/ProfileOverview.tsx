@@ -14,9 +14,93 @@ import rehypeRaw from 'rehype-raw';
 import { Skeleton } from "@/components/ui/skeleton";
 import 'highlight.js/styles/github.css';
 
+// Define the props for our component
+interface ReadmeCardProps {
+  readmeContent: string;
+  githubRepoUrl: string; // e.g., "https://github.com/shadcn-ui/ui"
+}
+
 interface ProfileOverviewProps {
   username: string;
   user: GitHubUser;
+}
+
+export function ReadmeCard({ readmeContent, githubRepoUrl }: ReadmeCardProps) {
+  // Function to construct the absolute URL for images from the repo URL
+  const getImageUrl = (src: string) => {
+    // If the src is already an absolute URL, return it as is
+    if (src.startsWith("http")) {
+      return src;
+    }
+
+    try {
+      // Parse the main repo URL to get the owner and repo name
+      const url = new URL(githubRepoUrl);
+      const [_, owner, repo] = url.pathname.split("/");
+      
+      // Assume the default branch is 'main'. For more complex cases, this could be a prop.
+      // Handles both './path' and 'path' formats
+      const cleanedSrc = src.startsWith("./") ? src.substring(2) : src;
+
+      return `https://raw.githubusercontent.com/${owner}/${repo}/main/${cleanedSrc}`;
+    } catch (error) {
+      console.error("Invalid GitHub repo URL provided:", githubRepoUrl);
+      return src; // Fallback to the original src if URL parsing fails
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>README</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="prose prose-sm max-w-none dark:prose-invert 
+                     prose-headings:text-foreground prose-p:text-foreground 
+                     prose-strong:text-foreground prose-code:text-foreground 
+                     prose-pre:bg-muted prose-pre:border prose-pre:p-4 prose-pre:rounded-md
+                     prose-blockquote:border-l-border prose-blockquote:text-muted-foreground
+                     prose-a:text-blue-500 prose-a:no-underline hover:prose-a:underline
+                     prose-hr:border-border">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeHighlight, rehypeRaw]}
+            components={{
+              // Override 'a' tag to open links in a new tab
+              a: ({ href, children }) => (
+                <a href={href} target="_blank" rel="noopener noreferrer">
+                  {children}
+                </a>
+              ),
+              // Override 'img' to fix relative paths
+              img: ({ src, alt }) => (
+                <img
+                  src={getImageUrl(src || "")}
+                  alt={alt}
+                  className="max-w-full rounded-md border border-border"
+                />
+              ),
+              // Keep custom code styling for syntax highlighting from rehype-highlight
+              code: ({ children, className }) => {
+                // Inline code will not have a className from rehype-highlight
+                const isInline = !className;
+                return isInline ? (
+                  <code className="bg-muted px-1.5 py-0.5 rounded-sm text-sm font-mono border">
+                    {children}
+                  </code>
+                ) : (
+                  // Code block (handled by <pre>)
+                  <code className={className}>{children}</code>
+                );
+              },
+            }}
+          >
+            {readmeContent}
+          </ReactMarkdown>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function ProfileOverview({ username, user }: ProfileOverviewProps) {
@@ -84,190 +168,6 @@ export function ProfileOverview({ username, user }: ProfileOverviewProps) {
 
   return (
     <div className="space-y-6">
-      {/* README */}
-      {readme && (
-        <Card>
-          <CardHeader>
-            <CardTitle>README</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm max-w-none dark:prose-invert 
-                         prose-headings:text-foreground prose-p:text-foreground 
-                         prose-strong:text-foreground prose-code:text-foreground 
-                         prose-pre:bg-muted prose-pre:border prose-pre:text-foreground
-                         prose-blockquote:border-l-border prose-blockquote:text-muted-foreground
-                         prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground
-                         prose-table:text-foreground prose-th:text-foreground prose-td:text-foreground
-                         prose-hr:border-border">
-              <ReactMarkdown 
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight, rehypeRaw]}
-                components={{
-                  // Custom heading components
-                  h1: ({ children }) => (
-                    <h1 className="text-2xl font-bold text-foreground border-b border-border pb-2 mb-4">
-                      {children}
-                    </h1>
-                  ),
-                  h2: ({ children }) => (
-                    <h2 className="text-xl font-semibold text-foreground border-b border-border pb-2 mb-3 mt-6">
-                      {children}
-                    </h2>
-                  ),
-                  h3: ({ children }) => (
-                    <h3 className="text-lg font-semibold text-foreground mb-2 mt-4">
-                      {children}
-                    </h3>
-                  ),
-                  h4: ({ children }) => (
-                    <h4 className="text-base font-semibold text-foreground mb-2 mt-3">
-                      {children}
-                    </h4>
-                  ),
-                  h5: ({ children }) => (
-                    <h5 className="text-sm font-semibold text-foreground mb-2 mt-3">
-                      {children}
-                    </h5>
-                  ),
-                  h6: ({ children }) => (
-                    <h6 className="text-xs font-semibold text-foreground mb-2 mt-3">
-                      {children}
-                    </h6>
-                  ),
-                  // Custom paragraph component
-                  p: ({ children }) => (
-                    <p className="text-foreground mb-4 leading-7">
-                      {children}
-                    </p>
-                  ),
-                  // Custom list components
-                  ul: ({ children }) => (
-                    <ul className="list-disc list-inside text-foreground mb-4 space-y-1">
-                      {children}
-                    </ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol className="list-decimal list-inside text-foreground mb-4 space-y-1">
-                      {children}
-                    </ol>
-                  ),
-                  li: ({ children }) => (
-                    <li className="text-foreground">
-                      {children}
-                    </li>
-                  ),
-                  // Custom blockquote component
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-border pl-4 py-2 bg-muted/50 text-muted-foreground italic mb-4">
-                      {children}
-                    </blockquote>
-                  ),
-                  // Custom table components
-                  table: ({ children }) => (
-                    <div className="overflow-x-auto mb-4">
-                      <table className="min-w-full border border-border rounded-md">
-                        {children}
-                      </table>
-                    </div>
-                  ),
-                  thead: ({ children }) => (
-                    <thead className="bg-muted">
-                      {children}
-                    </thead>
-                  ),
-                  tbody: ({ children }) => (
-                    <tbody className="bg-background">
-                      {children}
-                    </tbody>
-                  ),
-                  tr: ({ children }) => (
-                    <tr className="border-b border-border">
-                      {children}
-                    </tr>
-                  ),
-                  th: ({ children }) => (
-                    <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border">
-                      {children}
-                    </th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="px-4 py-2 text-foreground border-r border-border">
-                      {children}
-                    </td>
-                  ),
-                  // Custom horizontal rule
-                  hr: () => (
-                    <hr className="border-t border-border my-6" />
-                  ),
-                  // Custom link component to handle GitHub links
-                  a: ({ href, children }) => (
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 hover:text-blue-600 underline transition-colors"
-                    >
-                      {children}
-                    </a>
-                  ),
-                  // Custom code block styling
-                  pre: ({ children }) => (
-                    <pre className="bg-muted p-4 rounded-md overflow-x-auto border border-border mb-4">
-                      {children}
-                    </pre>
-                  ),
-                  // Custom inline code styling
-                  code: ({ children, className }) => {
-                    const isInline = !className;
-                    return isInline ? (
-                      <code className="bg-muted px-2 py-1 rounded text-sm font-mono text-foreground border">
-                        {children}
-                      </code>
-                    ) : (
-                      <code className={`${className} text-foreground`}>{children}</code>
-                    );
-                  },
-                  // Custom image styling
-                  img: ({ src, alt }) => (
-                    <img 
-                      src={src} 
-                      alt={alt} 
-                      className="max-w-full h-auto rounded-md border border-border mb-4"
-                    />
-                  ),
-                }}
-              >
-                {readme}
-              </ReactMarkdown>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Pinned Repositories */}
-      {pinnedRepos.length > 0 && (
-        <div>
-          <h3 className="text-xl font-semibold mb-4">Pinned Repositories</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pinnedRepos.map((repo) => (
-              <EnhancedRepositoryCard key={repo.id} repo={repo} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Recent Repositories */}
-      {recentRepos.length > 0 && (
-        <div>
-          <h3 className="text-xl font-semibold mb-4">Recently Updated Repositories</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recentRepos.map((repo) => (
-              <EnhancedRepositoryCard key={repo.id} repo={repo} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Contribution Stats */}
       <Card>
         <CardHeader>
@@ -296,6 +196,38 @@ export function ProfileOverview({ username, user }: ProfileOverviewProps) {
           </div>
         </CardContent>
       </Card>
+      {/* README */}
+      {readme && (
+        <ReadmeCard 
+          readmeContent={readme} 
+          githubRepoUrl={`https://github.com/${username}`} 
+        />
+      )}
+
+      {/* Pinned Repositories */}
+      {pinnedRepos.length > 0 && (
+        <div>
+          <h3 className="text-xl font-semibold mb-4">Pinned Repositories</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pinnedRepos.map((repo) => (
+              <EnhancedRepositoryCard key={repo.id} repo={repo} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Repositories */}
+      {recentRepos.length > 0 && (
+        <div>
+          <h3 className="text-xl font-semibold mb-4">Recently Updated Repositories</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentRepos.map((repo) => (
+              <EnhancedRepositoryCard key={repo.id} repo={repo} />
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

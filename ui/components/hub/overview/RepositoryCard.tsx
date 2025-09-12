@@ -417,7 +417,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                     href={`/hub/profile/${contributor.login}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group flex flex-col items-center p-4 rounded-xl bg-black-700 hover:bg-black-600 transition-all duration-300 transform hover:scale-105"
+                    className="group flex flex-col items-center p-4 rounded-xl bg-black-700 hover:bg-black transition-all duration-300 transform hover:scale-105"
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >
                     <div className="relative mb-3">
@@ -584,22 +584,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
         {/* Repository Actions */}
         <Card className="bg-black-800 border border-black-700 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3 text-xl text-white">
-              <Zap className="w-5 h-5 text-orange-500" />
-              Quick Actions
-            </CardTitle>
-            <CardDescription className="text-black-400">
-              Quick actions for this repository
-            </CardDescription>
-          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <a 
                 href={repository.html_url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="group flex items-center gap-4 p-6 rounded-xl bg-black-700 hover:bg-black-600 transition-all duration-300 border border-black-600"
+                className="group flex items-center gap-4 p-6 rounded-xl bg-black-700 hover:bg-black transition-all duration-300 border border-black-600"
               >
                 <Github className="w-6 h-6 text-black-400 group-hover:scale-110 transition-transform duration-300" />
                 <div>
@@ -607,14 +598,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                   <div className="text-sm text-black-400">Open repository page</div>
                 </div>
               </a>
-              <button className="group flex items-center gap-4 p-6 rounded-xl bg-black-700 hover:bg-black-600 transition-all duration-300 border border-black-600">
+              <button className="group flex items-center gap-4 p-6 rounded-xl bg-black-700 hover:bg-black transition-all duration-300 border border-black-600">
                 <GitBranch className="w-6 h-6 text-black-400 group-hover:scale-110 transition-transform duration-300" />
                 <div>
                   <div className="font-semibold text-lg text-white">Clone Repository</div>
                   <div className="text-sm text-black-400">Copy clone URL</div>
                 </div>
               </button>
-              <button className="group flex items-center gap-4 p-6 rounded-xl bg-black-700 hover:bg-black-600 transition-all duration-300 border border-black-600">
+              <button className="group flex items-center gap-4 p-6 rounded-xl bg-black-700 hover:bg-black transition-all duration-300 border border-black-600">
                 <Star className="w-6 h-6 text-black-400 group-hover:scale-110 transition-transform duration-300" />
                 <div>
                   <div className="font-semibold text-lg text-white">Star Repository</div>

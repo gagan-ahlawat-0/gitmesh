@@ -94,29 +94,15 @@ class GitIngestTool:
         if not self.github_token:
             self.github_token = self.key_manager.get_github_token()
         
-        # Clean up any placeholder environment tokens that might confuse gitingest
-        if os.environ.get("GITHUB_TOKEN") in ["your_github_token_here", "placeholder", "dummy", None]:
-            if "GITHUB_TOKEN" in os.environ:
-                del os.environ["GITHUB_TOKEN"]
-        
-        # Only set environment variable if we have a valid token
-        if self.github_token and self._is_valid_token(self.github_token):
+        # Set environment variable if token available
+        if self.github_token:
             os.environ["GITHUB_TOKEN"] = self.github_token
 
-    def _is_valid_token(self, token: str) -> bool:
-        """Check if token is valid (not a placeholder)."""
-        if not token or not token.strip():
-            return False
-        if len(token) < 10:
-            return False
-        if token.startswith("your_") or token in ["your_github_token_here", "placeholder", "dummy"]:
-            return False
-        return True
-    
     def get_token(self) -> Optional[str]:
         """Get GitHub token from instance or KeyManager."""
-        token = self.github_token or self.key_manager.get_github_token()
-        return token if self._is_valid_token(token) else None
+        if self.github_token:
+            return self.github_token
+        return self.key_manager.get_github_token()
     
     def analyze_repository(
         self, 
@@ -156,9 +142,7 @@ class GitIngestTool:
             logger.info(f"🔄 Analyzing repository: {repo_url}")
             
             # Call gitingest library (synchronous version only to avoid async conflicts)
-            auth_token = token or self.get_token()  # This now returns None for invalid tokens
-            
-            if auth_token:
+            if auth_token and auth_token.strip() and len(auth_token) > 10:
                 logger.info("🔐 Using GitHub authentication token")
                 try:
                     summary, tree, content = ingest(

@@ -378,6 +378,44 @@ async def search_organizations(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/search")
+async def combined_search(
+    token: str = Depends(require_auth),
+    q: str = Query(..., description="Search query"),
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(10, ge=1, le=30, description="Items per page per category")
+):
+    """Combined search for repositories, users, and organizations."""
+    try:
+        # Execute all searches in parallel
+        import asyncio
+        
+        repositories_task = github_service.search_repositories(q, "stars", "desc", page, per_page, token=token)
+        users_task = github_service.search_users(q, "followers", "desc", page, per_page, token=token)
+        organizations_task = github_service.search_organizations(q, "repositories", "desc", page, per_page, token=token)
+        
+        repositories_result, users_result, organizations_result = await asyncio.gather(
+            repositories_task, users_task, organizations_task, return_exceptions=True
+        )
+        
+        # Handle results and exceptions
+        repositories = repositories_result.get('items', []) if not isinstance(repositories_result, Exception) else []
+        users = users_result.get('items', []) if not isinstance(users_result, Exception) else []
+        organizations = organizations_result.get('items', []) if not isinstance(organizations_result, Exception) else []
+        
+        return {
+            "repositories": repositories,
+            "users": users,
+            "organizations": organizations,
+            "query": q,
+            "page": page,
+            "per_page": per_page
+        }
+    except Exception as e:
+        logger.error(f"Error in combined search: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/repositories/{owner}/{repo}/stats")
 async def get_repository_stats(
     owner: str,

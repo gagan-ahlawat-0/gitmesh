@@ -11,7 +11,7 @@ interface ChartProps {
 
 export default function Chart({ data, title }: ChartProps) {
   return (
-    <Card className="bg-gray-900 shadow-lg rounded-lg">
+    <Card className="bg-black shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="text-xl font-bold text-white">{title}</CardTitle>
       </CardHeader>

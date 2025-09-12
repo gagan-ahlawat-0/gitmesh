@@ -73,7 +73,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           <Button 
             onClick={handleLogin} 
             disabled={isLoggingIn || loading}
-            className="w-full bg-black hover:bg-gray-800 text-white"
+            className="w-full bg-black hover:bg-black text-white"
           >
             {isLoggingIn ? (
               <>

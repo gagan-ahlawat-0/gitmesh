@@ -92,15 +92,25 @@ export function HubNavigation() {
           {/* Logo and Brand */}
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg overflow-hidden">
+                <div className="w-8 h-8 rounded-lg overflow-hidden">
+                {/* Show dark_logo.png in light mode, light_logo.png in dark mode */}
                 <Image 
-                  src="/favicon.png" 
-                  alt="GitMesh" 
-                  width={32} 
+                  src="/dark_logo.png"
+                  alt="GitMesh"
+                  width={32}
                   height={32}
-                  className="object-contain"
+                  className="object-contain block dark:hidden"
+                  priority
                 />
-              </div>
+                <Image 
+                  src="/light_logo.png"
+                  alt="GitMesh"
+                  width={32}
+                  height={32}
+                  className="object-contain hidden dark:block"
+                  priority
+                />
+                </div>
               <span className="text-xl font-bold">GitMesh</span>
             </div>
 
@@ -130,15 +140,15 @@ export function HubNavigation() {
           <div className="flex items-center gap-4">
             {/* Search */}
             <form onSubmit={handleSearch} className="hidden sm:block">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  type="search"
-                  placeholder="Search repositories, projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64"
-                />
+              <div className="relative w-[400px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                type="search"
+                placeholder="Search repositories, projects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-full"
+              />
               </div>
             </form>
 

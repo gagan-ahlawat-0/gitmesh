@@ -151,10 +151,12 @@ class GitMeshTarsWrapper:
         
         # Initialize GitIngest if available
         if GITINGEST_AVAILABLE:
-            self.gitingest_tool = GitIngestTool(
-                github_pat=os.getenv("GITHUB_PAT") or os.getenv("GITHUB_TOKEN"),
-                verbose=True
-            )
+            try:
+                self.gitingest_tool = GitIngestTool()
+                logger.info("GitIngest tool initialized successfully")
+            except Exception as e:
+                logger.warning(f"Failed to initialize GitIngest tool: {e}")
+                self.gitingest_tool = None
         
         logger.info(f"GitMeshTarsWrapper initialized for user {user_id}, project {project_id}")
     
@@ -1574,17 +1576,12 @@ class GitMeshTarsWrapper:
             if not self.gitingest_tool:
                 return None
             
-            # Get repository metadata to check for updates
-            metadata = self.gitingest_tool.get_repository_metadata(repo_url)
-            if not metadata.get("accessible"):
-                return None
-            
-            # Create hash from relevant metadata
+            # Create hash from repo URL and branch for now
+            # In the future, we could enhance this with actual repo metadata
             hash_data = {
                 "repo": repo_url,
                 "branch": branch,
-                "updated_at": metadata.get("info", {}).get("updated_at"),
-                "size": metadata.get("info", {}).get("size")
+                "timestamp": datetime.now().strftime("%Y-%m-%d")  # Daily refresh
             }
             
             hash_string = json.dumps(hash_data, sort_keys=True)
@@ -1634,39 +1631,68 @@ class GitMeshTarsWrapper:
             
             logger.info(f"🔍 Analyzing repository {repo_url} with GitIngest...")
             
-            # Run GitIngest analysis
-            analysis_result = self.gitingest_tool.analyze_repository(repo_url)
-            
-            if not analysis_result.get("success"):
-                raise Exception(f"GitIngest analysis failed: {analysis_result.get('error', 'Unknown error')}")
-            
-            # Cache the results
-            cache_key = f"{repo_url}:{branch}"
-            self.repo_knowledge_cache[cache_key] = {
-                "content": analysis_result["content"],
-                "metadata": analysis_result["metadata"],
-                "timestamp": datetime.now().timestamp()
-            }
-            
-            # Update analysis tracking
-            current_hash = await self._get_repository_hash(repo_url, branch)
-            self.last_repo_analysis[cache_key] = {
-                "hash": current_hash,
-                "timestamp": datetime.now().timestamp(),
-                "success": True
-            }
-            
-            # Store in vector database for future retrieval
-            await self._store_repository_knowledge(repo_url, branch, analysis_result["content"])
-            
-            logger.info(f"✅ Repository analysis completed successfully for {repo_url}")
-            
-            return {
-                "success": True,
-                "content": analysis_result["content"],
-                "metadata": analysis_result["metadata"],
-                "cached": False
-            }
+            # Run GitIngest analysis using the new interface
+            try:
+                analysis_result = self.gitingest_tool.analyze_repository(repo_url, branch)
+                
+                if not analysis_result.get("success", False):
+                    error_msg = analysis_result.get("error", "Analysis failed")
+                    raise Exception(f"GitIngest analysis failed: {error_msg}")
+                
+                # Extract content from the new format
+                summary = analysis_result.get("summary", "")
+                tree = analysis_result.get("tree", "")
+                content = analysis_result.get("content", "")
+                
+                # Combine all content for comprehensive analysis
+                full_content = f"""
+Repository Summary:
+{summary}
+
+Repository Structure:
+{tree}
+
+Repository Content:
+{content}
+"""
+                
+                # Cache the results
+                cache_key = f"{repo_url}:{branch}"
+                self.repo_knowledge_cache[cache_key] = {
+                    "content": full_content,
+                    "metadata": {
+                        "summary": summary,
+                        "tree": tree,
+                        "analysis_result": analysis_result
+                    },
+                    "timestamp": datetime.now().timestamp()
+                }
+                
+                # Update analysis tracking
+                current_hash = await self._get_repository_hash(repo_url, branch)
+                self.last_repo_analysis[cache_key] = {
+                    "hash": current_hash,
+                    "timestamp": datetime.now().timestamp(),
+                    "success": True
+                }
+                
+                # Store in vector database for future retrieval
+                await self._store_repository_knowledge(repo_url, branch, full_content)
+                
+                logger.info(f"✅ Repository analysis completed successfully for {repo_url}")
+                
+                return {
+                    "success": True,
+                    "content": full_content,
+                    "summary": summary,
+                    "tree": tree,
+                    "metadata": analysis_result,
+                    "cached": False
+                }
+                
+            except Exception as analysis_error:
+                logger.error(f"GitIngest analysis error: {analysis_error}")
+                raise analysis_error
             
         except Exception as e:
             logger.error(f"❌ Failed to analyze repository {repo_url}: {e}")
@@ -1845,6 +1871,119 @@ class GitMeshTarsWrapper:
                         
         except Exception as e:
             logger.error(f"Error checking repository knowledge: {e}")
+    
+    async def analyze_repository_with_gitingest(self, repo_url: str, branch: str = "main") -> Dict[str, Any]:
+        """
+        Public method to analyze any repository using GitIngest.
+        
+        Args:
+            repo_url: The repository URL (GitHub URL or owner/repo format)
+            branch: The branch to analyze (default: "main")
+            
+        Returns:
+            Dict containing analysis results with success/error status
+        """
+        try:
+            if not self.gitingest_tool:
+                return {
+                    "success": False,
+                    "error": "GitIngest tool not available"
+                }
+            
+            logger.info(f"🔍 Analyzing repository {repo_url} (branch: {branch})...")
+            
+            # Use the GitIngest tool directly 
+            # Run in thread pool to avoid async issues
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            
+            def analyze_sync():
+                # Convert owner/repo to full URL if needed
+                repo_to_analyze = repo_url
+                if not repo_url.startswith(("http://", "https://")):
+                    repo_to_analyze = f"https://github.com/{repo_url}"
+                
+                return self.gitingest_tool.analyze_repository(repo_to_analyze, include_submodules=True)
+            
+            result = await loop.run_in_executor(None, analyze_sync)
+            
+            if result.get("success"):
+                logger.info(f"✅ Successfully analyzed repository {repo_url}")
+                
+                # Store in knowledge base if memory system is available
+                if self.memory and result.get("content"):
+                    try:
+                        await self.memory.save_memory(
+                            content=result["content"],
+                            memory_type="repository_analysis",
+                            quality=0.9,
+                            metadata={
+                                "repo_url": repo_url,
+                                "branch": branch,
+                                "session_id": self.session_id,
+                                "timestamp": datetime.now().isoformat(),
+                                "analysis_type": "gitingest"
+                            }
+                        )
+                        logger.info("📚 Stored repository analysis in knowledge base")
+                    except Exception as e:
+                        logger.warning(f"Failed to store in knowledge base: {e}")
+                
+                return {
+                    "success": True,
+                    "repo_url": repo_url,
+                    "branch": branch,
+                    "summary": result.get("summary", ""),
+                    "tree": result.get("tree", ""),
+                    "content": result.get("content", ""),
+                    "metadata": result.get("metadata", {}),
+                    "session_id": self.session_id
+                }
+            else:
+                logger.error(f"❌ Repository analysis failed: {result.get('error', 'Unknown error')}")
+                return {
+                    "success": False,
+                    "error": result.get("error", "Analysis failed"),
+                    "repo_url": repo_url,
+                    "branch": branch
+                }
+                
+        except Exception as e:
+            logger.error(f"Error analyzing repository with GitIngest: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "repo_url": repo_url,
+                "branch": branch
+            }
+    
+    def get_gitingest_status(self) -> Dict[str, Any]:
+        """Get the status of the GitIngest integration."""
+        try:
+            status = {
+                "available": GITINGEST_AVAILABLE and self.gitingest_tool is not None,
+                "tool_initialized": self.gitingest_tool is not None,
+                "session_id": self.session_id
+            }
+            
+            if self.gitingest_tool:
+                # Test if the tool works by getting its details
+                try:
+                    details = self.gitingest_tool.extract_details("https://github.com/octocat/Hello-World")
+                    status["test_successful"] = True
+                    status["test_details"] = details
+                except Exception as e:
+                    status["test_successful"] = False
+                    status["test_error"] = str(e)
+            
+            return status
+            
+        except Exception as e:
+            return {
+                "available": False,
+                "error": str(e),
+                "session_id": self.session_id
+            }
 
     def chat(
         self,

@@ -66,7 +66,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) =>
     <div className="h-[400px] flex flex-col">
       <ul className="space-y-4 flex-grow overflow-y-auto">
         {paginatedActivities.map((activity) => (
-          <li key={activity.id} className="flex items-start space-x-3 p-4 bg-gray-800 rounded-lg shadow-sm">
+          <li key={activity.id} className="flex items-start space-x-3 p-4 bg-black rounded-lg shadow-sm">
             <div className="flex-shrink-0">
               <img className="w-10 h-10 rounded-full" src={activity.actor.avatar_url} alt={activity.actor.login} />
             </div>

@@ -118,16 +118,12 @@ export default function HubInsightsPage() {
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <HubHeader
-          title="Insights"
-          subtitle="Explore insights and trends in your projects."
-        />
-        <div className="flex justify-end mb-4 mt-8">
+        <div className="flex justify-end mb-4">
           <Select onValueChange={setSelectedRepo} defaultValue="all">
-            <SelectTrigger className="w-full md:w-[280px] bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-orange-500 focus:border-orange-500">
+            <SelectTrigger className="w-full md:w-[280px] bg-black border-gray-700 text-white rounded-lg focus:ring-orange-500 focus:border-orange-500">
               <SelectValue placeholder="Select a repository" />
             </SelectTrigger>
-            <SelectContent className="bg-gray-800 text-white border-gray-700">
+            <SelectContent className="bg-black text-white border-gray-700">
               <SelectItem value="all">All Repositories</SelectItem>
               {repositories.map((repo) => (
                 <SelectItem key={repo.id} value={repo.full_name}>

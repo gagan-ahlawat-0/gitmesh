@@ -112,12 +112,12 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({ activity, isLast }) 
 
   return (
     <div className={`relative mb-8 pl-12 ${isLast ? '' : 'after:absolute after:left-6 after:top-12 after:h-[calc(100%-3rem)] after:w-px after:bg-gray-700'}`}>
-      <div className="absolute left-0 top-2 flex h-12 w-12 items-center justify-center rounded-full bg-gray-800">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900">
+      <div className="absolute left-0 top-2 flex h-12 w-12 items-center justify-center rounded-full bg-black">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black">
           {icon}
         </div>
       </div>
-      <Card className="bg-gray-800 border-gray-700 shadow-md">
+      <Card className="bg-black border-gray-700 shadow-md">
         <CardHeader>
           <CardTitle className="text-base font-semibold text-white">
             <a href={`https://github.com/${activity.repo.name}`} target="_blank" rel="noopener noreferrer" className="hover:underline">

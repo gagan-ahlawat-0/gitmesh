@@ -47,12 +47,10 @@ const WhyPage = () => {
   }, []);
   
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 pb-24 h-screen">
+    <div className="w-full h-full overflow-y-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <AnimatedTransition show={showContent} animation="fade" duration={800}>
-          <div className="h-full overflow-y-auto">
-            <BranchWhy />
-          </div>
+          <BranchWhy />
         </AnimatedTransition>
       </div>
     </div>

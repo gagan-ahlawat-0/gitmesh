@@ -33,8 +33,7 @@ import {
   Maximize2,
   Minimize2
 } from 'lucide-react';
-import FileChatInterface from '@/components/FileChatInterface';
-import AnimatedTransition from '@/components/AnimatedTransition';
+import { VSCodeInterface } from '@/components/VSCodeInterface';
 import { ChatProvider } from '@/contexts/ChatContext';
 import { toast } from 'sonner';
 
@@ -179,51 +178,10 @@ export default function ChatPage() {
   }
 
   return (
-    <div className={cn(
-      "min-h-screen bg-gradient-to-br from-background to-muted/20",
-      isFullscreen && "fixed inset-0 z-50"
-    )}>
-      {/* Header */}
-      <div className="border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold">Chat</h1>
-              </div>
-              
-              {repository && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>•</span>
-                  <span className="font-medium">{repository.name}</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {repository.language}
-                  </Badge>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsFullscreen(!isFullscreen)}
-              >
-                {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-              </Button>
-            </div>
-          </div>
-        </div>
+    <ChatProvider>
+      <div className="fixed inset-0 bg-background">
+        <VSCodeInterface />
       </div>
-
-      {/* Main Content - Unified Chat Interface */}
-      <div className="container mx-auto px-4 py-2">
-        <AnimatedTransition show={true} animation="slide-up">
-          <div className="h-[calc(100vh-120px)]">
-            <FileChatInterface importedData={importedData || undefined} />
-          </div>
-        </AnimatedTransition>
-      </div>
-    </div>
+    </ChatProvider>
   );
 }

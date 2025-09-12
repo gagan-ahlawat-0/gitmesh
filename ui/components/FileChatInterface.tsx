@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRepository } from '@/contexts/RepositoryContext';
 import { useChat } from '@/contexts/ChatContext';
@@ -9,14 +8,27 @@ import { useBranch } from '@/contexts/BranchContext';
 import { useKnowledgeBase } from '@/contexts/KnowledgeBaseContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   FileText, 
   Database, 
@@ -50,15 +62,6 @@ import {
   Zap,
   Target,
   MessageSquare,
-  Award,
-  Flame,
-  TrendingUp,
-  TrendingDown,
-  Plus,
-  Minus,
-  Trash2,
-  Copy,
-  ExternalLink,
   RefreshCw,
   Loader2,
   CheckSquare,
@@ -76,16 +79,18 @@ import {
   ChevronLeft,
   Maximize2,
   Minimize2,
-  Settings as SettingsIcon,
   Filter as FilterIcon,
   SortAsc,
   SortDesc,
   List,
-  Plus as PlusIcon
+  Plus as PlusIcon,
+  HelpCircle,
+  Github,
+  Table
 } from 'lucide-react';
 import { toast } from 'sonner';
 import GitHubAPI from '@/lib/github-api';
-import { transformGitHubData, fallbackContributionData } from './manage/contribution-data';
+import { fallbackContributionData } from './manage/contribution-data';
 import { ImportSource } from '@/lib/types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -175,6 +180,7 @@ interface ChatSession {
   createdAt: Date;
   updatedAt: Date;
 }
+
 
 // Import source card component
 interface ImportSourceCardProps {
@@ -405,6 +411,86 @@ const FileSystemNode: React.FC<FileSystemNodeProps> = ({
   );
 };
 
+// Branch file item component for import dialog
+interface BranchFileItemProps {
+  item: FileSystemItem;
+  level: number;
+  selectedFiles: string[];
+  onFileToggle: (path: string) => void;
+}
+
+const BranchFileItem: React.FC<BranchFileItemProps> = ({ item, level, selectedFiles, onFileToggle }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isFolder = item.type === 'folder';
+  const filePath = item.path || item.name;
+  const isSelected = selectedFiles.includes(filePath);
+
+  const handleClick = () => {
+    if (isFolder) {
+      setIsExpanded(!isExpanded);
+    } else {
+      onFileToggle(filePath);
+    }
+  };
+
+  return (
+    <div className="select-none">
+      <div
+        className={cn(
+          "flex items-center gap-2 px-2 py-1 rounded text-sm cursor-pointer transition-colors",
+          "hover:bg-muted/50",
+          isSelected && "bg-primary/10 text-primary",
+          level > 0 && "ml-4"
+        )}
+        onClick={handleClick}
+      >
+        {isFolder ? (
+          isExpanded ? (
+            <ChevronDown size={14} className="text-muted-foreground" />
+          ) : (
+            <ChevronRight size={14} className="text-muted-foreground" />
+          )
+        ) : (
+          <div className="w-3.5" />
+        )}
+        
+        {isFolder ? (
+          <Folder size={14} className="text-amber-500" />
+        ) : (
+          getFileIcon(item.name)
+        )}
+        
+        <span className="flex-1 truncate">{item.name}</span>
+        
+        {!isFolder && (
+          <div className={cn(
+            "w-4 h-4 border rounded flex-shrink-0 transition-colors",
+            isSelected 
+              ? "bg-primary border-primary" 
+              : "border-muted-foreground/30 hover:border-muted-foreground/50"
+          )}>
+            {isSelected && <Check size={12} className="text-primary-foreground m-auto" />}
+          </div>
+        )}
+      </div>
+      
+      {isFolder && isExpanded && item.children && (
+        <div className="ml-2">
+          {item.children.map((child, index) => (
+            <BranchFileItem
+              key={index}
+              item={child}
+              level={level + 1}
+              selectedFiles={selectedFiles}
+              onFileToggle={onFileToggle}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Chat message component
 interface ChatMessageProps {
   message: ChatMessage;
@@ -582,7 +668,7 @@ interface FileChatInterfaceProps {
 export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedData }) => {
   const { token, user, githubApi } = useAuth();
   const { repository } = useRepository();
-  const { selectedBranch, getBranchInfo } = useBranch();
+  const { selectedBranch, branchList, getBranchInfo } = useBranch();
   const { updateKnowledgeBase } = useKnowledgeBase();
   const {
     state,
@@ -607,6 +693,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   
   // Local state management
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isContextSidebarCollapsed, setIsContextSidebarCollapsed] = useState(false);
   const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -616,17 +703,31 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   
   // Import state management
   const [selectedImportSource, setSelectedImportSource] = useState<string | null>(null);
-  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [showImportPanel, setShowImportPanel] = useState(true);
   const [textTitle, setTextTitle] = useState('');
   const [textContent, setTextContent] = useState('');
   const [importLoading, setImportLoading] = useState(false);
-  const [branchList, setBranchList] = useState<string[]>([]);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [activeImportType, setActiveImportType] = useState<string>('');
+  const [importFormData, setImportFormData] = useState<any>({});
+  const [filesBySource, setFilesBySource] = useState<{[key: string]: any[]}>({
+    csv: [],
+    'control-panel': [],
+    url: [],
+    file: [],
+    text: [],
+    branch: []
+  });
+  const [selectedBranchFiles, setSelectedBranchFiles] = useState<string[]>([]);
+  const [branchFilesLoading, setBranchFilesLoading] = useState(false);
+
   const [branchFileStructures, setBranchFileStructures] = useState<Record<string, any[]>>({});
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [fileContents, setFileContents] = useState<Record<string, string>>({});
   const [loadingFileContent, setLoadingFileContent] = useState<Record<string, boolean>>({});
   const [selectedFileContents, setSelectedFileContents] = useState<Array<{branch: string, path: string, content: string}>>([]);
   const [controlPanelData, setControlPanelData] = useState<any>(fallbackContributionData);
+  const [activeSection, setActiveSection] = useState('files'); // 'files', 'about', 'why', 'how', 'contribute', 'manage'
   const [selectedDataTypes, setSelectedDataTypes] = useState<{
     pullRequests: boolean;
     issues: boolean;
@@ -1359,6 +1460,162 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
       handleSendMessage();
     }
   };
+
+  // Import popup handlers
+  const handleImportSourceClick = (sourceType: string) => {
+    setActiveImportType(sourceType);
+    setImportFormData({});
+    setShowImportDialog(true);
+  };
+
+  const handleImportSubmit = async () => {
+    try {
+      const sourceType = activeImportType;
+      let importedFiles: any[] = [];
+
+      switch (sourceType) {
+        case 'csv':
+          // Handle CSV import
+          if (importFormData.file) {
+            importedFiles = [{
+              name: importFormData.file.name,
+              source: 'csv',
+              content: 'CSV content processed',
+              type: 'csv'
+            }];
+          }
+          break;
+          
+        case 'url':
+          // Handle URL import
+          if (importFormData.url) {
+            importedFiles = [{
+              name: new URL(importFormData.url).hostname,
+              source: 'url',
+              content: 'Web content fetched',
+              url: importFormData.url,
+              type: 'webpage'
+            }];
+          }
+          break;
+          
+        case 'file':
+          // Handle file upload
+          if (importFormData.files && importFormData.files.length > 0) {
+            importedFiles = Array.from(importFormData.files).map((file: any) => ({
+              name: file.name,
+              source: 'file',
+              content: 'File content processed',
+              type: file.type || 'document'
+            }));
+          }
+          break;
+          
+        case 'text':
+          // Handle text input
+          if (importFormData.title && importFormData.text) {
+            importedFiles = [{
+              name: importFormData.title,
+              source: 'text',
+              content: importFormData.text,
+              type: 'text'
+            }];
+          }
+          break;
+          
+        case 'branch':
+          // Handle branch import
+          if (importFormData.selectedBranch && selectedBranchFiles.length > 0) {
+            importedFiles = selectedBranchFiles.map((filePath: string) => ({
+              name: filePath,
+              source: 'branch',
+              content: 'Branch file content loaded', // This would be fetched in a real implementation
+              branch: importFormData.selectedBranch,
+              type: 'code'
+            }));
+          }
+          break;
+          
+        case 'control-panel':
+          // Handle control panel data import
+          if (importFormData.dataSource) {
+            importedFiles = [{
+              name: importFormData.dataSource,
+              source: 'control-panel',
+              content: 'Control panel data imported',
+              type: 'data'
+            }];
+          }
+          break;
+      }
+
+      // Update filesBySource
+      if (importedFiles.length > 0) {
+        setFilesBySource(prev => ({
+          ...prev,
+          [sourceType]: [...prev[sourceType], ...importedFiles]
+        }));
+        
+        // Also add to selectedFiles for chat context
+        importedFiles.forEach(file => {
+          addSelectedFile({
+            branch: file.branch || 'imported',
+            path: file.name,
+            content: file.content
+          });
+        });
+        
+        toast.success(`Successfully imported ${importedFiles.length} item(s) from ${sourceType}`);
+      }
+
+      setShowImportDialog(false);
+      setActiveImportType('');
+      setImportFormData({});
+      setSelectedBranchFiles([]);
+      
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error('Failed to import. Please try again.');
+    }
+  };
+
+  // Handle branch selection for import
+  const handleBranchSelectForImport = async (branchName: string) => {
+    setImportFormData({...importFormData, selectedBranch: branchName});
+    setSelectedBranchFiles([]);
+    setBranchFilesLoading(true);
+
+    try {
+      // Check if we already have file structure for this branch
+      if (!branchFileStructures[branchName]) {
+        // Load branch files if not already loaded
+        if (githubAPI && repository) {
+          const tree = await githubAPI.getRepositoryTree(repository.owner.login, repository.name, branchName);
+          const processedStructure = convertTreeToFileStructure(tree.tree || []);
+          setBranchFileStructures(prev => ({
+            ...prev,
+            [branchName]: processedStructure
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading branch files:', error);
+      toast.error('Failed to load branch files');
+    } finally {
+      setBranchFilesLoading(false);
+    }
+  };
+
+  // Handle file selection in branch import
+  const handleBranchFileToggle = (filePath: string) => {
+    setSelectedBranchFiles(prev => {
+      if (prev.includes(filePath)) {
+        return prev.filter(path => path !== filePath);
+      } else {
+        return [...prev, filePath];
+      }
+    });
+  };
   
 
   
@@ -1373,35 +1630,25 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
 
   
   return (
-    <div className="w-full h-screen flex bg-background">
-      {/* Unified File & Import Sidebar */}
+    <div className="w-full h-full flex bg-background overflow-hidden">
+      {/* Import Sidebar - Focused on Import Functionality */}
       <div className={cn(
-        "border-r border-border bg-card/50 transition-all duration-300",
-        isSidebarCollapsed ? "w-16" : "w-72"
+        "border-r border-border bg-card/50 transition-all duration-300 h-full overflow-hidden",
+        isSidebarCollapsed ? "w-16" : "w-64"
       )}>
         {!isSidebarCollapsed && (
-          <div className="p-3 space-y-3 h-full flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <h3 className="font-medium">Files & Import</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowImportPanel(!showImportPanel)}
-                  className={cn(
-                    "p-1 rounded-md transition-colors",
-                    showImportPanel ? "bg-primary/10 text-primary" : "hover:bg-muted"
-                  )}
-                  title={showImportPanel ? "Hide Import" : "Show Import"}
-                >
-                  <Upload size={16} />
-                </button>
-                <button
-                  onClick={() => setIsSidebarCollapsed(true)}
-                  className="p-1 rounded-md hover:bg-muted"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-              </div>
+          <div className="p-3 space-y-3 h-full flex flex-col overflow-hidden">
+            
+            {/* Sidebar Header */}
+            <div className="flex items-center justify-between flex-shrink-0">
+              <h3 className="font-medium text-sm">Import</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSidebarCollapsed(true)}
+              >
+                <ChevronLeft size={14} />
+              </Button>
             </div>
             
             {/* Import Progress Indicator */}
@@ -1442,192 +1689,25 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
               </div>
             )}
             
-            {/* Import Panel */}
-            {showImportPanel && <ImportPanel />}
-            
-            {/* Search and filters */}
-            <div className="space-y-1">
-              <div className="relative">
-                <Search size={12} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                <input 
-                  type="text" 
-                  className="w-full pl-6 pr-2 py-1 rounded-lg border border-border bg-card/50 text-xs"
-                  placeholder="Search files..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+            {/* Import Sources */}
+            <div className="space-y-3 flex-1 overflow-hidden">              
+              <div className="space-y-2 flex-1 overflow-y-auto">
+                {importSources.map((source) => (
+                  <ImportSourceCard
+                    key={source.id}
+                    source={source}
+                    onClick={() => handleImportSourceClick(source.type)}
+                    isActive={selectedImportSource === source.type}
+                  />
+                ))}
               </div>
               
-              <div className="flex gap-1">
-                <button 
-                  className={cn(
-                    "px-1.5 py-0.5 text-xs rounded border border-border flex items-center gap-1",
-                    showOnlySelected ? "bg-primary/10 border-primary" : "bg-card/50"
-                  )}
-                  onClick={() => setShowOnlySelected(!showOnlySelected)}
-                >
-                  <FilterIcon size={10} />
-                  <span>Selected</span>
-                </button>
-                
-                <button 
-                  className="px-1.5 py-0.5 text-xs rounded border border-border bg-card/50 flex items-center gap-1"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setShowOnlySelected(false);
-                  }}
-                >
-                  <RefreshCw size={10} />
-                  <span>Reset</span>
-                </button>
-              </div>
             </div>
-            
-            {/* File selection controls */}
-            <div className="flex flex-wrap gap-1">
-              <button 
-                className="px-1.5 py-0.5 text-xs rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                onClick={() => selectedBranches.forEach(branch => selectAllFiles(branch))}
-              >
-                Select All
-              </button>
-              <button 
-                className="px-1.5 py-0.5 text-xs rounded bg-muted hover:bg-muted/80 transition-colors"
-                onClick={clearAllSelections}
-                disabled={selectedFiles.length === 0}
-              >
-                Clear
-              </button>
-              <button 
-                className="px-1.5 py-0.5 text-xs rounded bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors"
-                onClick={() => selectedBranches.forEach(branch => expandAllFolders(branch))}
-              >
-                Expand All
-              </button>
-              <button 
-                className="px-1.5 py-0.5 text-xs rounded bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 transition-colors"
-                onClick={() => selectedBranches.forEach(branch => collapseAllFolders(branch))}
-              >
-                Collapse All
-              </button>
-              <button 
-                className="px-1.5 py-0.5 text-xs rounded bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors"
-                onClick={() => {
-                  if (repository?.owner?.login && repository?.name) {
-                    setLoadingState('sessions', undefined, true);
-                    githubAPI.getBranchesWithTrees(repository.owner.login, repository.name)
-                      .then(data => {
-                        console.log('Manual refresh - fetched repository data:', data);
-                        setSelectedBranches(data.branches.map((b: { name: string }) => b.name));
-                        
-                        Object.entries(data.treesByBranch).forEach(([branchName, branchData]) => {
-                          const typedBranchData = branchData as { tree?: Array<{ path: string; type: string; size?: number }>; error?: string };
-                          if (typedBranchData.tree && !typedBranchData.error) {
-                            const fileStructure = convertTreeToFileStructure(typedBranchData.tree);
-                            console.log(`Manual refresh - setting file structure for branch ${branchName}:`, fileStructure);
-                            
-                            setFileStructure(branchName, fileStructure);
-                            setBranchFileStructures(prev => ({
-                              ...prev,
-                              [branchName]: fileStructure
-                            }));
-                          }
-                        });
-                      })
-                      .catch(err => {
-                        console.error('Manual refresh failed:', err);
-                        setError('sessions', undefined, 'Failed to refresh repository');
-                      })
-                      .finally(() => setLoadingState('sessions', undefined, false));
-                  }
-                }}
-                disabled={state.loadingStates.sessions}
-              >
-                {state.loadingStates.sessions ? 'Loading...' : 'Refresh'}
-              </button>
-            </div>
-            
-            {/* Selected files summary */}
-            {selectedFiles.length > 0 && (
-              <div className="p-2 bg-primary/5 rounded-lg flex-shrink-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium">Selected Files</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {selectedFiles.length}
-                  </Badge>
-                </div>
-                <div className="space-y-1 max-h-20 overflow-y-auto">
-                  {selectedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2 text-xs">
-                      {getFileIcon(file.path.split('/').pop() || '')}
-                      <span className="truncate">{file.path}</span>
 
-                      <button
-                        onClick={() => removeSelectedFile(file.branch, file.path)}
-                        className="ml-auto text-red-500 hover:text-red-700"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
 
             
-            {/* File tree */}
-            <div className="border border-border rounded-lg flex-1 overflow-y-auto bg-card/30 min-h-0">
-              {selectedBranches.length === 0 ? (
-                <div className="p-4 text-center text-muted-foreground">
-                  <p className="text-xs mb-2">No branches loaded</p>
-                  <p className="text-xs">Repository: {repository?.owner?.login}/{repository?.name || 'Unknown'}</p>
-                  <p className="text-xs">Token: {token ? 'Available' : 'Missing'}</p>
-                </div>
-              ) : (
-                selectedBranches.map(branch => (
-                  <div key={branch} className="p-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <GitBranch size={12} className="text-primary" />
-                      <span className="text-xs font-medium capitalize">{branch}</span>
-                    </div>
-                    
-                    {state.loadingStates.sessions ? (
-                      <div className="p-2 text-center text-muted-foreground">
-                        <Loader2 className="h-3 w-3 animate-spin mx-auto mb-1" />
-                        <p className="text-xs">Loading files...</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {(() => {
-                          const structure = getFilteredStructure(branch);
-                          console.log(`Rendering structure for branch ${branch}:`, structure);
-                          return structure.map((item, index) => {
-                            const contentKey = getFileCacheKey(branch, item.path || '');
-                            const cachedContent = getCachedFileContent(contentKey);
-                            return (
-                              <FileSystemNode
-                                key={`${item.name}-${index}`}
-                                item={item}
-                                level={0}
-                                onToggle={handleFolderToggle}
-                                onSelect={handleFileSelect}
-                                path={[item.name]}
-                                branch={branch}
-                                onFileSelect={fetchFileContent}
-                                fileContent={cachedContent?.content || ''}
-                                isLoadingContent={state.loadingStates.files[contentKey] || false}
-                                selectedFiles={selectedFiles}
-                              />
-                            );
-                          });
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+
+
           </div>
         )}
         
@@ -1645,68 +1725,21 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
       </div>
       
       {/* Chat Interface */}
-      <div className="flex-1 flex flex-col h-full">
-        {/* Chat Header */}
-        <div className="border-b border-border p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                {activeSession && (
-                  <Badge variant="outline" className="text-xs">
-                    {activeSession.title}
-                  </Badge>
-                )}
-              </div>
-              {selectedFiles.length > 0 && (
-                <Badge variant="secondary">
-                  {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected
-                </Badge>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowSessionManager(true)}
-                className="flex items-center gap-2"
-              >
-                <List size={16} />
-                <span className="hidden sm:inline">Sessions</span>
-              </Button>
-            </div>
-          </div>
-        </div>
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+
         
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 max-h-full">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-2 max-w-md">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                  <MessageSquare size={20} className="text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-base font-medium mb-1">Start Chatting with Your Files</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Import files or select from your repository to start chatting. 
-                    TARS will analyze the selected files and provide context-aware responses.
-                  </p>
-                </div>
                 
                 {selectedFiles.length === 0 && (
                   <div className="p-2 bg-muted/50 rounded-lg space-y-1">
                     <p className="text-xs text-muted-foreground">
-                      No files selected. You can:
+                      No files selected.
                     </p>
                     <div className="space-y-1 text-left">
-                      <button
-                        onClick={() => setShowImportPanel(true)}
-                        className="flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors w-full text-left"
-                      >
-                        <Upload size={12} />
-                        <span>Click here to import files</span>
-                      </button>
                       <button
                         onClick={() => setSelectedImportSource('text')}
                         className="flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors w-full text-left"
@@ -1815,154 +1848,454 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
                 <span>No files in context</span>
               </div>
             )}
+          </div>
+          </div>
+          </div>
+          
+
+
+      {/* Context Sidebar - Shows Selected Files and Context */}
+      <div className={cn(
+        "border-l border-border bg-card/50 transition-all duration-300 h-full overflow-hidden",
+        isContextSidebarCollapsed ? "w-16" : "w-64"
+      )}>
+        {!isContextSidebarCollapsed && (
+          <div className="p-3 space-y-3 h-full flex flex-col overflow-hidden">
             
-            {selectedFiles.length === 0 && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowImportPanel(true)}
-                  className="text-xs text-primary hover:text-primary/80 transition-colors"
-                >
-                  Import files
-                </button>
-                <span className="text-xs text-muted-foreground">or</span>
-                <button
-                  onClick={() => setSelectedImportSource('text')}
-                  className="text-xs text-primary hover:text-primary/80 transition-colors"
-                >
-                  Add text
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      {/* Context Panel */}
-      <div className="w-56 border-l border-border bg-card/30 h-full flex flex-col">
-        <div className="p-3 space-y-3 flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium text-sm">Context</h3>
-            <Badge variant="secondary" className="text-xs">
-              {selectedFiles.length} files
-            </Badge>
-          </div>
-          
-                      {/* Context Stats */}
-            {selectedFiles.length > 0 && (
-              <div className="p-2 bg-muted/30 rounded-lg space-y-1 flex-shrink-0">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Total files:</span>
-                  <span className="font-medium">{selectedFiles.length}</span>
+            {/* Context Sidebar Header */}
+            <div className="flex items-center justify-between flex-shrink-0">
+              <h3 className="font-medium text-sm">Context</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsContextSidebarCollapsed(true)}
+              >
+                <ChevronRight size={14} />
+              </Button>
+            </div>
+            
+            {/* Context Stats */}
+            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg flex-shrink-0">
+              <FileText size={14} className="text-primary" />
+              <div className="flex-1">
+                <div className="text-sm font-medium">
+                  {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Total size:</span>
-                  <span className="font-medium">
-                    {selectedFiles.reduce((acc, file) => acc + (file.content?.length || 0), 0).toLocaleString()} chars
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Branches:</span>
-                  <span className="font-medium">
-                    {new Set(selectedFiles.map(f => f.branch)).size}
-                  </span>
+                <div className="text-xs text-muted-foreground">
+                  {selectedFiles.reduce((acc, file) => acc + (file.content?.length || 0), 0).toLocaleString()} characters total
                 </div>
               </div>
-            )}
-          
-                      {selectedFiles.length > 0 ? (
-              <div className="space-y-1 flex-1 flex flex-col min-h-0">
-                <div className="flex items-center justify-between flex-shrink-0">
-                  <div className="text-xs text-muted-foreground">
-                    Active files in context:
-                  </div>
-                  <button
+            </div>
+            
+            {/* Selected Files List */}
+            <div className="flex-1 overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-sm">Selected Files</h4>
+                {selectedFiles.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setSelectedFiles([])}
-                    className="text-xs text-red-500 hover:text-red-700"
+                    className="text-xs h-6 px-2"
                   >
-                    Clear all
-                  </button>
-                </div>
-                <div className="space-y-1 flex-1 overflow-y-auto min-h-0">
-                  {selectedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2 p-1 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors">
-                      {getFileIcon(file.path.split('/').pop() || '')}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium truncate">{file.path}</div>
-                        <div className="text-xs text-muted-foreground">
-                          Branch: {file.branch} • {(file.content?.length || 0).toLocaleString()} chars
+                    Clear All
+                  </Button>
+                )}
+              </div>
+              
+              <div className="space-y-3 overflow-y-auto flex-1">
+                {selectedFiles.length > 0 ? (
+                  <div className="space-y-3">
+                    {/* Organize files by source */}
+                    {Object.entries(filesBySource).map(([sourceType, files]) => {
+                      if (files.length === 0) return null;
+                      
+                      const sourceConfig = {
+                        csv: { name: 'CSV Files', icon: <FileText size={14} className="text-blue-500" />, color: 'blue' },
+                        'control-panel': { name: 'Control Panel', icon: <Database size={14} className="text-purple-500" />, color: 'purple' },
+                        url: { name: 'Web Content', icon: <Globe size={14} className="text-green-500" />, color: 'green' },
+                        file: { name: 'Documents', icon: <Upload size={14} className="text-orange-500" />, color: 'orange' },
+                        text: { name: 'Text Content', icon: <Type size={14} className="text-pink-500" />, color: 'pink' },
+                        branch: { name: 'Branch Files', icon: <GitBranch size={14} className="text-indigo-500" />, color: 'indigo' }
+                      };
+                      
+                      const config = sourceConfig[sourceType as keyof typeof sourceConfig] || { name: sourceType, icon: <FileText size={14} />, color: 'gray' };
+                      
+                      return (
+                        <div key={sourceType} className="space-y-2">
+                          <div className="flex items-center gap-2 px-2 py-1 bg-muted/50 rounded-md">
+                            {config.icon}
+                            <span className="text-xs font-medium">{config.name}</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {files.length}
+                            </Badge>
+                            <button
+                              onClick={() => {
+                                // Clear all files from this source
+                                setFilesBySource(prev => ({
+                                  ...prev,
+                                  [sourceType]: []
+                                }));
+                                // Also remove from selectedFiles
+                                files.forEach(file => {
+                                  const matchingFile = selectedFiles.find(f => f.path === file.name);
+                                  if (matchingFile) {
+                                    removeSelectedFile(matchingFile.branch, matchingFile.path);
+                                  }
+                                });
+                              }}
+                              className="p-1 rounded hover:bg-muted text-red-500 opacity-70 hover:opacity-100 transition-opacity ml-auto"
+                              title={`Clear all ${config.name.toLowerCase()}`}
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-1 pl-2">
+                            {files.map((file, index) => (
+                              <div key={index} className="group flex items-center gap-2 p-2 rounded-md bg-muted/20 hover:bg-muted/40 transition-colors">
+                                {getFileIcon(file.name)}
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium truncate" title={file.name}>
+                                    {file.name}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {file.type} • {(file.content?.length || 0).toLocaleString()} chars
+                                  </div>
+                                  {file.branch && (
+                                    <div className="text-xs text-muted-foreground">
+                                      Branch: {file.branch}
+                                    </div>
+                                  )}
+                                  {file.url && (
+                                    <div className="text-xs text-muted-foreground truncate" title={file.url}>
+                                      URL: {new URL(file.url).hostname}
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    // Remove from filesBySource
+                                    setFilesBySource(prev => ({
+                                      ...prev,
+                                      [sourceType]: prev[sourceType].filter((_, i) => i !== index)
+                                    }));
+                                    // Also remove from selectedFiles if it exists there
+                                    const matchingFile = selectedFiles.find(f => f.path === file.name);
+                                    if (matchingFile) {
+                                      removeSelectedFile(matchingFile.branch, matchingFile.path);
+                                    }
+                                  }}
+                                  className="p-1 rounded hover:bg-muted text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Show traditional files that aren't from import sources */}
+                    {selectedFiles.filter(file => file.branch !== 'imported').length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 px-2 py-1 bg-muted/50 rounded-md">
+                          <GitBranch size={14} className="text-gray-500" />
+                          <span className="text-xs font-medium">Repository Files</span>
+                          <Badge variant="secondary" className="text-xs ml-auto">
+                            {selectedFiles.filter(file => file.branch !== 'imported').length}
+                          </Badge>
+                        </div>
+                        
+                        <div className="space-y-1 pl-2">
+                          {selectedFiles.filter(file => file.branch !== 'imported').map((file, index) => (
+                            <div key={index} className="group flex items-center gap-2 p-2 rounded-md bg-muted/20 hover:bg-muted/40 transition-colors">
+                              {getFileIcon(file.path.split('/').pop() || '')}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium truncate" title={file.path}>
+                                  {file.path.split('/').pop()}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate" title={file.path}>
+                                  {file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf('/')) : 'Root'}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Branch: {file.branch} • {(file.content?.length || 0).toLocaleString()} chars
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => removeSelectedFile(file.branch, file.path)}
+                                className="p-1 rounded hover:bg-muted text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X size={10} />
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      <button
-                        onClick={() => removeSelectedFile(file.branch, file.path)}
-                        className="p-1 rounded hover:bg-muted text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              
-              {/* Quick Actions */}
-              <div className="pt-1 border-t border-border space-y-1 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    // Generate a summary of all files
-                    const summary = selectedFiles.map(f => `${f.path} (${f.branch})`).join(', ');
-                    setInputMessage(`Please provide a summary of these files: ${summary}`);
-                  }}
-                  className="w-full text-xs h-7"
-                >
-                  <MessageSquare size={10} className="mr-1" />
-                  Ask about all files
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    // Generate a comparison
-                    const branches = [...new Set(selectedFiles.map(f => f.branch))];
-                    if (branches.length > 1) {
-                      setInputMessage(`Please compare the differences between these branches: ${branches.join(', ')}`);
-                    }
-                  }}
-                  disabled={new Set(selectedFiles.map(f => f.branch)).size <= 1}
-                  className="w-full text-xs h-7"
-                >
-                  <GitBranch size={10} className="mr-1" />
-                  Compare branches
-                </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText size={32} className="mx-auto mb-2 opacity-30" />
+                    <p className="text-sm font-medium mb-1">No files in context</p>
+                  </div>
+                )}
               </div>
             </div>
-          ) : (
-            <div className="text-center py-2 text-muted-foreground flex-1 flex flex-col justify-center">
-              <FileText size={20} className="mx-auto mb-1 opacity-50" />
-              <p className="text-xs">No files in context</p>
-              <p className="text-xs mt-1">Import or select files to add them here</p>
-              
-              {/* Quick Import Suggestions */}
-              <div className="mt-1 space-y-1 flex-shrink-0">
-                <button
-                  onClick={() => setShowImportPanel(true)}
-                  className="w-full px-2 py-1 text-xs rounded border border-border hover:bg-muted transition-colors"
-                >
-                  <Upload size={10} className="mr-1" />
-                  Import files
-                </button>
-                <button
-                  onClick={() => setSelectedImportSource('text')}
-                  className="w-full px-2 py-1 text-xs rounded border border-border hover:bg-muted transition-colors"
-                >
-                  <Type size={10} className="mr-1" />
-                  Add text content
-                </button>
+          </div>
+        )}
+        
+        {/* Collapsed Context Sidebar */}
+        {isContextSidebarCollapsed && (
+          <div className="p-2">
+            <button
+              onClick={() => setIsContextSidebarCollapsed(false)}
+              className="w-full p-2 rounded-lg hover:bg-muted flex items-center justify-center"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div className="mt-2 text-center">
+              <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
+                <FileText size={14} className="text-primary" />
               </div>
+              <div className="text-xs font-medium mt-1">{selectedFiles.length}</div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+   
       
+      {/* Import Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={(open) => {
+        setShowImportDialog(open);
+        if (!open) {
+          // Reset form data when closing
+          setImportFormData({});
+          setSelectedBranchFiles([]);
+          setActiveImportType('');
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Import {activeImportType === 'control-panel' ? 'Control Panel Data' : 
+                     activeImportType === 'csv' ? 'CSV File' :
+                     activeImportType === 'url' ? 'Web URL' :
+                     activeImportType === 'file' ? 'Documents' :
+                     activeImportType === 'text' ? 'Text Content' :
+                     activeImportType === 'branch' ? 'Branch Files' : 'Content'}
+            </DialogTitle>
+            <DialogDescription>
+              {activeImportType === 'csv' && 'Upload and import structured data from CSV files'}
+              {activeImportType === 'control-panel' && 'Import data from your Manage page controls'}
+              {activeImportType === 'url' && 'Import content from websites and articles'}
+              {activeImportType === 'file' && 'Upload documents, PDFs, and other files'}
+              {activeImportType === 'text' && 'Directly input or paste text content'}
+              {activeImportType === 'branch' && 'Import context from other branches'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* CSV Import Form */}
+            {activeImportType === 'csv' && (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="csv-file">CSV File</Label>
+                  <Input
+                    id="csv-file"
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => setImportFormData({...importFormData, file: e.target.files?.[0]})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="csv-delimiter">Delimiter</Label>
+                  <Select onValueChange={(value) => setImportFormData({...importFormData, delimiter: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select delimiter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=",">Comma (,)</SelectItem>
+                      <SelectItem value=";">Semicolon (;)</SelectItem>
+                      <SelectItem value="\t">Tab</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* Control Panel Import Form */}
+            {activeImportType === 'control-panel' && (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="data-source">Data Source</Label>
+                  <Select onValueChange={(value) => setImportFormData({...importFormData, dataSource: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select data source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="repositories">Repository Data</SelectItem>
+                      <SelectItem value="analytics">Analytics Data</SelectItem>
+                      <SelectItem value="settings">Configuration Data</SelectItem>
+                      <SelectItem value="users">User Data</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* URL Import Form */}
+            {activeImportType === 'url' && (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="url-input">Website URL</Label>
+                  <Input
+                    id="url-input"
+                    type="url"
+                    placeholder="https://example.com"
+                    value={importFormData.url || ''}
+                    onChange={(e) => setImportFormData({...importFormData, url: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="content-type">Content Type</Label>
+                  <Select onValueChange={(value) => setImportFormData({...importFormData, contentType: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select content type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="article">Article/Blog Post</SelectItem>
+                      <SelectItem value="documentation">Documentation</SelectItem>
+                      <SelectItem value="webpage">General Webpage</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* File Upload Form */}
+            {activeImportType === 'file' && (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="file-upload">Documents</Label>
+                  <Input
+                    id="file-upload"
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.md"
+                    onChange={(e) => setImportFormData({...importFormData, files: e.target.files})}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Text Input Form */}
+            {activeImportType === 'text' && (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="text-title">Title</Label>
+                  <Input
+                    id="text-title"
+                    placeholder="Enter a title for this content"
+                    value={importFormData.title || ''}
+                    onChange={(e) => setImportFormData({...importFormData, title: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="text-content">Content</Label>
+                  <Textarea
+                    id="text-content"
+                    placeholder="Paste or type your content here..."
+                    rows={6}
+                    value={importFormData.text || ''}
+                    onChange={(e) => setImportFormData({...importFormData, text: e.target.value})}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Branch Import Form */}
+            {activeImportType === 'branch' && (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="branch-select">Branch</Label>
+                  <Select onValueChange={handleBranchSelectForImport}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branchList.map((branch) => (
+                        <SelectItem key={branch} value={branch}>{branch}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {importFormData.selectedBranch && (
+                  <div>
+                    <Label>Files to Import</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Select files from branch: {importFormData.selectedBranch}
+                    </p>
+                    
+                    <div className="border rounded-lg max-h-64 overflow-y-auto">
+                      {branchFilesLoading ? (
+                        <div className="p-4 text-center">
+                          <Loader2 size={16} className="animate-spin mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground">Loading files...</p>
+                        </div>
+                      ) : branchFileStructures[importFormData.selectedBranch] ? (
+                        <div className="p-2 space-y-1">
+                          {branchFileStructures[importFormData.selectedBranch].map((item: any, index: number) => (
+                            <BranchFileItem
+                              key={index}
+                              item={item}
+                              level={0}
+                              selectedFiles={selectedBranchFiles}
+                              onFileToggle={handleBranchFileToggle}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-muted-foreground">
+                          <p className="text-sm">No files found in this branch</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {selectedBranchFiles.length > 0 && (
+                      <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                        <strong>{selectedBranchFiles.length}</strong> file{selectedBranchFiles.length !== 1 ? 's' : ''} selected
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleImportSubmit}
+              disabled={
+                (activeImportType === 'csv' && !importFormData.file) ||
+                (activeImportType === 'url' && !importFormData.url) ||
+                (activeImportType === 'file' && (!importFormData.files || importFormData.files.length === 0)) ||
+                (activeImportType === 'text' && (!importFormData.title || !importFormData.text)) ||
+                (activeImportType === 'branch' && (!importFormData.selectedBranch || selectedBranchFiles.length === 0)) ||
+                (activeImportType === 'control-panel' && !importFormData.dataSource)
+              }
+            >
+              Import
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Session Manager Modal */}
       <ChatSessionManager 
         isOpen={showSessionManager}

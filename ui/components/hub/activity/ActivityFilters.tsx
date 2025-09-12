@@ -22,10 +22,10 @@ export const ActivityFilters: React.FC<ActivityFiltersProps> = ({ repositories, 
   return (
     <div className="flex flex-col md:flex-row items-center gap-4">
       <Select onValueChange={setSelectedRepo} defaultValue="all">
-        <SelectTrigger className="w-full md:w-[280px] bg-gray-800 border-gray-700 text-white rounded-lg focus:ring-orange-500 focus:border-orange-500">
+        <SelectTrigger className="w-full md:w-[280px] bg-black border-gray-700 text-white rounded-lg focus:ring-orange-500 focus:border-orange-500">
           <SelectValue placeholder="Select a repository" />
         </SelectTrigger>
-        <SelectContent className="bg-gray-800 text-white border-gray-700">
+        <SelectContent className="bg-black text-white border-gray-700">
           <SelectItem value="all">All Repositories</SelectItem>
           {repositories.map((repo) => (
             <SelectItem key={repo.id} value={repo.full_name}>

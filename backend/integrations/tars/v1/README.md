@@ -1,131 +1,131 @@
-# TARS v1 - Tactical AI Resource System
+```markdown
+# GitIngest Tool - GitMesh Integration
 
-A comprehensive multi-agent system for open source project analysis, resource acquisition, and intelligent conversation management.
+A clean and simple GitIngest integration tool that automatically integrates with GitMesh's authentication system.
 
 ## Features
 
-### 🤖 Multi-Agent Architecture
-- **Resource Acquisition Layer**: 6 specialized agents for web crawling, code analysis, document processing, data analysis, GitHub integration, and knowledge management
-- **Analysis/Intelligence Layer**: 4 specialized agents for technical analysis, competitive analysis, trend analysis, and project health assessment  
-- **Conversation/Session Layer**: 1 orchestrator agent for managing interactions and coordinating workflows
+- **Automatic Authentication**: Seamlessly integrates with GitMesh's `KeyManager` to use stored GitHub tokens
+- **Token Override**: Support for overriding authentication tokens for specific operations
+- **Submodule Support**: Option to include repository submodules in analysis
+- **Clean API**: Simple and intuitive interface with convenience functions
+- **Public/Private Repos**: Handles both public and private GitHub repositories
 
-### 🧠 Advanced AI Capabilities
-- **Hybrid Memory System**: Short-term, long-term, and entity memory with RAG capabilities
-- **Knowledge Base Integration**: Vector-based knowledge storage with semantic search
-- **Intelligent Workflows**: Automated orchestration of acquisition, analysis, and conversation flows
-- **Guardrails**: Built-in safety and quality controls for AI operations
+## Authentication Integration
 
-### 🔧 Extensible Framework
-- Built on the proven `ai` framework from GitMesh
-- Modular design with clean separation of concerns
-- Configurable memory, knowledge, and LLM providers
-- Rich tool ecosystem for specialized tasks
+The tool automatically integrates with GitMesh's authentication system:
 
-## Quick Start
+1. **KeyManager Integration**: Uses `config.key_manager.KeyManager` to retrieve GitHub tokens stored by the main application
+2. **Automatic Fallback**: Falls back to public repository access if no authentication is available
+3. **Token Override**: Allows manual token specification for specific operations
+4. **Environment Variables**: Supports `GITHUB_TOKEN` and `GITHUB_PAT` environment variables
 
-### Installation
+## Usage Examples
 
-1. Clone the repository and navigate to the TARS v1 directory:
-```bash
-cd integrations/tars/v1
-```
-
-2. Install dependencies (from the main project root):
-```bash
-pip install -r requirements.txt
-```
-
-3. Set up environment variables:
-```bash
-# For OpenAI (recommended)
-export OPENAI_API_KEY="your-openai-api-key"
-
-# For Supabase memory (optional, defaults to local storage)
-export SUPABASE_URL="your-supabase-url"
-export SUPABASE_KEY="your-supabase-key"
-```
-
-### Usage
-
-#### Interactive Mode
-```bash
-python -m integrations.tars.v1.cli --interactive
-```
-
-#### Project Analysis
-```bash
-# Analyze a GitHub repository
-python -m integrations.tars.v1.cli --analyze-project \
-  --urls "https://github.com/owner/repo" \
-  --repositories "https://github.com/owner/repo.git"
-
-# Analyze multiple sources
-python -m integrations.tars.v1.cli --analyze-project \
-  --urls "https://project-website.com" \
-  --repositories "https://github.com/owner/repo.git" \
-  --documents "/path/to/docs.pdf" \
-  --github-repos "owner/repo"
-```
-
-#### Single Query
-```bash
-python -m integrations.tars.v1.cli --query "What are the latest trends in AI/ML frameworks?"
-```
-
-#### System Status
-```bash
-python -m integrations.tars.v1.cli --status
-```
-
-### Python API
+### Basic Usage
 
 ```python
-from integrations.tars.v1 import TarsMain
+from gitingest_tool import GitIngestTool
 
-# Initialize TARS
-tars = TarsMain(user_id="developer", verbose=True)
-await tars.initialize()
+# Automatically uses KeyManager for authentication
+tool = GitIngestTool()
+result = tool.analyze_repository("https://github.com/username/repo")
 
-# Analyze a project
-results = await tars.analyze_project(
-    web_urls=["https://github.com/owner/repo"],
-    repositories=["https://github.com/owner/repo.git"],
-    github_repos=["owner/repo"]
-)
-
-# Interactive conversation
-await tars.start_interactive_mode()
-
-# Single query
-response = await tars.process_query("Explain the architecture of this project")
-
-# Cleanup
-await tars.shutdown()
+if result["success"]:
+    print(f"Summary: {result['summary']}")
+    print(f"Tree: {result['tree']}")
+    print(f"Content: {result['content']}")
 ```
 
-## Architecture
+### Token Override
 
-### Resource Acquisition Layer
-- **WebCrawlerAgent**: Crawls and extracts content from web pages
-- **CodeRepositoryAgent**: Analyzes Git repositories and code structure
-- **DocumentAnalysisAgent**: Processes PDFs, Word docs, presentations
-- **DataProcessingAgent**: Handles CSV, Excel, JSON data files  
-- **GitHubIssueAgent**: Analyzes GitHub issues, PRs, and discussions
-- **KnowledgeIntegrationAgent**: Manages knowledge base operations
+```python
+# Override token for specific operation
+result = tool.analyze_repository(
+    "https://github.com/username/private-repo", 
+    token="github_pat_...",
+    include_submodules=True
+)
+```
 
-### Analysis/Intelligence Layer
-- **TechnicalAnalysisAgent**: Deep technical analysis of code and architecture
-- **CompetitiveAnalysisAgent**: Competitive landscape and comparison analysis
-- **TrendAnalysisAgent**: Technology trends and market analysis
-- **ProjectHealthAgent**: Project health metrics and sustainability analysis
+### Convenience Functions
 
-### Conversation/Session Layer
-- **ConversationOrchestratorAgent**: Manages user interactions and workflow coordination
+```python
+from gitingest_tool import extract_details, analyze_repository
 
-### Workflow System
-- **AcquisitionWorkflow**: Orchestrates resource acquisition tasks
-- **AnalysisWorkflow**: Coordinates analysis operations
-- **ConversationWorkflow**: Manages interactive conversations
+# Simple extraction with automatic auth
+summary, tree, content = extract_details("https://github.com/username/repo")
+
+# Full analysis with automatic auth
+result = analyze_repository("https://github.com/username/repo", include_submodules=True)
+```
+
+### Individual Components
+
+```python
+tool = GitIngestTool()
+
+# Get specific components
+summary = tool.get_summary("https://github.com/username/repo")
+tree = tool.get_tree("https://github.com/username/repo")
+content = tool.get_content("https://github.com/username/repo")
+```
+
+## API Reference
+
+### GitIngestTool Class
+
+#### `__init__(github_token: Optional[str] = None)`
+Initialize the tool with optional token override.
+
+#### `analyze_repository(repo_url: str, include_submodules: bool = False, token: Optional[str] = None) -> Dict[str, Any]`
+Analyze a repository and return structured results.
+
+**Returns:**
+```python
+{
+    "success": bool,
+    "repo_url": str,
+    "summary": str,
+    "tree": str,
+    "content": str,
+    "error": Optional[str]
+}
+```
+
+#### `get_summary(repo_url: str, **kwargs) -> Optional[str]`
+Get repository summary only.
+
+#### `get_tree(repo_url: str, **kwargs) -> Optional[str]`
+Get repository tree structure only.
+
+#### `get_content(repo_url: str, **kwargs) -> Optional[str]`
+Get repository content only.
+
+### Convenience Functions
+
+#### `analyze_repository(repo_url: str, github_token: Optional[str] = None, include_submodules: bool = False) -> Dict[str, Any]`
+Analyze a repository with automatic auth integration.
+
+#### `extract_details(repo_url: str, github_token: Optional[str] = None) -> Tuple[str, str, str]`
+Extract repository details and return as tuple `(summary, tree, content)`.
+
+## Requirements
+
+- `gitingest` library: `pip install gitingest`
+- GitMesh's `config.key_manager.KeyManager` for authentication integration
+
+## Integration Notes
+
+1. **Automatic Token Retrieval**: The tool automatically retrieves GitHub tokens from GitMesh's KeyManager
+2. **Environment Variables**: Supports standard GitHub token environment variables as fallback
+3. **Error Handling**: Graceful handling of authentication failures and API errors
+4. **Logging**: Integrated logging with clear authentication status indicators
+
+## Examples
+
+See `example_usage.py` for comprehensive examples of all features and integration patterns.
+````
 
 ## Configuration
 

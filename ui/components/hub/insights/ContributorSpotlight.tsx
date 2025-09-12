@@ -10,7 +10,7 @@ interface ContributorSpotlightProps {
 
 export default function ContributorSpotlight({ data }: ContributorSpotlightProps) {
   return (
-    <Card className="bg-gray-900 shadow-lg rounded-lg">
+    <Card className="bg-black shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="text-xl font-bold text-white">Contributor Spotlight</CardTitle>
       </CardHeader>

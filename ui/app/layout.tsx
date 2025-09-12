@@ -11,10 +11,10 @@ import Image from "next/image"
 export const metadata: Metadata = {
   title: "GitMesh",
   description: "AI-powered GitHub contribution manager with structured planning and branch-aware workflows",
-    generator: 'RAWx18',
-  icons: {
-    icon: '/favicon.png',
-  }
+  icons: [
+    { rel: "icon", url: "/light_logo.png", media: "(prefers-color-scheme: dark)" },
+    { rel: "icon", url: "/dark_logo.png", media: "(prefers-color-scheme: light)" },
+  ],
 }
 
 export default function RootLayout({

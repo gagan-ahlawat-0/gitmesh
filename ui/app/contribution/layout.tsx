@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Navbar from '@/components/Navbar';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import VSCodeInterface from '@/components/VSCodeInterface';
 import ClientProviders from '@/components/ClientProviders';
 import "./globals.css";
 import { KnowledgeBaseProvider } from '@/contexts/KnowledgeBaseContext';
@@ -17,6 +17,7 @@ export default function ContributionLayout({
   children: React.ReactNode;
 }) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { setRepository, repository, isRepositoryLoaded } = useRepository();
   const repoProcessedRef = useRef(false);
   const router = useRouter();
@@ -110,8 +111,11 @@ export default function ContributionLayout({
     <ClientProviders>
       <KnowledgeBaseProvider>
         <BranchProvider>
-          <Navbar />
-          <main className="pt-16">{children}</main>
+          <div className="h-screen overflow-hidden">
+            <VSCodeInterface>
+              {children}
+            </VSCodeInterface>
+          </div>
         </BranchProvider>
       </KnowledgeBaseProvider>
     </ClientProviders>

@@ -235,7 +235,7 @@ const RepositoryView = ({ repository }: { repository: any }) => {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-      <div className="max-w-6xl mx-auto space-y-12 bg-black-900 h-full overflow-y-auto p-8">
+      <div className="max-w-6xl mx-auto space-y-12 bg-black-900 p-8">
         {/* Hero Section with Owner Profile */}
         <div className="text-center space-y-8">
           <div className="flex flex-col items-center space-y-6">
@@ -394,7 +394,7 @@ const RepositoryView = ({ repository }: { repository: any }) => {
                     href={`/hub/profile/${contributor.login}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group flex flex-col items-center p-4 rounded-xl bg-black-700 hover:bg-black-600 transition-all duration-300 transform hover:scale-105"
+                    className="group flex flex-col items-center p-4 rounded-xl bg-black-700 hover:bg-black transition-all duration-300 transform hover:scale-105"
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >
                     <div className="relative mb-3">
@@ -559,49 +559,6 @@ const RepositoryView = ({ repository }: { repository: any }) => {
           </CardContent>
         </Card>
 
-        {/* Repository Actions */}
-        <Card className="bg-black-800 border border-black-700 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3 text-xl text-white">
-              <Zap className="w-5 h-5 text-orange-500" />
-              Quick Actions
-            </CardTitle>
-            <CardDescription className="text-black-400">
-              Quick actions for this repository
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <a 
-                href={repository.html_url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="group flex items-center gap-4 p-6 rounded-xl bg-black-700 hover:bg-black-600 transition-all duration-300 border border-black-600"
-              >
-                <Github className="w-6 h-6 text-black-400 group-hover:scale-110 transition-transform duration-300" />
-                <div>
-                  <div className="font-semibold text-lg text-white">View on GitHub</div>
-                  <div className="text-sm text-black-400">Open repository page</div>
-                </div>
-              </a>
-              <button className="group flex items-center gap-4 p-6 rounded-xl bg-black-700 hover:bg-black-600 transition-all duration-300 border border-black-600">
-                <GitBranch className="w-6 h-6 text-black-400 group-hover:scale-110 transition-transform duration-300" />
-                <div>
-                  <div className="font-semibold text-lg text-white">Clone Repository</div>
-                  <div className="text-sm text-black-400">Copy clone URL</div>
-                </div>
-              </button>
-              <button className="group flex items-center gap-4 p-6 rounded-xl bg-black-700 hover:bg-black-600 transition-all duration-300 border border-black-600">
-                <Star className="w-6 h-6 text-black-400 group-hover:scale-110 transition-transform duration-300" />
-                <div>
-                  <div className="font-semibold text-lg text-white">Star Repository</div>
-                  <div className="text-sm text-black-400">Show your support</div>
-                </div>
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Sponsor Button */}
         <div className="text-center">
           <Button className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-full text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
@@ -629,7 +586,7 @@ const GenericBranchView = ({ selectedBranch, branchInfo }: { selectedBranch: str
   }
 
   return (
-    <div className="space-y-8 h-full overflow-y-auto">
+    <div className="space-y-8">
       <div className="text-center">
         <div className="flex items-center justify-center gap-3 mb-4">
           <div className={`p-3 rounded-full bg-primary`}>

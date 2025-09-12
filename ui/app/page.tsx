@@ -67,11 +67,11 @@ export default function Home() {
               <div className="flex items-center space-x-3">
                 <div className="w-60 h-30 rounded-2xl flex items-center overflow-hidden">
                   <Image 
-                    src="/favicon.png" 
-                    alt="GitMesh Logo" 
-                    width={240} 
-                    height={120}
-                    className="object-contain"
+                  src={theme === "dark" ? "/dark_logo.png" : "/light_logo.png"}
+                  alt="GitMesh Logo" 
+                  width={240} 
+                  height={120}
+                  className="object-contain"
                   />
                 </div>
               </div>

@@ -76,14 +76,10 @@ export default function HubProjectsPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <HubHeader
-          title="Projects"
-          subtitle="Manage your projects and repositories."
-        />
-        <div className="mt-8 flex flex-col md:flex-row gap-6">
+      <div className="container mx-auto p-4 sm:p-3 lg:p-8">
+        <div className="flex flex-col md:flex-row gap-6">
           <div className="w-full md:w-1/4">
-            <div className="bg-gray-900 p-4 rounded-lg shadow-lg">
+            <div className="bg-black p-4 rounded-lg shadow-lg">
               <h3 className="text-lg font-semibold mb-4 text-orange-500">Filter by</h3>
               <FilterDropdown onFilterChange={setFilter} languages={languages} />
             </div>
@@ -93,7 +89,7 @@ export default function HubProjectsPage() {
               <SearchBar onSearch={setSearchQuery} />
             </div>
             <Tabs defaultValue="trending" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 bg-gray-900 rounded-lg">
+              <TabsList className="grid w-full grid-cols-4 bg-black rounded-lg">
                 <TabsTrigger value="trending" className="text-white data-[state=active]:bg-orange-500 data-[state=active]:text-black">Trending</TabsTrigger>
                 <TabsTrigger value="yours" className="text-white data-[state=active]:bg-orange-500 data-[state=active]:text-black">Your Projects</TabsTrigger>
                 <TabsTrigger value="contributed" className="text-white data-[state=active]:bg-orange-500 data-[state=active]:text-black">Contributed</TabsTrigger>
