@@ -151,12 +151,10 @@ class GitMeshTarsWrapper:
         
         # Initialize GitIngest if available
         if GITINGEST_AVAILABLE:
-            try:
-                self.gitingest_tool = GitIngestTool()
-                logger.info("GitIngest tool initialized successfully")
-            except Exception as e:
-                logger.warning(f"Failed to initialize GitIngest tool: {e}")
-                self.gitingest_tool = None
+            self.gitingest_tool = GitIngestTool(
+                github_pat=os.getenv("GITHUB_PAT") or os.getenv("GITHUB_TOKEN"),
+                verbose=True
+            )
         
         logger.info(f"GitMeshTarsWrapper initialized for user {user_id}, project {project_id}")
     
@@ -645,6 +643,7 @@ class GitMeshTarsWrapper:
         2. Maintains session-specific context in Supabase/Qdrant
         3. Leverages all TARS workflows for intelligent responses
         4. Stores conversation for future context
+        5. Processes files sent with the message context
         """
         try:
             # Initialize TARS if not already done
@@ -654,6 +653,10 @@ class GitMeshTarsWrapper:
             # If TARS is still not available, use intelligent fallback
             if not self.tars:
                 return await self._fallback_chat_processing(message, context, session_history)
+            
+            # Process any files sent with the message context immediately
+            if context and context.get("files"):
+                await self._process_context_files(context["files"])
             
             # Build comprehensive session context from knowledge base
             session_context = await self._build_session_context(message, context, session_history)
@@ -678,6 +681,78 @@ class GitMeshTarsWrapper:
         except Exception as e:
             logger.error(f"Error processing chat message through TARS: {e}")
             return await self._generate_intelligent_fallback_response(message, context, str(e))
+    
+    async def _process_context_files(self, files: List[Dict[str, Any]]) -> None:
+        """Process files sent with the message context and add them to the knowledge base immediately."""
+        try:
+            logger.info(f"Processing {len(files)} files from message context")
+            
+            for file_data in files:
+                try:
+                    # Extract file information
+                    file_path = file_data.get("path", "unknown_file")
+                    file_content = file_data.get("content", "")
+                    file_branch = file_data.get("branch", "main")
+                    repository_id = file_data.get("repository_id", self.repository_id or "unknown")
+                    
+                    if not file_content or file_content == "Loading...":
+                        logger.warning(f"Skipping file {file_path} - no content available")
+                        continue
+                    
+                    # Create metadata for the file
+                    metadata = {
+                        "source_type": "user_uploaded_file",
+                        "file_path": file_path,
+                        "branch": file_branch,
+                        "repository_id": repository_id,
+                        "session_id": self.session_id,
+                        "user_id": self.user_id,
+                        "timestamp": datetime.now().isoformat(),
+                        "processing_context": "chat_message"
+                    }
+                    
+                    # Process the file content and store in knowledge base
+                    if self.qdrant_db:
+                        # Store the full file content
+                        memory_id = self.qdrant_db.store_memory(
+                            text=file_content,
+                            memory_type="knowledge",
+                            metadata=metadata
+                        )
+                        logger.info(f"Stored file {file_path} in knowledge base with ID: {memory_id}")
+                        
+                        # Also create a summary entry if the file is large
+                        if len(file_content) > 2000:
+                            summary = file_content[:500] + "\n...\n" + file_content[-500:]
+                            summary_metadata = {**metadata, "content_type": "summary"}
+                            self.qdrant_db.store_memory(
+                                text=f"File: {file_path}\nSummary: {summary}",
+                                memory_type="knowledge",
+                                metadata=summary_metadata
+                            )
+                    
+                    # Also store in Supabase if available
+                    if self.memory:
+                        try:
+                            self.memory.store(
+                                text=file_content,
+                                metadata=metadata,
+                                memory_type="file_context"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Could not store file in Supabase memory: {e}")
+                    
+                    logger.info(f"Successfully processed file: {file_path} ({len(file_content)} chars)")
+                    
+                except Exception as file_error:
+                    logger.error(f"Error processing individual file {file_data.get('path', 'unknown')}: {file_error}")
+                    continue
+            
+            logger.info(f"Completed processing {len(files)} context files")
+            
+        except Exception as e:
+            logger.error(f"Error in _process_context_files: {e}")
+            # Don't raise here - we want chat to continue even if file processing fails
     
     async def import_and_build_knowledge(
         self, 
@@ -804,7 +879,8 @@ class GitMeshTarsWrapper:
                     "project_id": self.project_id,
                     "repository_id": self.repository_id,
                     "branch": self.branch
-                }
+                },
+                "current_context_files": context.get("files", []) if context else []
             }
             
             # Get relevant knowledge base entries from Qdrant using semantic search
@@ -817,6 +893,7 @@ class GitMeshTarsWrapper:
                         filter_params={"session_id": self.session_id}
                     )
                     session_context["knowledge_entries"] = relevant_knowledge
+                    logger.info(f"Found {len(relevant_knowledge)} relevant knowledge entries for query")
                 except Exception as e:
                     logger.warning(f"Could not search knowledge base: {e}")
             
@@ -848,9 +925,131 @@ class GitMeshTarsWrapper:
             }
     
     async def _enhance_query_with_knowledge(self, query: str, session_context: Dict[str, Any]) -> str:
-        """Enhance user query with comprehensive knowledge base context for TARS processing."""
+        """Enhance user query with progressive context loading for optimal AI responses."""
+        try:
+            # Try to use progressive context manager first
+            return await self._enhance_query_progressive(query, session_context)
+        except Exception as e:
+            logger.warning(f"Progressive context enhancement failed: {e}")
+            # Fallback to existing method
+            return await self._enhance_query_optimized(query, session_context)
+    
+    async def _enhance_query_progressive(self, query: str, session_context: Dict[str, Any]) -> str:
+        """Enhanced query with progressive context loading."""
+        from .context_manager import ProgressiveContextManager
+        context_manager = ProgressiveContextManager(max_context_tokens=4000)
+        
+        # Add repository knowledge with progressive detail
+        if self.repository_id and any(keyword in query.lower() for keyword in ['code', 'repo', 'project', 'file', 'structure', 'function', 'class', 'how', 'what', 'analyze']):
+            try:
+                cache_key = f"https://github.com/{self.repository_id}:{self.branch or 'main'}"
+                if cache_key in self.repo_knowledge_cache:
+                    repo_data = self.repo_knowledge_cache[cache_key]
+                    repo_content = repo_data.get("content", "")
+                    if repo_content:
+                        context_manager.add_repository_context(repo_content, self.repository_id)
+            except Exception as e:
+                logger.warning(f"Error adding repository context: {e}")
+        
+        # Add knowledge base entries
+        knowledge_entries = session_context.get("knowledge_entries", [])
+        for i, entry in enumerate(knowledge_entries[:10]):
+            content = entry.get("content", "")
+            metadata = entry.get("metadata", {})
+            if content:
+                source_type = metadata.get('source_type', 'knowledge_base')
+                
+                # Determine appropriate level based on content length and type
+                if len(content) < 200:
+                    level = "summary"
+                    priority = 0.8
+                elif len(content) < 800:
+                    level = "details"
+                    priority = 0.6
+                else:
+                    level = "specifics"
+                    priority = 0.4
+                
+                context_manager.add_context_item(
+                    content=f"Knowledge: {content[:800]}...",
+                    context_type=source_type,
+                    source=f"KB Entry {i+1}",
+                    priority=priority,
+                    level=level
+                )
+        
+        # Add conversation history
+        chat_history = session_context.get("stored_chat_history", [])
+        for i, conv in enumerate(chat_history[-3:]):
+            role = conv.get("metadata", {}).get("role", "unknown")
+            content = conv.get("content", "")
+            if content:
+                context_manager.add_context_item(
+                    content=f"Previous {role}: {content[:300]}...",
+                    context_type="conversation_history",
+                    source=f"Chat {i+1}",
+                    priority=0.3,
+                    level="details"
+                )
+        
+        # Add imported files summary
+        imported_files = session_context.get("imported_files", [])
+        if imported_files:
+            files_summary = f"Available Files ({len(imported_files)}): "
+            files_summary += ", ".join([f"{f.get('name', 'unknown')} ({f.get('type', 'unknown')})" 
+                                      for f in imported_files[:5]])
+            if len(imported_files) > 5:
+                files_summary += f" and {len(imported_files) - 5} more"
+            
+            context_manager.add_context_item(
+                content=files_summary,
+                context_type="file_inventory",
+                source="Imported Files",
+                priority=0.7,
+                level="summary"
+            )
+        
+        # Add project context summary
+        project_context = session_context.get("project_context", {})
+        if project_context.get("repository_id"):
+            project_summary = f"Project: {project_context['repository_id']}"
+            if project_context.get("branch"):
+                project_summary += f" (Branch: {project_context['branch']})"
+            
+            context_manager.add_context_item(
+                content=project_summary,
+                context_type="project_info",
+                source="Project Context",
+                priority=0.9,
+                level="summary"
+            )
+        
+        # Build progressive context
+        enhanced_query, metrics = context_manager.build_progressive_context(query)
+        
+        # Log context optimization metrics
+        logger.info(f"Context optimization: {metrics.get('utilization_percent', 0):.1f}% utilization, "
+                   f"{metrics.get('items_included', {})} items across {metrics.get('levels_used', 0)} levels")
+        
+        return enhanced_query
+    
+    async def _enhance_query_optimized(self, query: str, session_context: Dict[str, Any]) -> str:
+        """Enhance user query with optimized knowledge base context for TARS processing."""
         try:
             enhanced_parts = [f"User Query: {query}\n"]
+            
+            # Use context optimizer if available for better context management
+            context_optimizer = None
+            if INDEXER_AVAILABLE:
+                try:
+                    from .indexing.core import ContextOptimizer, IndexingConfig
+                    config = IndexingConfig(context_window=4000)  # Conservative limit for better responses
+                    context_optimizer = ContextOptimizer(config)
+                except ImportError:
+                    pass
+            
+            # Collect all potential context chunks
+            context_chunks = []
             
             # Add repository knowledge if available and relevant
             if self.repository_id and any(keyword in query.lower() for keyword in ['code', 'repo', 'project', 'file', 'structure', 'function', 'class', 'how', 'what', 'analyze']):
@@ -860,74 +1059,143 @@ class GitMeshTarsWrapper:
                         repo_data = self.repo_knowledge_cache[cache_key]
                         repo_content = repo_data.get("content", "")
                         if repo_content:
-                            enhanced_parts.append("📁 Repository Knowledge:")
-                            # Extract key structural information
+                            # Smart chunking for repository content
                             lines = repo_content.split('\n')
-                            file_count = len([l for l in lines if l.startswith('File: ')])
-                            enhanced_parts.append(f"   📊 Repository contains {file_count} files")
                             
-                            # Add sample of code structure
+                            # Create high-level summary chunk
+                            file_count = len([l for l in lines if l.startswith('File: ')])
+                            summary_chunk = f"� Repository Overview: {file_count} files in {self.repository_id}"
+                            context_chunks.append(summary_chunk)
+                            
+                            # Extract key code elements as chunks
                             key_elements = []
-                            for line in lines[:100]:  # First 100 lines for overview
-                                if any(pattern in line for pattern in ['def ', 'class ', 'import ', 'from ']):
-                                    key_elements.append(line.strip())
-                                if len(key_elements) >= 8:
+                            current_chunk = []
+                            for line in lines:
+                                if any(pattern in line for pattern in ['def ', 'class ', 'import ', 'from ', 'function ']):
+                                    if current_chunk:
+                                        context_chunks.append('\n'.join(current_chunk))
+                                        current_chunk = []
+                                    current_chunk.append(line.strip())
+                                elif current_chunk:
+                                    current_chunk.append(line.strip())
+                                    if len(current_chunk) >= 5:  # Limit chunk size
+                                        context_chunks.append('\n'.join(current_chunk))
+                                        current_chunk = []
+                                        
+                                if len(context_chunks) >= 20:  # Limit total chunks
                                     break
                             
-                            if key_elements:
-                                enhanced_parts.append("   🔍 Code Elements:")
-                                for element in key_elements:
-                                    enhanced_parts.append(f"     {element}")
-                            enhanced_parts.append("")
+                            if current_chunk:
+                                context_chunks.append('\n'.join(current_chunk))
+                                
                 except Exception as e:
                     logger.warning(f"Error adding repository context: {e}")
             
-            # Add relevant knowledge base context
+            # Add relevant knowledge base context as chunks
             knowledge_entries = session_context.get("knowledge_entries", [])
-            if knowledge_entries:
-                enhanced_parts.append("Relevant Knowledge Base Context:")
-                for i, entry in enumerate(knowledge_entries[:5], 1):
-                    content = entry.get("content", "")
-                    metadata = entry.get("metadata", {})
-                    enhanced_parts.append(f"{i}. Source: {metadata.get('source_type', 'unknown')}")
-                    enhanced_parts.append(f"   Content: {content[:300]}...")
-                enhanced_parts.append("")
+            for entry in knowledge_entries[:10]:  # Limit entries
+                content = entry.get("content", "")
+                metadata = entry.get("metadata", {})
+                if content:
+                    source_info = f"Source: {metadata.get('source_type', 'unknown')}"
+                    chunk = f"{source_info}\n{content[:500]}..."  # Limit chunk size
+                    context_chunks.append(chunk)
             
-            # Add recent conversation context
+            # Add recent conversation context as chunks
             chat_history = session_context.get("stored_chat_history", [])
-            if chat_history:
-                enhanced_parts.append("Recent Conversation Context:")
-                for conv in chat_history[-3:]:
-                    role = conv.get("metadata", {}).get("role", "unknown")
-                    content = conv.get("content", "")
-                    enhanced_parts.append(f"- {role}: {content[:150]}...")
-                enhanced_parts.append("")
+            for conv in chat_history[-5:]:  # Limit history
+                role = conv.get("metadata", {}).get("role", "unknown")
+                content = conv.get("content", "")
+                if content:
+                    chunk = f"Previous {role}: {content[:200]}..."
+                    context_chunks.append(chunk)
             
-            # Add imported files context
+            # Add imported files context as chunks
             imported_files = session_context.get("imported_files", [])
-            if imported_files:
-                enhanced_parts.append(f"Available Imported Resources ({len(imported_files)} files):")
-                for file_info in imported_files[:5]:
-                    enhanced_parts.append(f"- {file_info.get('name', 'unknown')}: {file_info.get('type', 'unknown')}")
-                enhanced_parts.append("")
+            for file_info in imported_files[:5]:  # Limit files
+                name = file_info.get('name', 'unknown')
+                file_type = file_info.get('type', 'unknown')
+                chunk = f"Available file: {name} ({file_type})"
+                context_chunks.append(chunk)
             
-            # Add recent analysis context
-            recent_analyses = session_context.get("recent_analyses", [])
-            if recent_analyses:
-                enhanced_parts.append("Recent Analysis Results:")
-                for analysis in recent_analyses[:3]:
-                    enhanced_parts.append(f"- {analysis.get('workflow', 'unknown')}: {analysis.get('summary', 'No summary')}")
-                enhanced_parts.append("")
+            # Add current context files (files sent with this message)
+            current_files = session_context.get("current_context_files", [])
+            for file_data in current_files:
+                file_path = file_data.get("path", "unknown")
+                file_content = file_data.get("content", "")
+                file_branch = file_data.get("branch", "main")
+                
+                if file_content and file_content != "Loading...":
+                    # Add file header info
+                    file_info_chunk = f"📄 Current File: {file_path} (branch: {file_branch})"
+                    context_chunks.append(file_info_chunk)
+                    
+                    # Add file content in manageable chunks
+                    if len(file_content) > 1000:
+                        # For large files, add summary and key sections
+                        content_chunk = f"File Content (first 800 chars): {file_content[:800]}..."
+                        context_chunks.append(content_chunk)
+                        
+                        # Add last part too for completeness
+                        if len(file_content) > 1600:
+                            end_chunk = f"File Content (last 400 chars): ...{file_content[-400:]}"
+                            context_chunks.append(end_chunk)
+                    else:
+                        # For smaller files, include full content
+                        content_chunk = f"Full File Content:\n{file_content}"
+                        context_chunks.append(content_chunk)
+                else:
+                    # File without content
+                    context_chunks.append(f"📄 File: {file_path} (content not available)")
+            
+            if current_files:
+                logger.info(f"Added {len(current_files)} current context files to query enhancement")
+            
+            # Use context optimizer to select best chunks
+            if context_optimizer and context_chunks:
+                try:
+                    optimized_chunks, context_stats = context_optimizer.calculate_optimal_context(
+                        context_chunks, query
+                    )
+                    
+                    # Add optimized context
+                    if optimized_chunks:
+                        enhanced_parts.append("🎯 Relevant Context (Optimized):")
+                        for i, chunk in enumerate(optimized_chunks, 1):
+                            enhanced_parts.append(f"{i}. {chunk}")
+                            if i >= 8:  # Limit displayed chunks
+                                break
+                        enhanced_parts.append("")
+                        
+                        # Add context utilization info for debugging
+                        enhanced_parts.append(f"📊 Context Usage: {context_stats.utilization_percentage:.1f}% of available tokens")
+                        enhanced_parts.append("")
+                        
+                except Exception as e:
+                    logger.warning(f"Error optimizing context: {e}")
+                    # Fallback to basic context
+                    if context_chunks:
+                        enhanced_parts.append("📚 Available Context:")
+                        for i, chunk in enumerate(context_chunks[:5], 1):
+                            enhanced_parts.append(f"{i}. {chunk[:200]}...")
+                        enhanced_parts.append("")
+            else:
+                # Fallback for when optimizer not available
+                if context_chunks:
+                    enhanced_parts.append("📚 Available Context:")
+                    for i, chunk in enumerate(context_chunks[:5], 1):
+                        enhanced_parts.append(f"{i}. {chunk[:200]}...")
+                    enhanced_parts.append("")
             
             # Add project context
             project_context = session_context.get("project_context", {})
             if project_context.get("repository_id"):
-                enhanced_parts.append(f"Project Context: Repository {project_context['repository_id']}")
+                enhanced_parts.append(f"🔧 Project: {project_context['repository_id']}")
                 if project_context.get("branch"):
-                    enhanced_parts.append(f"Branch: {project_context['branch']}")
+                    enhanced_parts.append(f"🌿 Branch: {project_context['branch']}")
                 enhanced_parts.append("")
             
-            enhanced_parts.append("Please provide a comprehensive and helpful response based on the above context, leveraging the knowledge base and conversation history.")
+            enhanced_parts.append("💡 Please provide a comprehensive response based on the above context, focusing on the most relevant information from the optimized knowledge base.")
             
             return "\\n".join(enhanced_parts)
             
@@ -949,7 +1217,21 @@ class GitMeshTarsWrapper:
             
             # Check for and clean up any JSON tool calls or function formats
             if (content.strip().startswith('{') and '"name"' in content) or '"function"' in content or '"type": "function"' in content:
-                content = "Hello! I'm TARS, your AI assistant for project analysis. I'm here to help you understand your codebase, analyze repositories, and provide insights about your development projects. How can I assist you today?"
+                # Generate a dynamic response based on session context instead of hardcoded text
+                if session_context.get("imported_files"):
+                    file_count = len(session_context["imported_files"])
+                    content = f"I see you have {file_count} files available for analysis. What would you like me to help you with regarding your project?"
+                elif session_context.get("repository_id"):
+                    repo_id = session_context["repository_id"]
+                    content = f"I'm ready to help with your {repo_id} repository. What specific aspect would you like me to analyze or discuss?"
+                elif session_context.get("current_context_files"):
+                    file_count = len(session_context["current_context_files"])
+                    if file_count == 1:
+                        content = f"I can see you've shared a file with me. What would you like me to help you with regarding this code?"
+                    else:
+                        content = f"I can see you've shared {file_count} files with me. What would you like me to help you analyze or discuss?"
+                else:
+                    content = "Hello! I'm here to help with code analysis, project questions, and development tasks. What can I assist you with?"
             
             # Clean and format the response
             content = content.strip()
@@ -1336,6 +1618,10 @@ class GitMeshTarsWrapper:
     async def _fallback_chat_processing(self, message: str, context: Dict[str, Any], session_history: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Intelligent fallback chat processing when TARS is not available"""
         try:
+            # Process any files in the context first
+            if context and context.get("files"):
+                await self._process_context_files(context["files"])
+            
             # Search existing knowledge base for relevant information
             relevant_knowledge = []
             knowledge_entries_used = 0
@@ -1404,23 +1690,64 @@ class GitMeshTarsWrapper:
         """Generate an intelligent response using available knowledge"""
         message_lower = message.lower()
         
-        # If we have relevant knowledge, use it
+        # If we have relevant knowledge, create a comprehensive response
         if knowledge:
-            knowledge_text = "\n".join([k["content"][:200] for k in knowledge[:3]])
-            return f"Based on the available information, here's what I can tell you about '{message}':\n\n{knowledge_text}\n\nWould you like me to elaborate on any specific aspect?"
+            # Process knowledge into organized content
+            knowledge_content = []
+            file_sources = []
+            
+            for item in knowledge[:5]:  # Use top 5 most relevant items
+                content = item.get("content", "")
+                metadata = item.get("metadata", {})
+                source = metadata.get("source", "knowledge_base")
+                
+                # Track file sources
+                if "file_path" in metadata:
+                    file_sources.append(metadata["file_path"])
+                
+                # Add content with proper formatting
+                if len(content) > 300:
+                    content = content[:300] + "..."
+                knowledge_content.append(content)
+            
+            # Build contextual response
+            response_parts = []
+            
+            # Add file context if available
+            if file_sources:
+                unique_files = list(set(file_sources))
+                if len(unique_files) == 1:
+                    response_parts.append(f"Based on the file `{unique_files[0]}` you've provided:")
+                else:
+                    response_parts.append(f"Based on the {len(unique_files)} files you've provided:")
+            else:
+                response_parts.append("Based on the available context:")
+            
+            # Add knowledge content
+            response_parts.append("\n".join(knowledge_content))
+            
+            # Add helpful follow-up
+            if "analysis" in message_lower or "analyze" in message_lower:
+                response_parts.append("\nWould you like me to provide a deeper analysis of any specific section?")
+            elif "explain" in message_lower or "how" in message_lower:
+                response_parts.append("\nLet me know if you need clarification on any of these points.")
+            else:
+                response_parts.append("\nWhat specific aspect would you like me to explore further?")
+            
+            return "\n\n".join(response_parts)
         
         # Fallback to intelligent responses based on message content
         if any(word in message_lower for word in ['tars', 'integration', 'gitmesh']):
-            return f"Regarding '{message}', I can help you with GitMesh and TARS integration. The system supports knowledge base building, intelligent chat, and unified storage with Supabase and Qdrant. What specific aspect would you like to explore?"
+            return f"I can help you with GitMesh and TARS integration. The system supports knowledge base building, intelligent chat, and unified storage with Supabase and Qdrant. What specific aspect of '{message}' would you like to explore?"
         
         elif any(word in message_lower for word in ['how', 'what', 'explain']):
-            return f"I'd be happy to explain that for you. Regarding '{message}', could you provide a bit more context about what you're trying to accomplish? This will help me give you a more targeted answer."
+            return f"I'd be happy to help explain that. To give you the most relevant answer about '{message}', could you provide a bit more context about what you're trying to accomplish?"
         
         elif any(word in message_lower for word in ['code', 'function', 'api', 'implementation']):
-            return f"For your question about '{message}', I can help with code analysis and implementation details. Could you share more specifics about the component or functionality you're working with?"
+            return f"I can help with code analysis and implementation details. For your question about '{message}', could you share the specific code or component you're working with?"
         
         else:
-            return f"I understand you're asking about '{message}'. While I'm setting up the full TARS system, I can still help you. Could you provide more details about what you're trying to achieve?"
+            return f"I understand you're asking about '{message}'. To provide the most helpful response, could you share more details about what you're trying to achieve or any relevant files/code?"
     
     async def _get_session_knowledge_stats(self) -> Dict[str, Any]:
         """Get knowledge statistics for current session."""
@@ -1576,12 +1903,17 @@ class GitMeshTarsWrapper:
             if not self.gitingest_tool:
                 return None
             
-            # Create hash from repo URL and branch for now
-            # In the future, we could enhance this with actual repo metadata
+            # Get repository metadata to check for updates
+            metadata = self.gitingest_tool.get_repository_metadata(repo_url)
+            if not metadata.get("accessible"):
+                return None
+            
+            # Create hash from relevant metadata
             hash_data = {
                 "repo": repo_url,
                 "branch": branch,
-                "timestamp": datetime.now().strftime("%Y-%m-%d")  # Daily refresh
+                "updated_at": metadata.get("info", {}).get("updated_at"),
+                "size": metadata.get("info", {}).get("size")
             }
             
             hash_string = json.dumps(hash_data, sort_keys=True)
@@ -1631,68 +1963,39 @@ class GitMeshTarsWrapper:
             
             logger.info(f"🔍 Analyzing repository {repo_url} with GitIngest...")
             
-            # Run GitIngest analysis using the new interface
-            try:
-                analysis_result = self.gitingest_tool.analyze_repository(repo_url, branch)
-                
-                if not analysis_result.get("success", False):
-                    error_msg = analysis_result.get("error", "Analysis failed")
-                    raise Exception(f"GitIngest analysis failed: {error_msg}")
-                
-                # Extract content from the new format
-                summary = analysis_result.get("summary", "")
-                tree = analysis_result.get("tree", "")
-                content = analysis_result.get("content", "")
-                
-                # Combine all content for comprehensive analysis
-                full_content = f"""
-Repository Summary:
-{summary}
-
-Repository Structure:
-{tree}
-
-Repository Content:
-{content}
-"""
-                
-                # Cache the results
-                cache_key = f"{repo_url}:{branch}"
-                self.repo_knowledge_cache[cache_key] = {
-                    "content": full_content,
-                    "metadata": {
-                        "summary": summary,
-                        "tree": tree,
-                        "analysis_result": analysis_result
-                    },
-                    "timestamp": datetime.now().timestamp()
-                }
-                
-                # Update analysis tracking
-                current_hash = await self._get_repository_hash(repo_url, branch)
-                self.last_repo_analysis[cache_key] = {
-                    "hash": current_hash,
-                    "timestamp": datetime.now().timestamp(),
-                    "success": True
-                }
-                
-                # Store in vector database for future retrieval
-                await self._store_repository_knowledge(repo_url, branch, full_content)
-                
-                logger.info(f"✅ Repository analysis completed successfully for {repo_url}")
-                
-                return {
-                    "success": True,
-                    "content": full_content,
-                    "summary": summary,
-                    "tree": tree,
-                    "metadata": analysis_result,
-                    "cached": False
-                }
-                
-            except Exception as analysis_error:
-                logger.error(f"GitIngest analysis error: {analysis_error}")
-                raise analysis_error
+            # Run GitIngest analysis
+            analysis_result = self.gitingest_tool.analyze_repository(repo_url)
+            
+            if not analysis_result.get("success"):
+                raise Exception(f"GitIngest analysis failed: {analysis_result.get('error', 'Unknown error')}")
+            
+            # Cache the results
+            cache_key = f"{repo_url}:{branch}"
+            self.repo_knowledge_cache[cache_key] = {
+                "content": analysis_result["content"],
+                "metadata": analysis_result["metadata"],
+                "timestamp": datetime.now().timestamp()
+            }
+            
+            # Update analysis tracking
+            current_hash = await self._get_repository_hash(repo_url, branch)
+            self.last_repo_analysis[cache_key] = {
+                "hash": current_hash,
+                "timestamp": datetime.now().timestamp(),
+                "success": True
+            }
+            
+            # Store in vector database for future retrieval
+            await self._store_repository_knowledge(repo_url, branch, analysis_result["content"])
+            
+            logger.info(f"✅ Repository analysis completed successfully for {repo_url}")
+            
+            return {
+                "success": True,
+                "content": analysis_result["content"],
+                "metadata": analysis_result["metadata"],
+                "cached": False
+            }
             
         except Exception as e:
             logger.error(f"❌ Failed to analyze repository {repo_url}: {e}")
@@ -1871,119 +2174,6 @@ Repository Content:
                         
         except Exception as e:
             logger.error(f"Error checking repository knowledge: {e}")
-    
-    async def analyze_repository_with_gitingest(self, repo_url: str, branch: str = "main") -> Dict[str, Any]:
-        """
-        Public method to analyze any repository using GitIngest.
-        
-        Args:
-            repo_url: The repository URL (GitHub URL or owner/repo format)
-            branch: The branch to analyze (default: "main")
-            
-        Returns:
-            Dict containing analysis results with success/error status
-        """
-        try:
-            if not self.gitingest_tool:
-                return {
-                    "success": False,
-                    "error": "GitIngest tool not available"
-                }
-            
-            logger.info(f"🔍 Analyzing repository {repo_url} (branch: {branch})...")
-            
-            # Use the GitIngest tool directly 
-            # Run in thread pool to avoid async issues
-            import concurrent.futures
-            loop = asyncio.get_event_loop()
-            
-            def analyze_sync():
-                # Convert owner/repo to full URL if needed
-                repo_to_analyze = repo_url
-                if not repo_url.startswith(("http://", "https://")):
-                    repo_to_analyze = f"https://github.com/{repo_url}"
-                
-                return self.gitingest_tool.analyze_repository(repo_to_analyze, include_submodules=True)
-            
-            result = await loop.run_in_executor(None, analyze_sync)
-            
-            if result.get("success"):
-                logger.info(f"✅ Successfully analyzed repository {repo_url}")
-                
-                # Store in knowledge base if memory system is available
-                if self.memory and result.get("content"):
-                    try:
-                        await self.memory.save_memory(
-                            content=result["content"],
-                            memory_type="repository_analysis",
-                            quality=0.9,
-                            metadata={
-                                "repo_url": repo_url,
-                                "branch": branch,
-                                "session_id": self.session_id,
-                                "timestamp": datetime.now().isoformat(),
-                                "analysis_type": "gitingest"
-                            }
-                        )
-                        logger.info("📚 Stored repository analysis in knowledge base")
-                    except Exception as e:
-                        logger.warning(f"Failed to store in knowledge base: {e}")
-                
-                return {
-                    "success": True,
-                    "repo_url": repo_url,
-                    "branch": branch,
-                    "summary": result.get("summary", ""),
-                    "tree": result.get("tree", ""),
-                    "content": result.get("content", ""),
-                    "metadata": result.get("metadata", {}),
-                    "session_id": self.session_id
-                }
-            else:
-                logger.error(f"❌ Repository analysis failed: {result.get('error', 'Unknown error')}")
-                return {
-                    "success": False,
-                    "error": result.get("error", "Analysis failed"),
-                    "repo_url": repo_url,
-                    "branch": branch
-                }
-                
-        except Exception as e:
-            logger.error(f"Error analyzing repository with GitIngest: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "repo_url": repo_url,
-                "branch": branch
-            }
-    
-    def get_gitingest_status(self) -> Dict[str, Any]:
-        """Get the status of the GitIngest integration."""
-        try:
-            status = {
-                "available": GITINGEST_AVAILABLE and self.gitingest_tool is not None,
-                "tool_initialized": self.gitingest_tool is not None,
-                "session_id": self.session_id
-            }
-            
-            if self.gitingest_tool:
-                # Test if the tool works by getting its details
-                try:
-                    details = self.gitingest_tool.extract_details("https://github.com/octocat/Hello-World")
-                    status["test_successful"] = True
-                    status["test_details"] = details
-                except Exception as e:
-                    status["test_successful"] = False
-                    status["test_error"] = str(e)
-            
-            return status
-            
-        except Exception as e:
-            return {
-                "available": False,
-                "error": str(e),
-                "session_id": self.session_id
-            }
 
     def chat(
         self,
