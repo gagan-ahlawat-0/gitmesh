@@ -761,6 +761,140 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   const [showImportSuccess, setShowImportSuccess] = useState(false);
   const [hasShownWelcome, setHasShownWelcome] = useState(false);
   
+  // Demo mode state
+  const [useDemoMode, setUseDemoMode] = useState(false);
+  
+  // Demo/Mock data for when backend is not available
+  const demoFileStructure = [
+    {
+      name: 'src',
+      type: 'folder' as const,
+      children: [
+        {
+          name: 'components',
+          type: 'folder' as const,
+          children: [
+            { name: 'Button.tsx', type: 'file' as const, size: 1024, path: 'src/components/Button.tsx' },
+            { name: 'Modal.tsx', type: 'file' as const, size: 2048, path: 'src/components/Modal.tsx' },
+            { name: 'Header.tsx', type: 'file' as const, size: 1536, path: 'src/components/Header.tsx' }
+          ]
+        },
+        {
+          name: 'utils',
+          type: 'folder' as const,
+          children: [
+            { name: 'helpers.ts', type: 'file' as const, size: 512, path: 'src/utils/helpers.ts' },
+            { name: 'constants.ts', type: 'file' as const, size: 256, path: 'src/utils/constants.ts' }
+          ]
+        },
+        { name: 'index.tsx', type: 'file' as const, size: 3072, path: 'src/index.tsx' },
+        { name: 'App.tsx', type: 'file' as const, size: 2560, path: 'src/App.tsx' }
+      ]
+    },
+    {
+      name: 'docs',
+      type: 'folder' as const,
+      children: [
+        { name: 'README.md', type: 'file' as const, size: 4096, path: 'docs/README.md' },
+        { name: 'CONTRIBUTING.md', type: 'file' as const, size: 2048, path: 'docs/CONTRIBUTING.md' }
+      ]
+    },
+    { name: 'package.json', type: 'file' as const, size: 1024, path: 'package.json' },
+    { name: 'tsconfig.json', type: 'file' as const, size: 512, path: 'tsconfig.json' }
+  ];
+
+  const demoFiles: Record<string, string> = {
+    'src/components/Button.tsx': `import React from 'react';
+import { cn } from '@/lib/utils';
+
+interface ButtonProps {
+  children: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'outline';
+  size?: 'sm' | 'md' | 'lg';
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+}
+
+export const Button: React.FC<ButtonProps> = ({
+  children,
+  variant = 'primary',
+  size = 'md',
+  onClick,
+  disabled = false,
+  className
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'rounded-lg font-medium transition-colors',
+        {
+          'bg-blue-600 text-white hover:bg-blue-700': variant === 'primary',
+          'bg-gray-600 text-white hover:bg-gray-700': variant === 'secondary',
+          'border border-gray-300 text-gray-700 hover:bg-gray-50': variant === 'outline',
+          'px-2 py-1 text-sm': size === 'sm',
+          'px-4 py-2': size === 'md',
+          'px-6 py-3 text-lg': size === 'lg',
+          'opacity-50 cursor-not-allowed': disabled
+        },
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+};`,
+    'src/App.tsx': `import React from 'react';
+import { Button } from './components/Button';
+
+function App() {
+  const handleClick = () => {
+    console.log('Button clicked!');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <main className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">
+          Welcome to GitMesh Demo
+        </h1>
+        <div className="space-y-4">
+          <Button variant="primary" onClick={handleClick}>
+            Primary Button
+          </Button>
+          <Button variant="secondary" onClick={handleClick}>
+            Secondary Button
+          </Button>
+          <Button variant="outline" onClick={handleClick}>
+            Outline Button
+          </Button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export default App;`,
+    'package.json': `{
+  "name": "gitmesh-demo",
+  "version": "1.0.0",
+  "description": "A demo repository for GitMesh",
+  "main": "src/index.tsx",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^4.9.5"
+  }
+}`
+  };
+  
   // Get active session and its data
   const activeSession = getActiveSession();
   const messages = activeSession?.messages || [];
@@ -801,6 +935,34 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   const fetchFileContent = useCallback(async (branch: string, filePath: string) => {
     if (!repository?.owner?.login || !repository?.name) return;
     
+    // Use demo data if in demo mode
+    if (useDemoMode) {
+      const content = demoFiles[filePath] || `// Demo content for ${filePath}
+// This is placeholder content since backend is not available
+
+function demoFunction() {
+  console.log('This is demo content for ${filePath}');
+}
+
+export default demoFunction;`;
+      
+      const contentHash = getFileHash(content);
+      const contentKey = getFileCacheKey(branch, filePath);
+      cacheFileContent(contentKey, content, contentHash);
+      
+      // Update selected files with demo content
+      const currentFiles = selectedFilesRef.current;
+      const updatedFiles = currentFiles.map(file => 
+        file.branch === branch && file.path === filePath 
+          ? { ...file, content, contentHash: contentHash || undefined }
+          : file
+      );
+      setSelectedFiles(updatedFiles);
+      
+      console.log(`Using demo content for ${filePath} (${content.length} characters)`);
+      return;
+    }
+    
     const contentKey = getFileCacheKey(branch, filePath);
     
     // Check if we're already fetching this file
@@ -813,6 +975,10 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
       setLoadingState('files', contentKey, true);
       
       try {
+        if (!githubAPI) {
+          throw new Error('GitHub API not available');
+        }
+        
         const content = await githubAPI.getFileContent(
           repository.owner.login, 
           repository.name, 
@@ -861,7 +1027,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
     
     // Store the timeout reference
     setFetchTimeouts(prev => ({ ...prev, [contentKey]: timeoutId }));
-  }, [repository, getFileCacheKey, setLoadingState, cacheFileContent, getFileHash, setSelectedFiles, setError, fetchTimeouts]); // Removed selectedFiles dependency
+  }, [repository, getFileCacheKey, setLoadingState, cacheFileContent, getFileHash, setSelectedFiles, setError, fetchTimeouts, useDemoMode, demoFiles]); // Removed selectedFiles dependency
 
   // Handle imported data with enhanced workflow
   useEffect(() => {
@@ -1008,7 +1174,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   
   // Fetch branches and file structures
   useEffect(() => {
-    if (repository?.owner?.login && repository?.name) {
+    if (repository?.owner?.login && repository?.name && githubAPI) {
       setLoadingState('sessions', undefined, true);
       
       githubAPI.getBranchesWithTrees(repository.owner.login, repository.name)
@@ -1030,42 +1196,101 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
               }));
             }
           });
+          setUseDemoMode(false); // Backend is working, disable demo mode
         })
         .catch(err => {
           console.error('Failed to fetch branches with trees:', err);
           setError('sessions', undefined, 'Failed to load repository structure');
           
           // Fallback: fetch branches first, then individual trees
-          githubAPI.getRepositoryBranches(repository.owner.login, repository.name)
-            .then(branches => {
-              console.log('Fetched branches (fallback):', branches);
-              setSelectedBranches(branches.map((b: { name: string }) => b.name));
-              
-              // Fetch tree for each branch individually
-              branches.forEach(async (branch: { name: string }) => {
-                try {
-                  const tree = await githubAPI.getRepositoryTree(repository.owner.login, repository.name, branch.name);
-                  console.log(`Fetched tree for branch ${branch.name}:`, tree);
-                  
-                  const fileStructure = convertTreeToFileStructure(tree);
-                  setFileStructure(branch.name, fileStructure);
-                  setBranchFileStructures(prev => ({
-                    ...prev,
-                    [branch.name]: fileStructure
-                  }));
-                } catch (treeErr) {
-                  console.error(`Failed to fetch tree for branch ${branch.name}:`, treeErr);
-                }
+          if (githubAPI) {
+            githubAPI.getRepositoryBranches(repository.owner.login, repository.name)
+              .then(branches => {
+                console.log('Fetched branches (fallback):', branches);
+                setSelectedBranches(branches.map((b: { name: string }) => b.name));
+                
+                // Fetch tree for each branch individually
+                branches.forEach(async (branch: { name: string }) => {
+                  try {
+                    if (githubAPI) {
+                      const tree = await githubAPI.getRepositoryTree(repository.owner.login, repository.name, branch.name);
+                      console.log(`Fetched tree for branch ${branch.name}:`, tree);
+                      
+                      const fileStructure = convertTreeToFileStructure(tree);
+                      setFileStructure(branch.name, fileStructure);
+                      setBranchFileStructures(prev => ({
+                        ...prev,
+                        [branch.name]: fileStructure
+                      }));
+                    }
+                  } catch (treeErr) {
+                    console.error(`Failed to fetch tree for branch ${branch.name}:`, treeErr);
+                  }
+                });
+                setUseDemoMode(false); // Backend is working, disable demo mode
+              })
+              .catch(branchErr => {
+                console.error('Failed to fetch branches (fallback):', branchErr);
+                console.log('Enabling demo mode due to backend connection issues');
+                
+                // Enable demo mode when backend is not available
+                setUseDemoMode(true);
+                setSelectedBranches(['main', 'development']);
+                
+                // Set demo file structure for main branch
+                setFileStructure('main', demoFileStructure);
+                setBranchFileStructures(prev => ({
+                  ...prev,
+                  main: demoFileStructure,
+                  development: demoFileStructure
+                }));
+                
+                // Clear errors since we're using demo mode
+                setError('sessions', undefined, null);
+                
+                toast.info('Using demo mode - backend connection not available');
               });
-            })
-            .catch(branchErr => {
-              console.error('Failed to fetch branches (fallback):', branchErr);
-              setError('sessions', undefined, 'Failed to load branches');
-            });
+          } else {
+            // No githubAPI available, enable demo mode immediately
+            console.log('Enabling demo mode - GitHub API not available');
+            setUseDemoMode(true);
+            setSelectedBranches(['main', 'development']);
+            
+            setFileStructure('main', demoFileStructure);
+            setBranchFileStructures(prev => ({
+              ...prev,
+              main: demoFileStructure,
+              development: demoFileStructure
+            }));
+            
+            setError('sessions', undefined, null);
+            toast.info('Using demo mode - GitHub API not available');
+          }
         })
         .finally(() => setLoadingState('sessions', undefined, false));
     }
   }, [repository, token, setLoadingState, setFileStructure, setError]);
+  
+  // Populate demo files when demo mode is enabled
+  useEffect(() => {
+    if (useDemoMode && selectedFiles.length === 0) {
+      console.log('Populating demo files...');
+      // Add some initial demo files to showcase the functionality
+      const initialDemoFiles = [
+        { branch: 'main', path: 'src/App.tsx', content: demoFiles['src/App.tsx'] },
+        { branch: 'main', path: 'src/components/Button.tsx', content: demoFiles['src/components/Button.tsx'] },
+        { branch: 'main', path: 'package.json', content: demoFiles['package.json'] }
+      ];
+      
+      // Use setTimeout to avoid state update during render
+      setTimeout(() => {
+        initialDemoFiles.forEach(file => {
+          addSelectedFile(file);
+        });
+        toast.success('Demo files loaded! You can now chat with the sample code.');
+      }, 100);
+    }
+  }, [useDemoMode, selectedFiles.length, addSelectedFile, demoFiles]);
   
   // Get filtered file structure for a branch
   const getFilteredStructure = (branch: string): FileSystemItem[] => {
@@ -1526,12 +1751,90 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
         case 'branch':
           // Handle branch import
           if (importFormData.selectedBranch && selectedBranchFiles.length > 0) {
-            importedFiles = selectedBranchFiles.map((filePath: string) => ({
-              name: filePath,
-              source: 'branch',
-              content: 'Branch file content loaded', // This would be fetched in a real implementation
-              branch: importFormData.selectedBranch,
-              type: 'code'
+            // Set import progress
+            setImportProgress({
+              isImporting: true,
+              progress: 0,
+              message: 'Fetching branch files...',
+              importedFiles: 0,
+              totalFiles: selectedBranchFiles.length
+            });
+
+            let processedFiles = 0;
+            const branchFiles = [];
+
+            for (const filePath of selectedBranchFiles) {
+              try {
+                let content = '';
+                
+                // Check if we're in demo mode or if this is a demo file
+                if (useDemoMode || selectedBranches.includes('main') && demoFiles[filePath]) {
+                  content = demoFiles[filePath] || `// Demo content for ${filePath}
+// This file is part of the demo branch import
+
+export default function ${filePath.split('/').pop()?.replace(/\.[^/.]+$/, "") || 'demoFunction'}() {
+  return 'Hello from ${filePath}';
+}`;
+                } else {
+                  // Fetch real content if not in demo mode
+                  if (githubAPI && repository) {
+                    try {
+                      content = await githubAPI.getFileContent(
+                        repository.owner.login,
+                        repository.name,
+                        filePath,
+                        importFormData.selectedBranch
+                      );
+                    } catch (fetchError) {
+                      console.error(`Failed to fetch content for ${filePath}:`, fetchError);
+                      content = `// Error loading content for ${filePath}
+// File exists but content could not be fetched
+console.log('File: ${filePath}');`;
+                    }
+                  } else {
+                    content = `// Content not available for ${filePath}
+// GitHub API not available`;
+                  }
+                }
+
+                branchFiles.push({
+                  name: filePath,
+                  source: 'branch',
+                  content: content,
+                  branch: importFormData.selectedBranch,
+                  type: 'code'
+                });
+
+                processedFiles++;
+                setImportProgress(prev => ({
+                  ...prev,
+                  progress: (processedFiles / selectedBranchFiles.length) * 100,
+                  importedFiles: processedFiles,
+                  message: `Processing ${filePath}...`
+                }));
+
+              } catch (error) {
+                console.error(`Error processing ${filePath}:`, error);
+                // Add placeholder for failed files
+                branchFiles.push({
+                  name: filePath,
+                  source: 'branch',
+                  content: `// Error loading ${filePath}\n// ${error}`,
+                  branch: importFormData.selectedBranch,
+                  type: 'code'
+                });
+                processedFiles++;
+              }
+            }
+
+            importedFiles = branchFiles;
+            
+            // Complete the import progress
+            setImportProgress(prev => ({
+              ...prev,
+              isImporting: false,
+              progress: 100,
+              message: 'Branch import completed!'
             }));
           }
           break;
@@ -1579,28 +1882,84 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
     }
   };
 
+  // Debug effect to monitor branchFileStructures changes
+  useEffect(() => {
+    console.log('branchFileStructures state changed:', branchFileStructures);
+    if (importFormData.selectedBranch) {
+      console.log('Current selected branch structure:', branchFileStructures[importFormData.selectedBranch]);
+      console.log('Length:', branchFileStructures[importFormData.selectedBranch]?.length);
+    }
+  }, [branchFileStructures, importFormData.selectedBranch]);
+
   // Handle branch selection for import
   const handleBranchSelectForImport = async (branchName: string) => {
+    console.log('Branch selected for import:', branchName);
+    console.log('useDemoMode:', useDemoMode);
+    console.log('demoFileStructure available:', !!demoFileStructure);
+    console.log('demoFileStructure length:', demoFileStructure?.length);
+    console.log('demoFileStructure content:', demoFileStructure);
+    
     setImportFormData({...importFormData, selectedBranch: branchName});
     setSelectedBranchFiles([]);
     setBranchFilesLoading(true);
 
     try {
       // Check if we already have file structure for this branch
-      if (!branchFileStructures[branchName]) {
-        // Load branch files if not already loaded
-        if (githubAPI && repository) {
-          const tree = await githubAPI.getRepositoryTree(repository.owner.login, repository.name, branchName);
-          const processedStructure = convertTreeToFileStructure(tree.tree || []);
+      if (!branchFileStructures[branchName] || branchFileStructures[branchName].length === 0) {
+        console.log('Loading file structure for branch:', branchName);
+        
+        // For branch import, always try to use demo structure if backend/API is not available
+        // or if we don't have real data
+        if (useDemoMode || !githubAPI || !repository) {
+          console.log('Using demo file structure for branch import');
           setBranchFileStructures(prev => ({
             ...prev,
-            [branchName]: processedStructure
+            [branchName]: demoFileStructure
           }));
+          console.log('Demo file structure set:', demoFileStructure);
+        } else {
+          // Load branch files if API is available
+          try {
+            console.log('Fetching from GitHub API');
+            const tree = await githubAPI.getRepositoryTree(repository.owner.login, repository.name, branchName);
+            const processedStructure = convertTreeToFileStructure(tree.tree || []);
+            
+            // If the processed structure is empty, fallback to demo
+            if (processedStructure.length === 0) {
+              console.log('GitHub API returned empty structure, using demo structure');
+              setBranchFileStructures(prev => ({
+                ...prev,
+                [branchName]: demoFileStructure
+              }));
+              toast.info('Using demo files - no files found in branch');
+            } else {
+              setBranchFileStructures(prev => ({
+                ...prev,
+                [branchName]: processedStructure
+              }));
+              console.log('GitHub file structure set:', processedStructure);
+            }
+          } catch (apiError) {
+            console.error('GitHub API error, falling back to demo:', apiError);
+            setBranchFileStructures(prev => ({
+              ...prev,
+              [branchName]: demoFileStructure
+            }));
+            toast.info('Using demo files - GitHub API error');
+          }
         }
+      } else {
+        console.log('File structure already exists for branch:', branchName);
+        console.log('Existing structure:', branchFileStructures[branchName]);
       }
     } catch (error) {
       console.error('Error loading branch files:', error);
-      toast.error('Failed to load branch files');
+      // Fallback to demo structure on error
+      setBranchFileStructures(prev => ({
+        ...prev,
+        [branchName]: demoFileStructure
+      }));
+      toast.error('Failed to load branch files, using demo files');
     } finally {
       setBranchFilesLoading(false);
     }
@@ -1650,6 +2009,19 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
                 <ChevronLeft size={14} />
               </Button>
             </div>
+            
+            {/* Demo Mode Indicator */}
+            {useDemoMode && (
+              <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={14} className="text-amber-600" />
+                  <span className="text-xs font-medium text-amber-800">Demo Mode</span>
+                </div>
+                <p className="text-xs text-amber-700 mt-1">
+                  Using sample files - backend not available
+                </p>
+              </div>
+            )}
             
             {/* Import Progress Indicator */}
             {importProgress.isImporting && (
@@ -2225,9 +2597,17 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
                       <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
-                      {branchList.map((branch) => (
+                      {/* Use selectedBranches (from our local state) if branchList is empty */}
+                      {(branchList.length > 0 ? branchList : selectedBranches).map((branch) => (
                         <SelectItem key={branch} value={branch}>{branch}</SelectItem>
                       ))}
+                      {/* Fallback for demo mode */}
+                      {branchList.length === 0 && selectedBranches.length === 0 && (
+                        <>
+                          <SelectItem value="main">main</SelectItem>
+                          <SelectItem value="development">development</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -2247,19 +2627,34 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
                         </div>
                       ) : branchFileStructures[importFormData.selectedBranch] ? (
                         <div className="p-2 space-y-1">
-                          {branchFileStructures[importFormData.selectedBranch].map((item: any, index: number) => (
-                            <BranchFileItem
-                              key={index}
-                              item={item}
-                              level={0}
-                              selectedFiles={selectedBranchFiles}
-                              onFileToggle={handleBranchFileToggle}
-                            />
-                          ))}
+                          {(() => {
+                            console.log('Rendering files for branch:', importFormData.selectedBranch);
+                            console.log('File structure:', branchFileStructures[importFormData.selectedBranch]);
+                            console.log('Files count:', branchFileStructures[importFormData.selectedBranch]?.length);
+                            return null;
+                          })()}
+                          
+                          {branchFileStructures[importFormData.selectedBranch].length > 0 ? (
+                            branchFileStructures[importFormData.selectedBranch].map((item: any, index: number) => (
+                              <BranchFileItem
+                                key={index}
+                                item={item}
+                                level={0}
+                                selectedFiles={selectedBranchFiles}
+                                onFileToggle={handleBranchFileToggle}
+                              />
+                            ))
+                          ) : (
+                            <div className="p-4 text-center text-muted-foreground">
+                              <p className="text-sm">File structure exists but is empty</p>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="p-4 text-center text-muted-foreground">
                           <p className="text-sm">No files found in this branch</p>
+                          {/* Debug info */}
+                          <p className="text-xs mt-1">Debug: Branch {importFormData.selectedBranch}, useDemoMode: {useDemoMode ? 'true' : 'false'}</p>
                         </div>
                       )}
                     </div>

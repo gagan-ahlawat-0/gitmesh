@@ -45,27 +45,35 @@ class IndexingConfig:
     # Embedding settings - use production models
     embedding_model: str = "jina-code-v2"  # Best for code
     embedding_dim: int = 768
-    context_window: int = 8192
+    context_window: int = 4000  # Conservative context window for better responses
     
-    # Chunking settings - hierarchical approach
-    chunk_sizes: List[int] = field(default_factory=lambda: [512, 1024, 2048, 4096])
-    overlap_ratio: float = 0.25
+    # Chunking settings - optimized for better AI responses
+    chunk_sizes: List[int] = field(default_factory=lambda: [256, 512, 1024])  # Smaller chunks for better context
+    overlap_ratio: float = 0.2  # Reduced overlap to fit more diverse content
     enable_semantic_chunking: bool = True
     enable_ast_chunking: bool = True
     
     # Performance settings - production optimized
-    max_workers: int = min(16, (os.cpu_count() or 1) * 2)
-    batch_size: int = 128
+    max_workers: int = min(8, (os.cpu_count() or 1))  # Reduced for stability
+    batch_size: int = 64  # Smaller batches for better memory management
     enable_quantization: bool = True
-    cache_size: int = 50000
+    cache_size: int = 25000  # Reduced cache size
     
-    # Memory settings - production limits
-    max_memory_mb: int = 8192
+    # Memory settings - conservative limits for better responses
+    max_memory_mb: int = 4096  # Reduced memory limit
     enable_lazy_loading: bool = True
     enable_memory_monitoring: bool = True
+    memory_threshold: float = 0.8  # More conservative threshold
+    
+    # Context optimization settings - new for better AI responses
+    max_context_items: int = 15  # Limit total context items
+    max_context_tokens: int = 3000  # Reserve tokens for response
+    context_relevance_threshold: float = 0.5  # Minimum relevance score
+    enable_progressive_loading: bool = True  # Use progressive context loading
+    context_compression_ratio: float = 0.7  # Target compression ratio
     
     # Quality settings - production standards
-    min_chunk_quality: float = 0.75
+    min_chunk_quality: float = 0.6  # Slightly lower for more content
     enable_deduplication: bool = True
     enable_quality_analysis: bool = True
     
@@ -303,33 +311,71 @@ class ContextOptimizer:
         return sorted(set(base_sizes))
     
     def calculate_optimal_context(self, chunks: List[str], query: str = "") -> Tuple[List[str], ContextStats]:
-        """Calculate optimal context selection for given chunks."""
+        """Calculate optimal context selection with hierarchical chunking and relevance scoring."""
         available_context = self.config.context_window
         
-        # Reserve space for query and response
+        # Reserve space for query and response - more conservative for better responses
         query_tokens = len(query.split()) * 1.3  # Rough token estimate
-        reserved_tokens = int(query_tokens + available_context * 0.2)  # 20% for response
+        reserved_tokens = int(query_tokens + available_context * 0.35)  # 35% for response and overhead
         
         usable_context = available_context - reserved_tokens
         
-        # Score chunks by relevance/importance
-        scored_chunks = []
+        # Implement hierarchical context selection
+        high_relevance_chunks = []
+        medium_relevance_chunks = []
+        low_relevance_chunks = []
+        
+        # Score and categorize chunks by relevance/importance
         for i, chunk in enumerate(chunks):
             chunk_tokens = len(chunk.split()) * 1.3
             importance = self._calculate_chunk_importance(chunk, query)
-            scored_chunks.append((chunk, chunk_tokens, importance, i))
+            
+            chunk_data = (chunk, chunk_tokens, importance, i)
+            
+            if importance >= 0.8:
+                high_relevance_chunks.append(chunk_data)
+            elif importance >= 0.5:
+                medium_relevance_chunks.append(chunk_data)
+            else:
+                low_relevance_chunks.append(chunk_data)
         
-        # Sort by importance
-        scored_chunks.sort(key=lambda x: x[2], reverse=True)
+        # Sort each category by importance
+        high_relevance_chunks.sort(key=lambda x: x[2], reverse=True)
+        medium_relevance_chunks.sort(key=lambda x: x[2], reverse=True)
+        low_relevance_chunks.sort(key=lambda x: x[2], reverse=True)
         
-        # Select optimal chunks within context window
+        # Progressive selection: prioritize high relevance, then medium, then low
         selected_chunks = []
         used_tokens = 0
         
-        for chunk, tokens, importance, idx in scored_chunks:
-            if used_tokens + tokens <= usable_context:
+        # First, include high relevance chunks (up to 60% of available context)
+        high_context_limit = int(usable_context * 0.6)
+        for chunk, tokens, importance, idx in high_relevance_chunks:
+            if used_tokens + tokens <= high_context_limit:
                 selected_chunks.append(chunk)
                 used_tokens += tokens
+            else:
+                break
+        
+        # Then, add medium relevance chunks (up to 30% of available context)
+        medium_context_limit = int(usable_context * 0.3)
+        medium_tokens_used = 0
+        for chunk, tokens, importance, idx in medium_relevance_chunks:
+            if used_tokens + tokens <= usable_context and medium_tokens_used + tokens <= medium_context_limit:
+                selected_chunks.append(chunk)
+                used_tokens += tokens
+                medium_tokens_used += tokens
+            else:
+                break
+        
+        # Finally, fill remaining space with low relevance chunks (up to 10%)
+        low_context_limit = int(usable_context * 0.1)
+        low_tokens_used = 0
+        for chunk, tokens, importance, idx in low_relevance_chunks:
+            if used_tokens + tokens <= usable_context and low_tokens_used + tokens <= low_context_limit:
+                selected_chunks.append(chunk)
+                used_tokens += tokens
+                low_tokens_used += tokens
             else:
                 break
         
@@ -352,28 +398,91 @@ class ContextOptimizer:
         return selected_chunks, self.context_stats
     
     def _calculate_chunk_importance(self, chunk: str, query: str) -> float:
-        """Calculate importance score for a chunk."""
-        if not query:
-            return 1.0
+        """Calculate importance score for a chunk with enhanced relevance scoring."""
+        if not chunk.strip():
+            return 0.0
         
-        # Simple relevance scoring (in production, use semantic similarity)
-        query_words = set(query.lower().split())
-        chunk_words = set(chunk.lower().split())
+        chunk_lower = chunk.lower()
+        query_lower = query.lower() if query else ""
         
-        if not query_words:
-            return 1.0
+        importance_score = 0.0
         
-        intersection = query_words.intersection(chunk_words)
-        relevance = len(intersection) / len(query_words)
+        # 1. Direct keyword matching (40% weight)
+        if query_lower:
+            query_words = set(query_lower.split())
+            chunk_words = set(chunk_lower.split())
+            
+            # Exact matches
+            exact_matches = len(query_words.intersection(chunk_words))
+            if len(query_words) > 0:
+                exact_match_ratio = exact_matches / len(query_words)
+                importance_score += exact_match_ratio * 0.4
+            
+            # Partial matches (substrings)
+            partial_matches = 0
+            for query_word in query_words:
+                if any(query_word in chunk_word for chunk_word in chunk_words):
+                    partial_matches += 1
+            
+            if len(query_words) > 0:
+                partial_match_ratio = partial_matches / len(query_words)
+                importance_score += partial_match_ratio * 0.2
+        else:
+            # No query provided, use base importance
+            importance_score = 0.3
         
-        # Boost based on chunk characteristics
-        code_indicators = ['def ', 'class ', 'import ', 'function', 'method']
-        has_code = any(indicator in chunk.lower() for indicator in code_indicators)
+        # 2. Code structure importance (25% weight)
+        code_indicators = [
+            'def ', 'class ', 'function ', 'import ', 'from ',
+            'export ', 'interface ', 'type ', 'const ', 'let ', 'var ',
+            '@', 'async ', 'await ', 'return ', 'if ', 'for ', 'while'
+        ]
         
-        if has_code:
-            relevance *= 1.5
+        code_score = 0.0
+        for indicator in code_indicators:
+            if indicator in chunk_lower:
+                code_score += 0.1
         
-        return min(relevance, 1.0)
+        importance_score += min(code_score, 0.25)
+        
+        # 3. Documentation and comments (15% weight)
+        doc_indicators = ['"""', "'''", '/*', '//', '#', 'readme', 'documentation', 'comment']
+        doc_score = 0.0
+        for indicator in doc_indicators:
+            if indicator in chunk_lower:
+                doc_score += 0.05
+        
+        importance_score += min(doc_score, 0.15)
+        
+        # 4. Error handling and important keywords (10% weight)
+        important_keywords = [
+            'error', 'exception', 'try', 'catch', 'finally', 'raise',
+            'main', 'init', 'setup', 'config', 'settings', 'api',
+            'todo', 'fixme', 'bug', 'issue', 'security', 'auth'
+        ]
+        
+        keyword_score = 0.0
+        for keyword in important_keywords:
+            if keyword in chunk_lower:
+                keyword_score += 0.02
+        
+        importance_score += min(keyword_score, 0.1)
+        
+        # 5. Chunk length and information density (10% weight)
+        chunk_length = len(chunk)
+        
+        # Prefer medium-length chunks (not too short, not too long)
+        if 100 <= chunk_length <= 800:
+            length_score = 0.1
+        elif 50 <= chunk_length < 100 or 800 < chunk_length <= 1500:
+            length_score = 0.05
+        else:
+            length_score = 0.02
+        
+        importance_score += length_score
+        
+        # Ensure score is between 0 and 1
+        return min(max(importance_score, 0.0), 1.0)
 
 
 class CodebaseIndexer:
