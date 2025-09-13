@@ -191,10 +191,10 @@ export type UserActivity =
     };
 
 class GitHubAPI {
-  private token: string;
+  private token: string | null;
   private lastUpdateTimestamp: string;
 
-  constructor(token: string) {
+  constructor(token: string | null = null) {
     this.token = token;
     this.lastUpdateTimestamp = new Date().toISOString();
   }
@@ -210,18 +210,24 @@ class GitHubAPI {
     }
   }
 
-  private async request(endpoint: string, options: RequestInit = {}, retries = 3, backoff = 1000) {
+  private async request(endpoint: string, options: RequestInit = {}, retries = 3, backoff = 1000): Promise<any> {
     console.log(`Making request to: ${API_BASE_URL}${endpoint}`);
-    console.log('Token:', this.token);
+    console.log('Token:', this.token ? 'Available' : 'Not available');
     
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(options.headers as Record<string, string>),
+      };
+      
+      // Only add Authorization header if token is available
+      if (this.token) {
+        headers['Authorization'] = `Bearer ${this.token}`;
+      }
+      
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers,
       });
 
       console.log('Response status:', response.status);

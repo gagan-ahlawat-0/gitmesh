@@ -58,11 +58,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [githubApi, setGithubApi] = useState<GitHubAPI | null>(null);
 
   useEffect(() => {
-    if (token) {
-      setGithubApi(new GitHubAPI(token));
-    } else {
-      setGithubApi(null);
-    }
+    // Always create GitHubAPI instance, with or without token
+    setGithubApi(new GitHubAPI(token));
   }, [token]);
 
   // Initialize auth state from localStorage

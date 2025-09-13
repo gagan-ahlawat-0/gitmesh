@@ -280,18 +280,44 @@ class GitHubService:
     async def get_repository_details(self, owner: str, repo: str, token: Optional[str] = None) -> Dict[str, Any]:
         """Get repository details."""
         auth_token = token or self.get_token()
-        if not auth_token:
-            raise ValueError("GitHub token not provided and not found in KeyManager")
-        return await self.client.get(f'/repos/{owner}/{repo}', auth_token)
+        
+        try:
+            # Try with authentication first if token is available
+            if auth_token:
+                try:
+                    return await self.client.get(f'/repos/{owner}/{repo}', auth_token)
+                except Exception as auth_error:
+                    logger.warning(f"Authenticated repository details request failed, trying unauthenticated: {auth_error}")
+            
+            # Try unauthenticated access for public repositories
+            return await self.client.get(f'/repos/{owner}/{repo}', None)
+            
+        except Exception as e:
+            logger.error(f"Failed to get repository details: {e}")
+            raise
 
     async def get_repository_branches(self, owner: str, repo: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get repository branches."""
         auth_token = token or self.get_token()
-        if not auth_token:
-            raise ValueError("GitHub token not provided and not found in KeyManager")
-        response = await self.client.get(f'/repos/{owner}/{repo}/branches', auth_token)
-        logger.info(f"GitHub API response for branches: {response}")
-        return response
+        
+        try:
+            # Try with authentication first if token is available
+            if auth_token:
+                try:
+                    response = await self.client.get(f'/repos/{owner}/{repo}/branches', auth_token)
+                    logger.info(f"GitHub API response for branches (authenticated): {len(response) if response else 0} branches")
+                    return response
+                except Exception as auth_error:
+                    logger.warning(f"Authenticated branch request failed, trying unauthenticated: {auth_error}")
+            
+            # Try unauthenticated access for public repositories
+            response = await self.client.get(f'/repos/{owner}/{repo}/branches', None)
+            logger.info(f"GitHub API response for branches (unauthenticated): {len(response) if response else 0} branches")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to get repository branches: {e}")
+            return []
 
     async def get_repository_commits(
         self, 
@@ -382,18 +408,39 @@ class GitHubService:
     async def get_repository_tree(self, owner: str, repo: str, branch: str = 'main', token: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get repository tree structure."""
         auth_token = token or self.get_token()
-        if not auth_token:
-            raise ValueError("GitHub token not provided and not found in KeyManager")
+        
         try:
-            # Get the commit SHA for the branch
-            branch_data = await self.client.get(f'/repos/{owner}/{repo}/branches/{branch}', auth_token)
-            tree_sha = branch_data['commit']['commit']['tree']['sha']
+            # Try with authentication first if token is available
+            if auth_token:
+                try:
+                    # Get the commit SHA for the branch
+                    branch_data = await self.client.get(f'/repos/{owner}/{repo}/branches/{branch}', auth_token)
+                    tree_sha = branch_data['commit']['commit']['tree']['sha']
+                    
+                    # Get the tree with recursive option
+                    params = {'recursive': '1'}
+                    tree_data = await self.client.get(f'/repos/{owner}/{repo}/git/trees/{tree_sha}', auth_token, params)
+                    
+                    return tree_data.get('tree', [])
+                except Exception as auth_error:
+                    logger.warning(f"Authenticated request failed, trying unauthenticated access: {auth_error}")
+                    # Fall through to unauthenticated attempt
             
-            # Get the tree with recursive option
-            params = {'recursive': '1'}
-            tree_data = await self.client.get(f'/repos/{owner}/{repo}/git/trees/{tree_sha}', auth_token, params)
-            
-            return tree_data.get('tree', [])
+            # Try without authentication for public repositories
+            try:
+                # Get the commit SHA for the branch (unauthenticated)
+                branch_data = await self.client.get(f'/repos/{owner}/{repo}/branches/{branch}', None)
+                tree_sha = branch_data['commit']['commit']['tree']['sha']
+                
+                # Get the tree with recursive option (unauthenticated)
+                params = {'recursive': '1'}
+                tree_data = await self.client.get(f'/repos/{owner}/{repo}/git/trees/{tree_sha}', None, params)
+                
+                return tree_data.get('tree', [])
+            except Exception as unauth_error:
+                logger.error(f"Both authenticated and unauthenticated requests failed: {unauth_error}")
+                return []
+                
         except Exception as e:
             logger.error(f"Failed to get repository tree: {e}")
             return []
@@ -401,10 +448,22 @@ class GitHubService:
     async def get_file_content(self, owner: str, repo: str, path: str, branch: str = 'main', token: Optional[str] = None) -> Dict[str, Any]:
         """Get file content from repository."""
         auth_token = token or self.get_token()
-        if not auth_token:
-            raise ValueError("GitHub token not provided and not found in KeyManager")
         params = {'ref': branch}
-        return await self.client.get(f'/repos/{owner}/{repo}/contents/{path}', auth_token, params)
+        
+        try:
+            # Try with authentication first if token is available
+            if auth_token:
+                try:
+                    return await self.client.get(f'/repos/{owner}/{repo}/contents/{path}', auth_token, params)
+                except Exception as auth_error:
+                    logger.warning(f"Authenticated file content request failed, trying unauthenticated: {auth_error}")
+            
+            # Try unauthenticated access for public repositories
+            return await self.client.get(f'/repos/{owner}/{repo}/contents/{path}', None, params)
+            
+        except Exception as e:
+            logger.error(f"Failed to get file content: {e}")
+            raise
 
     # Search Operations
 
@@ -521,14 +580,29 @@ class GitHubService:
     async def get_repository_trees_for_all_branches(self, owner: str, repo: str, token: Optional[str] = None) -> Dict[str, Any]:
         """Get file trees for all branches in a repository."""
         auth_token = token or self.get_token()
-        if not auth_token:
-            raise ValueError("GitHub token not provided and not found in KeyManager")
+        
         try:
-            branches = await self.get_repository_branches(owner, repo, auth_token)
+            # Try to get branches with authentication first, fall back to unauthenticated
+            branches = []
+            if auth_token:
+                try:
+                    branches = await self.get_repository_branches(owner, repo, auth_token)
+                except Exception as auth_error:
+                    logger.warning(f"Authenticated branch fetch failed, trying unauthenticated: {auth_error}")
+            
+            if not branches:
+                # Try unauthenticated access for public repositories
+                try:
+                    branches = await self.client.get(f'/repos/{owner}/{repo}/branches', None)
+                except Exception as unauth_error:
+                    logger.error(f"Both authenticated and unauthenticated branch fetch failed: {unauth_error}")
+                    return {}
+            
             trees_by_branch = {}
             
             for branch in branches:
                 try:
+                    # Use the updated get_repository_tree method which handles auth fallback
                     tree = await self.get_repository_tree(owner, repo, branch['name'], auth_token)
                     trees_by_branch[branch['name']] = tree
                 except Exception as e:
@@ -538,6 +612,7 @@ class GitHubService:
             return trees_by_branch
         except Exception as e:
             logger.error(f"Failed to get trees for all branches: {e}")
+            return {}
             return {}
 
     def is_valid_owner(self, owner: str) -> bool:

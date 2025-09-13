@@ -374,15 +374,15 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 // Provider component
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(chatReducer, initialState);
-  const { token, user } = useAuth();
+  const { token, user, githubApi } = useAuth();
   const { repository } = useRepository();
   
   console.log('ChatContext: Auth token available:', token ? 'Yes' : 'No');
   console.log('ChatContext: User available:', user ? 'Yes' : 'No');
   
-  // Temporary fallback to demo-token for testing
-  const effectiveToken = token || 'demo-token';
-  console.log('ChatContext: Using token:', effectiveToken === 'demo-token' ? 'Demo token' : 'Real token');
+  // Use real token if available, don't fall back to demo token for public repos
+  const effectiveToken = token;
+  console.log('ChatContext: Using token:', effectiveToken ? 'Real token' : 'No token (will use unauthenticated requests for public repos)');
   
   const chatAPI = useMemo(() => effectiveToken ? new ChatAPI(effectiveToken) : null, [effectiveToken]);
 

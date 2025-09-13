@@ -61,9 +61,35 @@ def get_github_token(user: Optional[User] = Depends(get_current_user)) -> str:
         raise HTTPException(status_code=500, detail="Token decryption error")
 
 
+def get_optional_github_token(user: Optional[User] = Depends(get_current_user)) -> Optional[str]:
+    """
+    Dependency to get the authenticated user's GitHub access token optionally.
+    Returns None if no authentication is available, allowing public repository access.
+    """
+    if not user:
+        return None
+
+    if user.login == 'demo-user':
+        return 'demo-github-token'
+
+    if not hasattr(user, 'access_token') or not user.access_token:
+        return None
+
+    try:
+        token = security_utils.decrypt_token(user.access_token)
+        return token if token else None
+    except Exception as e:
+        logger.warning(f"Failed to decrypt token for user {user.login}: {e}")
+        return None
+
 
 def require_auth(token: Optional[str] = Depends(get_github_token)) -> str:
     """Require authentication for protected endpoints."""
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
+    return token
+
+
+def optional_auth(token: Optional[str] = Depends(get_optional_github_token)) -> Optional[str]:
+    """Optional authentication for public endpoints."""
     return token

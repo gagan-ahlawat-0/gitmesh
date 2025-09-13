@@ -802,7 +802,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
     getMessageStatus
   } = useChat();
   
-  const githubAPI = githubApi;
+  const githubAPI = githubApi || new GitHubAPI(null);
   
   // Local state management
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -1127,7 +1127,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   
   // Fetch branches and file structures
   useEffect(() => {
-    if (repository?.owner?.login && repository?.name && githubAPI) {
+    if (repository?.owner?.login && repository?.name) {
       setLoadingState('sessions', undefined, true);
       
       githubAPI.getBranchesWithTrees(repository.owner.login, repository.name)
@@ -1687,7 +1687,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
                 let content = '';
                 
                 // Only fetch real content - no demo mode
-                if (githubAPI && repository) {
+                if (repository) {
                   try {
                     content = await githubAPI.getFileContent(
                       repository.owner.login,
@@ -1822,7 +1822,7 @@ console.log('File: ${filePath}');`;
         console.log('Loading file structure for branch:', branchName);
         
         // Only use real GitHub API data - no demo fallback
-        if (githubAPI && repository) {
+        if (repository) {
           console.log('Fetching from GitHub API');
           const tree = await githubAPI.getRepositoryTree(repository.owner.login, repository.name, branchName);
           const processedStructure = convertTreeToFileStructure(tree.tree || []);
