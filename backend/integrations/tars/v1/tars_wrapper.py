@@ -84,6 +84,21 @@ except (ImportError, Exception) as e:
     QdrantMemory = None
     QDRANT_AVAILABLE = False
 
+# Context optimization settings for large projects
+CONTEXT_OPTIMIZATION = {
+    "max_context_files": 100,          # Reduced from 200 for speed
+    "large_file_threshold": 3000,      # Reduced from 4000 
+    "chunk_size": 1500,               # Reduced from 2000 for faster processing
+    "chunk_overlap": 150,             # Reduced from 200
+    "max_chunks_per_file": 6,         # Reduced from 10 to limit context size
+    "relevance_threshold": 0.8,       # Increased from 0.7 for better filtering
+    "smart_batching": True,           # Enable intelligent batching
+    "deduplication": True,            # Enable file deduplication
+    "max_knowledge_entries": 8,       # New: Limit knowledge entries for speed
+    "fast_search_limit": 15,          # New: Smaller search limit for faster queries
+    "keyword_filtering": True         # New: Enable keyword pre-filtering
+}
+
 
 class GitMeshTarsWrapper:
     """
@@ -148,6 +163,10 @@ class GitMeshTarsWrapper:
         self.gitingest_tool = None
         self.knowledge_base_hash = None
         self.last_repo_analysis = {}
+        
+        # Query cache for performance optimization
+        self._query_cache = {}
+        self._cache_max_size = 50  # Limit cache size for memory efficiency
         
         # Initialize GitIngest if available
         if GITINGEST_AVAILABLE:
@@ -694,6 +713,16 @@ class GitMeshTarsWrapper:
         try:
             logger.info(f"[TARS DEBUG] Processing {len(files)} files from message context")
             
+            # Optimization: Limit number of files processed at once for large contexts
+            max_files = CONTEXT_OPTIMIZATION["max_context_files"]
+            if len(files) > max_files:
+                logger.info(f"[OPTIMIZATION] Processing only first {max_files} files out of {len(files)} for performance")
+                files = files[:max_files]
+            
+            # Track files for deduplication
+            processed_files = set()
+            skipped_duplicates = 0
+            
             for i, file_data in enumerate(files):
                 try:
                     # Extract file information
@@ -709,11 +738,27 @@ class GitMeshTarsWrapper:
                     
                     logger.info(f"[TARS DEBUG] File {i+1}: {file_path}")
                     logger.info(f"[TARS DEBUG] Content length: {len(file_content)}")
-                    logger.info(f"[TARS DEBUG] Content preview: {file_content[:200] if len(file_content) > 200 else file_content}...")
                     
                     if not file_content or file_content == "Loading...":
                         logger.warning(f"[TARS DEBUG] Skipping file {file_path} - no content available")
                         continue
+                    
+                    # Create unique identifier for file content (for deduplication)
+                    content_hash = hashlib.md5(f"{file_path}:{file_branch}:{file_content}".encode()).hexdigest()
+                    
+                    # Check if file already exists in knowledge base (deduplication)
+                    if await self._check_file_exists_in_knowledge_base(content_hash, file_path, repository_id):
+                        logger.info(f"[TARS DEBUG] File {file_path} already exists in knowledge base, skipping")
+                        skipped_duplicates += 1
+                        continue
+                    
+                    # Check for duplicates in current batch
+                    if content_hash in processed_files:
+                        logger.info(f"[TARS DEBUG] Duplicate file in current batch: {file_path}")
+                        skipped_duplicates += 1
+                        continue
+                    
+                    processed_files.add(content_hash)
                     
                     # Create metadata for the file
                     metadata = {
@@ -724,44 +769,18 @@ class GitMeshTarsWrapper:
                         "session_id": self.session_id,
                         "user_id": self.user_id,
                         "timestamp": datetime.now().isoformat(),
-                        "processing_context": "chat_message"
+                        "processing_context": "chat_message",
+                        "content_hash": content_hash,
+                        "file_size": len(file_content),
+                        "chunked": False  # Will be set to True if we chunk the file
                     }
                     
-                    # Process the file content and store in knowledge base
-                    if self.qdrant_db:
-                        # Store the full file content
-                        memory_id = self.qdrant_db.store_memory(
-                            text=file_content,
-                            memory_type="knowledge",
-                            metadata=metadata
-                        )
-                        logger.info(f"Stored file {file_path} in knowledge base with ID: {memory_id}")
-                        
-                        # Also create a summary entry if the file is large
-                        if len(file_content) > 2000:
-                            try:
-                                summary_start = file_content[:500] if len(file_content) > 500 else file_content
-                                summary_end = file_content[-500:] if len(file_content) > 500 else ""
-                                summary = summary_start + ("\n...\n" + summary_end if summary_end else "")
-                                summary_metadata = {**metadata, "content_type": "summary"}
-                                self.qdrant_db.store_memory(
-                                    text=f"File: {file_path}\nSummary: {summary}",
-                                    memory_type="knowledge",
-                                    metadata=summary_metadata
-                                )
-                            except Exception as summary_error:
-                                logger.warning(f"Could not create summary for {file_path}: {summary_error}")
-                    
-                    # Also store in Supabase if available
-                    if self.memory:
-                        try:
-                            self.memory.store(
-                                text=file_content,
-                                metadata=metadata,
-                                memory_type="file_context"
-                            )
-                        except Exception as e:
-                            logger.warning(f"Could not store file in Supabase memory: {e}")
+                    # Process large files with chunking for better context selection
+                    if len(file_content) > CONTEXT_OPTIMIZATION["large_file_threshold"]:
+                        await self._process_large_file_with_chunking(file_path, file_content, metadata)
+                    else:
+                        # Process small files normally
+                        await self._process_small_file(file_path, file_content, metadata)
                     
                     logger.info(f"Successfully processed file: {file_path} ({len(file_content)} chars)")
                     
@@ -769,11 +788,313 @@ class GitMeshTarsWrapper:
                     logger.error(f"Error processing individual file {file_data.get('path', 'unknown')}: {file_error}")
                     continue
             
-            logger.info(f"Completed processing {len(files)} context files")
+            logger.info(f"Completed processing {len(files)} context files ({skipped_duplicates} duplicates skipped)")
             
         except Exception as e:
             logger.error(f"Error in _process_context_files: {e}")
             # Don't raise here - we want chat to continue even if file processing fails
+    
+    async def _select_best_context_for_query(self, current_message: str, max_context_items: int = 20, current_files_count: int = 0) -> List[Dict]:
+        """
+        Intelligently select the best context for a query using hierarchical search with caching.
+        Uses keyword filtering → semantic search → relevance ranking for speed and accuracy.
+        """
+        try:
+            # Check cache first
+            cached_result = await self._get_cached_context(current_message, current_files_count)
+            if cached_result is not None:
+                return cached_result
+            
+            # Stage 1: Fast keyword filtering for large knowledge bases
+            fast_limit = CONTEXT_OPTIMIZATION["fast_search_limit"]
+            keyword_filtered = await self._fast_keyword_filter(current_message, limit=fast_limit)
+            
+            # Stage 2: Semantic search on filtered or all results
+            if keyword_filtered:
+                # Use keyword-filtered results for more targeted semantic search
+                search_candidates = keyword_filtered
+                logger.info(f"[HIERARCHICAL SEARCH] Using {len(keyword_filtered)} keyword-filtered candidates")
+            else:
+                # Fallback to smaller direct semantic search
+                search_limit = min(max_context_items, fast_limit)
+                search_candidates = self.qdrant_db.search_memory(
+                    query=current_message,
+                    memory_type="knowledge", 
+                    limit=search_limit,
+                    filter_params={"session_id": self.session_id}
+                )
+                logger.info(f"[HIERARCHICAL SEARCH] Direct semantic search with {len(search_candidates)} candidates")
+            
+            if not search_candidates:
+                return []
+            
+            # Stage 3: Calculate smart limits based on context size
+            max_entries = CONTEXT_OPTIMIZATION["max_knowledge_entries"]
+            if current_files_count > 50:
+                target_limit = max(3, max_entries // 3)  # Very conservative when many files
+            elif current_files_count > 20:
+                target_limit = max(5, max_entries // 2)  # Moderate when some files
+            else:
+                target_limit = max_entries  # Full limit when few files
+            
+            # Stage 4: Enhanced relevance filtering and ranking
+            threshold = CONTEXT_OPTIMIZATION["relevance_threshold"]
+            scored_entries = []
+            
+            for entry in search_candidates:
+                score = float(entry.get('score', 0.0))
+                # Higher threshold for better precision
+                if score > threshold:
+                    scored_entries.append((score, entry))
+            
+            # Sort by score descending and take top entries
+            scored_entries.sort(key=lambda x: x[0], reverse=True)
+            best_entries = [entry for score, entry in scored_entries[:target_limit]]
+            
+            # Cache the result for future queries
+            await self._cache_context_result(current_message, current_files_count, best_entries)
+            
+            logger.info(f"[FAST CONTEXT] Selected {len(best_entries)} high-relevance entries from {len(search_candidates)} candidates (threshold: {threshold})")
+            return best_entries
+            
+        except Exception as e:
+            logger.error(f"Error in fast context selection: {e}")
+            return []
+
+    async def _extract_query_keywords(self, query: str) -> List[str]:
+        """Extract relevant keywords from query for pre-filtering."""
+        import re
+        
+        # Common stop words to exclude
+        stop_words = {'the', 'is', 'at', 'which', 'on', 'a', 'an', 'as', 'are', 'was', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'now'}
+        
+        # Extract words, keeping programming terms and technical keywords
+        words = re.findall(r'\b\w+\b', query.lower())
+        
+        # Filter out stop words and keep meaningful terms
+        keywords = []
+        for word in words:
+            if len(word) > 2 and word not in stop_words:
+                keywords.append(word)
+        
+        # Add common programming terms if present
+        programming_terms = ['function', 'class', 'method', 'variable', 'import', 'export', 'component', 'interface', 'type', 'error', 'bug', 'fix', 'implement', 'api', 'endpoint', 'route', 'database', 'query', 'model', 'service', 'controller', 'config', 'setup', 'install']
+        
+        for term in programming_terms:
+            if term in query.lower() and term not in keywords:
+                keywords.append(term)
+        
+        # Extract file extensions and paths
+        file_patterns = re.findall(r'\.\w+|/[\w/.-]+', query)
+        keywords.extend(file_patterns)
+        
+        return keywords[:10]  # Limit to top 10 keywords
+
+    async def _fast_keyword_filter(self, query: str, limit: int = 30) -> List[Dict]:
+        """Fast keyword-based filtering before semantic search."""
+        try:
+            if not CONTEXT_OPTIMIZATION["keyword_filtering"] or not self.qdrant_db:
+                return []
+            
+            keywords = await self._extract_query_keywords(query)
+            if not keywords:
+                return []
+            
+            # Search with keyword filters
+            results = []
+            for keyword in keywords[:5]:  # Use top 5 keywords
+                try:
+                    # Search for entries containing this keyword
+                    keyword_results = self.qdrant_db.search_memory(
+                        query=keyword,
+                        memory_type="knowledge",
+                        limit=limit // len(keywords[:5]),  # Distribute limit across keywords
+                        filter_params={"session_id": self.session_id}
+                    )
+                    results.extend(keyword_results)
+                except Exception as e:
+                    logger.warning(f"Keyword search failed for '{keyword}': {e}")
+                    continue
+            
+            # Remove duplicates based on content hash
+            seen_content = set()
+            unique_results = []
+            for result in results:
+                content_hash = hash(result.get('content', '')[:100])  # Hash first 100 chars
+                if content_hash not in seen_content:
+                    seen_content.add(content_hash)
+                    unique_results.append(result)
+            
+            logger.info(f"[FAST FILTER] Keyword filtering found {len(unique_results)} relevant entries from {len(results)} total")
+            return unique_results[:limit]  # Return top results
+            
+        except Exception as e:
+            logger.error(f"Error in fast keyword filtering: {e}")
+            return []
+
+    def _get_query_cache_key(self, query: str, current_files_count: int) -> str:
+        """Generate cache key for query results."""
+        import hashlib
+        query_hash = hashlib.md5(f"{query.lower().strip()}_{current_files_count}".encode()).hexdigest()
+        return query_hash
+
+    async def _get_cached_context(self, query: str, current_files_count: int) -> Optional[List[Dict]]:
+        """Get cached context results if available."""
+        try:
+            cache_key = self._get_query_cache_key(query, current_files_count)
+            if cache_key in self._query_cache:
+                cached_result, timestamp = self._query_cache[cache_key]
+                # Cache valid for 5 minutes
+                if (datetime.now().timestamp() - timestamp) < 300:
+                    logger.info(f"[CACHE HIT] Using cached context for query")
+                    return cached_result
+                else:
+                    # Remove expired cache
+                    del self._query_cache[cache_key]
+            return None
+        except Exception as e:
+            logger.warning(f"Error checking query cache: {e}")
+            return None
+
+    async def _cache_context_result(self, query: str, current_files_count: int, result: List[Dict]) -> None:
+        """Cache context results for future use."""
+        try:
+            cache_key = self._get_query_cache_key(query, current_files_count)
+            
+            # Implement LRU-style cache eviction
+            if len(self._query_cache) >= self._cache_max_size:
+                # Remove oldest entry
+                oldest_key = min(self._query_cache.keys(), key=lambda k: self._query_cache[k][1])
+                del self._query_cache[oldest_key]
+            
+            self._query_cache[cache_key] = (result, datetime.now().timestamp())
+            logger.info(f"[CACHE STORE] Cached context result for future queries")
+        except Exception as e:
+            logger.warning(f"Error caching query result: {e}")
+
+    async def _check_file_exists_in_knowledge_base(self, content_hash: str, file_path: str, repository_id: str) -> bool:
+        """Check if a file with the same content already exists in knowledge base."""
+        try:
+            if self.qdrant_db:
+                # Search for existing files with same content hash
+                existing_files = self.qdrant_db.search_memory(
+                    query=f"file:{file_path}",
+                    memory_type="knowledge",
+                    filter_params={
+                        "content_hash": content_hash,
+                        "repository_id": repository_id
+                    },
+                    limit=1
+                )
+                return len(existing_files) > 0
+        except Exception as e:
+            logger.warning(f"Could not check for duplicate file {file_path}: {e}")
+        return False
+    
+    async def _process_large_file_with_chunking(self, file_path: str, file_content: str, metadata: Dict[str, Any]) -> None:
+        """Process large files with intelligent chunking for better context selection."""
+        try:
+            # Import chunking capabilities from Prasion AI framework
+            if INDEXER_AVAILABLE:
+                chunker = create_adaptive_chunker()
+                chunks = chunker.chunk_content(file_content, file_path)
+                logger.info(f"[CHUNKING] Split {file_path} into {len(chunks)} chunks")
+            else:
+                # Fallback simple chunking with optimization settings
+                chunk_size = CONTEXT_OPTIMIZATION["chunk_size"]
+                overlap = CONTEXT_OPTIMIZATION["chunk_overlap"]
+                max_chunks = CONTEXT_OPTIMIZATION["max_chunks_per_file"]
+                chunks = []
+                
+                for i in range(0, len(file_content), chunk_size - overlap):
+                    chunk = file_content[i:i + chunk_size]
+                    chunks.append({
+                        'content': chunk,
+                        'start_index': i,
+                        'end_index': i + len(chunk),
+                        'chunk_id': f"chunk_{i//chunk_size}"
+                    })
+                    # Limit chunks for performance
+                    if len(chunks) >= max_chunks:
+                        logger.info(f"[CHUNKING] Reached max chunks limit ({max_chunks}) for {file_path}")
+                        break
+                        
+                logger.info(f"[CHUNKING] Split {file_path} into {len(chunks)} simple chunks")
+            
+            # Store each chunk with enhanced metadata
+            for idx, chunk in enumerate(chunks):
+                chunk_metadata = {
+                    **metadata,
+                    "chunk_index": idx,
+                    "total_chunks": len(chunks),
+                    "chunked": True,
+                    "chunk_id": chunk.get('chunk_id', f"chunk_{idx}"),
+                    "start_index": chunk.get('start_index', 0),
+                    "end_index": chunk.get('end_index', len(chunk.get('content', '')))
+                }
+                
+                chunk_content = chunk.get('content', chunk) if isinstance(chunk, dict) else chunk
+                
+                if self.qdrant_db:
+                    chunk_id = self.qdrant_db.store_memory(
+                        text=f"File: {file_path} (Part {idx+1}/{len(chunks)})\n{chunk_content}",
+                        memory_type="knowledge",
+                        metadata=chunk_metadata
+                    )
+                    logger.info(f"Stored chunk {idx+1}/{len(chunks)} of {file_path} with ID: {chunk_id}")
+                
+                # Also store in Supabase if available
+                if self.memory:
+                    try:
+                        self.memory.store(
+                            text=chunk_content,
+                            metadata=chunk_metadata,
+                            memory_type="file_context"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Could not store chunk in Supabase memory: {e}")
+            
+            # Store file summary for quick reference
+            summary_content = f"File: {file_path}\nSize: {len(file_content)} characters\nChunks: {len(chunks)}\nFirst 500 chars: {file_content[:500]}..."
+            summary_metadata = {**metadata, "content_type": "file_summary", "is_summary": True}
+            
+            if self.qdrant_db:
+                self.qdrant_db.store_memory(
+                    text=summary_content,
+                    memory_type="knowledge",
+                    metadata=summary_metadata
+                )
+                
+        except Exception as e:
+            logger.error(f"Error chunking large file {file_path}: {e}")
+            # Fallback to storing whole file
+            await self._process_small_file(file_path, file_content, metadata)
+    
+    async def _process_small_file(self, file_path: str, file_content: str, metadata: Dict[str, Any]) -> None:
+        """Process small files without chunking."""
+        try:
+            if self.qdrant_db:
+                # Store the full file content
+                memory_id = self.qdrant_db.store_memory(
+                    text=file_content,
+                    memory_type="knowledge",
+                    metadata=metadata
+                )
+                logger.info(f"Stored small file {file_path} in knowledge base with ID: {memory_id}")
+            
+            # Also store in Supabase if available
+            if self.memory:
+                try:
+                    self.memory.store(
+                        text=file_content,
+                        metadata=metadata,
+                        memory_type="file_context"
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not store small file in Supabase memory: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error processing small file {file_path}: {e}")
     
     async def import_and_build_knowledge(
         self, 
@@ -916,12 +1237,14 @@ class GitMeshTarsWrapper:
                         file_content = str(file_content) if file_content is not None else ""
                     
                     if file_content and file_content != "Loading...":
-                        # Add as knowledge entry with safe string slicing
+                        # Add as knowledge entry with safe string slicing and size limits
                         try:
-                            content_preview = file_content[:2000] if len(file_content) > 2000 else file_content
+                            # Limit file content size for faster processing
+                            max_content_size = 1500  # Reduced from 2000 for speed
+                            content_preview = file_content[:max_content_size] if len(file_content) > max_content_size else file_content
                             
                             knowledge_entry = {
-                                "content": content_preview,  # Safely limited content
+                                "content": content_preview,  # Size-limited content
                                 "metadata": {
                                     "source_type": "current_context_file",
                                     "file_path": file_data.get("path", "unknown"),
@@ -939,17 +1262,30 @@ class GitMeshTarsWrapper:
             # THEN: Get additional relevant knowledge base entries from Qdrant using semantic search
             if self.qdrant_db:
                 try:
-                    relevant_knowledge = self.qdrant_db.search_memory(
-                        query=current_message,
-                        memory_type="knowledge",
-                        limit=8,  # Reduced to make room for current files
-                        filter_params={"session_id": self.session_id}
+                    # Use intelligent context selection based on query relevance
+                    relevant_knowledge = await self._select_best_context_for_query(
+                        current_message=current_message,
+                        max_context_items=8,  # Reduced from 20 for speed
+                        current_files_count=len(session_context["knowledge_entries"])
                     )
+                    
                     # Add to existing knowledge entries
                     session_context["knowledge_entries"].extend(relevant_knowledge)
-                    logger.info(f"[CONTEXT DEBUG] Found {len(relevant_knowledge)} additional knowledge entries from vector search")
+                    logger.info(f"[CONTEXT DEBUG] Found {len(relevant_knowledge)} additional knowledge entries from intelligent selection")
                 except Exception as e:
                     logger.warning(f"Could not search knowledge base: {e}")
+                    # Fallback to simple search
+                    try:
+                        relevant_knowledge = self.qdrant_db.search_memory(
+                            query=current_message,
+                            memory_type="knowledge",
+                            limit=5,  # Reduced from 8 for speed
+                            filter_params={"session_id": self.session_id}
+                        )
+                        session_context["knowledge_entries"].extend(relevant_knowledge)
+                        logger.info(f"[CONTEXT DEBUG] Fallback: Found {len(relevant_knowledge)} knowledge entries")
+                    except Exception as fallback_error:
+                        logger.error(f"Fallback search also failed: {fallback_error}")
             
             total_knowledge = len(session_context["knowledge_entries"])
             logger.info(f"[CONTEXT DEBUG] Total knowledge entries for AI context: {total_knowledge}")
