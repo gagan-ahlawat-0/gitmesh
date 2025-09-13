@@ -2987,8 +2987,69 @@ Output MUST be JSON with 'reflection' and 'satisfactory'.
                     continue  # Now properly in a loop
             
         except Exception as error:
+            # Check for specific error types and implement retries
+            error_msg = str(error).lower()
+            
+            # Handle VertexAI 503 Service Unavailable errors with retry logic
+            if "503" in error_msg or "service unavailable" in error_msg or "overload" in error_msg:
+                retry_count = kwargs.get('_retry_count', 0)
+                max_retries = 3
+                
+                if retry_count < max_retries:
+                    import asyncio
+                    wait_time = (retry_count + 1) * 2  # 2, 4, 6 seconds backoff
+                    logging.warning(f"VertexAI service overload (503), retrying in {wait_time}s (attempt {retry_count + 1}/{max_retries})")
+                    
+                    await asyncio.sleep(wait_time)
+                    
+                    # Try with a fallback model if available
+                    fallback_models = ["gemini/gemini-1.5-flash-8b", "gemini/gemini-1.5-flash"]
+                    original_model = self.model
+                    
+                    if retry_count >= 1 and original_model not in fallback_models:
+                        self.model = fallback_models[0]
+                        logging.info(f"Switching to fallback model: {self.model}")
+                    
+                    try:
+                        # Recursive call with updated retry count
+                        kwargs['_retry_count'] = retry_count + 1
+                        return await self.get_response_async(
+                            prompt=prompt,
+                            system_prompt=system_prompt,
+                            chat_history=chat_history,
+                            temperature=temperature,
+                            tools=tools,
+                            output_json=output_json,
+                            output_pydantic=output_pydantic,
+                            verbose=verbose,
+                            markdown=markdown,
+                            self_reflect=self_reflect,
+                            max_reflect=max_reflect,
+                            min_reflect=min_reflect,
+                            console=console,
+                            agent_name=agent_name,
+                            agent_role=agent_role,
+                            agent_tools=agent_tools,
+                            task_name=task_name,
+                            task_description=task_description,
+                            task_id=task_id,
+                            execute_tool_fn=execute_tool_fn,
+                            stream=stream,
+                            **kwargs
+                        )
+                    finally:
+                        # Restore original model
+                        self.model = original_model
+                else:
+                    logging.error(f"Maximum retries ({max_retries}) exceeded for VertexAI service overload")
+                    display_error(f"VertexAI service overloaded. Please try again later.")
+                    # Fallback to simple non-AI response
+                    return "I'm currently experiencing high demand. Please try your request again in a few moments."
+            
+            # Handle context length errors
             if LLMContextLengthExceededException(str(error))._is_context_limit_error(str(error)):
                 raise LLMContextLengthExceededException(str(error))
+            
             display_error(f"Error in get_response_async: {str(error)}")
             raise
             

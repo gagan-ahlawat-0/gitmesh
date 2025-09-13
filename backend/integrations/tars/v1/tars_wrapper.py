@@ -18,6 +18,7 @@ import asyncio
 import logging
 import hashlib
 import sys
+import base64
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 from dataclasses import dataclass, asdict
@@ -87,15 +88,15 @@ except (ImportError, Exception) as e:
 # Context optimization settings for large projects
 CONTEXT_OPTIMIZATION = {
     "max_context_files": 100,          # Reduced from 200 for speed
-    "large_file_threshold": 3000,      # Reduced from 4000 
-    "chunk_size": 1500,               # Reduced from 2000 for faster processing
-    "chunk_overlap": 150,             # Reduced from 200
+    "large_file_threshold": 20000,     # Increased from 3000 - most files will be sent as full content
+    "chunk_size": 8000,               # Increased from 1500 for better context
+    "chunk_overlap": 200,             # Increased for better continuity
     "max_chunks_per_file": 6,         # Reduced from 10 to limit context size
     "relevance_threshold": 0.8,       # Increased from 0.7 for better filtering
     "smart_batching": True,           # Enable intelligent batching
     "deduplication": True,            # Enable file deduplication
-    "max_knowledge_entries": 8,       # New: Limit knowledge entries for speed
-    "fast_search_limit": 15,          # New: Smaller search limit for faster queries
+    "max_knowledge_entries": 15,      # Increased for better context
+    "fast_search_limit": 25,          # Increased for better search
     "keyword_filtering": True         # New: Enable keyword pre-filtering
 }
 
@@ -708,6 +709,67 @@ class GitMeshTarsWrapper:
             logger.error(f"Error processing chat message through TARS: {e}")
             return await self._generate_intelligent_fallback_response(message, context, str(e))
     
+    def _decode_file_content(self, content: Any) -> str:
+        """
+        Decode file content that may be base64-encoded from GitHub API or other sources.
+        
+        Args:
+            content: Content that can be a string, dict with base64 content, or other format
+            
+        Returns:
+            str: Decoded content as readable text
+        """
+        try:
+            # If content is None or empty, return empty string
+            if not content:
+                return ""
+            
+            # If content is already a string, return as-is
+            if isinstance(content, str):
+                # Check if it looks like base64 encoded content
+                try:
+                    # Try to decode as base64 if it looks like encoded content
+                    if len(content) > 100 and content.replace('\n', '').replace(' ', '').isalnum():
+                        decoded = base64.b64decode(content).decode('utf-8')
+                        logger.info(f"[CONTENT DECODE] Successfully decoded base64 string content")
+                        return decoded
+                except:
+                    pass  # Not base64, return as-is
+                return content
+                
+            # If content is a dict (GitHub API response format)
+            if isinstance(content, dict):
+                # Check for GitHub API format with base64 content
+                if 'content' in content and 'encoding' in content:
+                    raw_content = content['content']
+                    encoding = content.get('encoding', '').lower()
+                    
+                    if encoding == 'base64':
+                        try:
+                            # Remove whitespace and decode base64
+                            clean_content = raw_content.replace('\n', '').replace(' ', '')
+                            decoded = base64.b64decode(clean_content).decode('utf-8')
+                            logger.info(f"[CONTENT DECODE] Successfully decoded GitHub API base64 content")
+                            return decoded
+                        except Exception as decode_error:
+                            logger.error(f"[CONTENT DECODE] Failed to decode base64 content: {decode_error}")
+                            return str(content)  # Fallback to string representation
+                    else:
+                        # Non-base64 encoding, return the content part
+                        return str(raw_content)
+                else:
+                    # Dict without GitHub API format, convert to string
+                    logger.warning(f"[CONTENT DECODE] Unknown dict format, converting to string: {type(content)}")
+                    return str(content)
+            
+            # For any other type, convert to string
+            logger.warning(f"[CONTENT DECODE] Unknown content type {type(content)}, converting to string")
+            return str(content)
+            
+        except Exception as e:
+            logger.error(f"[CONTENT DECODE] Error decoding content: {e}")
+            return str(content) if content is not None else ""
+
     async def _process_context_files(self, files: List[Dict[str, Any]]) -> None:
         """Process files sent with the message context and add them to the knowledge base immediately."""
         try:
@@ -727,20 +789,19 @@ class GitMeshTarsWrapper:
                 try:
                     # Extract file information
                     file_path = file_data.get("path", "unknown_file")
-                    file_content = file_data.get("content", "")
+                    raw_file_content = file_data.get("content", "")
                     file_branch = file_data.get("branch", "main")
                     repository_id = file_data.get("repository_id", self.repository_id or "unknown")
                     
-                    # Ensure file_content is a string
-                    if not isinstance(file_content, str):
-                        logger.warning(f"[TARS DEBUG] File content is not a string, converting: {type(file_content)}")
-                        file_content = str(file_content) if file_content is not None else ""
+                    # Decode file content properly (handles base64 from GitHub API)
+                    file_content = self._decode_file_content(raw_file_content)
                     
                     logger.info(f"[TARS DEBUG] File {i+1}: {file_path}")
-                    logger.info(f"[TARS DEBUG] Content length: {len(file_content)}")
+                    logger.info(f"[TARS DEBUG] Raw content type: {type(raw_file_content)}")
+                    logger.info(f"[TARS DEBUG] Decoded content length: {len(file_content)}")
                     
                     if not file_content or file_content == "Loading...":
-                        logger.warning(f"[TARS DEBUG] Skipping file {file_path} - no content available")
+                        logger.warning(f"[TARS DEBUG] Skipping file {file_path} - no content available after decoding")
                         continue
                     
                     # Create unique identifier for file content (for deduplication)
@@ -1055,7 +1116,7 @@ class GitMeshTarsWrapper:
                         logger.warning(f"Could not store chunk in Supabase memory: {e}")
             
             # Store file summary for quick reference
-            summary_content = f"File: {file_path}\nSize: {len(file_content)} characters\nChunks: {len(chunks)}\nFirst 500 chars: {file_content[:500]}..."
+            summary_content = f"File: {file_path}\nSize: {len(file_content)} characters\nChunks: {len(chunks)}\nFirst 1000 chars: {file_content[:1000]}..." if len(file_content) > 1000 else f"File: {file_path}\nSize: {len(file_content)} characters\nContent: {file_content}"
             summary_metadata = {**metadata, "content_type": "file_summary", "is_summary": True}
             
             if self.qdrant_db:
@@ -1229,22 +1290,19 @@ class GitMeshTarsWrapper:
             if context and context.get("files"):
                 logger.info(f"[CONTEXT DEBUG] Adding {len(context['files'])} current context files directly")
                 for file_data in context["files"]:
-                    file_content = file_data.get("content", "")
+                    raw_file_content = file_data.get("content", "")
                     
-                    # Ensure file_content is a string
-                    if not isinstance(file_content, str):
-                        logger.warning(f"[CONTEXT DEBUG] File content is not a string, converting: {type(file_content)}")
-                        file_content = str(file_content) if file_content is not None else ""
+                    # Decode file content properly (handles base64 from GitHub API)
+                    file_content = self._decode_file_content(raw_file_content)
+                    
+                    logger.info(f"[CONTEXT DEBUG] Raw content type: {type(raw_file_content)}")
+                    logger.info(f"[CONTEXT DEBUG] Decoded content length: {len(file_content)}")
                     
                     if file_content and file_content != "Loading...":
-                        # Add as knowledge entry with safe string slicing and size limits
+                        # Add as knowledge entry with full content for current context files
                         try:
-                            # Limit file content size for faster processing
-                            max_content_size = 1500  # Reduced from 2000 for speed
-                            content_preview = file_content[:max_content_size] if len(file_content) > max_content_size else file_content
-                            
                             knowledge_entry = {
-                                "content": content_preview,  # Size-limited content
+                                "content": file_content,  # Full content for current context files
                                 "metadata": {
                                     "source_type": "current_context_file",
                                     "file_path": file_data.get("path", "unknown"),
@@ -1254,7 +1312,7 @@ class GitMeshTarsWrapper:
                                 }
                             }
                             session_context["knowledge_entries"].append(knowledge_entry)
-                            logger.info(f"[CONTEXT DEBUG] Added current file to knowledge: {file_data.get('path')}")
+                            logger.info(f"[CONTEXT DEBUG] Added current file to knowledge: {file_data.get('path')} ({len(file_content)} chars)")
                         except Exception as entry_error:
                             logger.error(f"[CONTEXT DEBUG] Error processing file entry {file_data.get('path')}: {entry_error}")
                             continue
@@ -1265,7 +1323,7 @@ class GitMeshTarsWrapper:
                     # Use intelligent context selection based on query relevance
                     relevant_knowledge = await self._select_best_context_for_query(
                         current_message=current_message,
-                        max_context_items=8,  # Reduced from 20 for speed
+                        max_context_items=CONTEXT_OPTIMIZATION["max_knowledge_entries"],  # Use config value
                         current_files_count=len(session_context["knowledge_entries"])
                     )
                     
@@ -1279,7 +1337,7 @@ class GitMeshTarsWrapper:
                         relevant_knowledge = self.qdrant_db.search_memory(
                             query=current_message,
                             memory_type="knowledge",
-                            limit=5,  # Reduced from 8 for speed
+                            limit=8,  # Increased for better context
                             filter_params={"session_id": self.session_id}
                         )
                         session_context["knowledge_entries"].extend(relevant_knowledge)
@@ -1330,7 +1388,7 @@ class GitMeshTarsWrapper:
     async def _enhance_query_progressive(self, query: str, session_context: Dict[str, Any]) -> str:
         """Enhanced query with progressive context loading."""
         from .context_manager import ProgressiveContextManager
-        context_manager = ProgressiveContextManager(max_context_tokens=4000)
+        context_manager = ProgressiveContextManager(max_context_tokens=20000)  # Increased from 4000 for better context
         
         # Add repository knowledge with progressive detail
         if self.repository_id and any(keyword in query.lower() for keyword in ['code', 'repo', 'project', 'file', 'structure', 'function', 'class', 'how', 'what', 'analyze']):
@@ -1363,8 +1421,14 @@ class GitMeshTarsWrapper:
                     level = "specifics"
                     priority = 0.4
                 
+                # For current context files, send full content; for knowledge base, limit size
+                if metadata.get('source_type') == 'current_context_file':
+                    context_content = f"Current File Content: {content}"  # Full content for current files
+                else:
+                    context_content = f"Knowledge: {content[:2000]}..." if len(content) > 2000 else f"Knowledge: {content}"  # Increased limit for knowledge base
+                
                 context_manager.add_context_item(
-                    content=f"Knowledge: {content[:800]}...",
+                    content=context_content,
                     context_type=source_type,
                     source=f"KB Entry {i+1}",
                     priority=priority,
@@ -1491,7 +1555,13 @@ class GitMeshTarsWrapper:
                 metadata = entry.get("metadata", {})
                 if content:
                     source_info = f"Source: {metadata.get('source_type', 'unknown')}"
-                    chunk = f"{source_info}\n{content[:500]}..."  # Limit chunk size
+                    
+                    # For current context files, send full content; for others, limit size
+                    if metadata.get('source_type') == 'current_context_file':
+                        chunk = f"{source_info}\n{content}"  # Full content for current files
+                    else:
+                        chunk = f"{source_info}\n{content[:1500]}..." if len(content) > 1500 else f"{source_info}\n{content}"  # Increased limit for others
+                    
                     context_chunks.append(chunk)
             
             # Add recent conversation context as chunks
