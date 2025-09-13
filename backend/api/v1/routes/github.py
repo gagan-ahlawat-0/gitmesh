@@ -6,7 +6,7 @@ import os
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
 import structlog
-from .dependencies import require_auth, get_current_user
+from .dependencies import require_auth, get_current_user, optional_auth
 from models.api.github_models import (
     RepositoriesResponse,
     RepositoryResponse,
@@ -61,7 +61,7 @@ async def get_user_repositories(
 async def get_repository_details(
     owner: str,
     repo: str,
-    token: str = Depends(require_auth)
+    token: Optional[str] = Depends(optional_auth)
 ):
     """Get repository details."""
     try:
@@ -90,7 +90,7 @@ async def test_branches(owner: str, repo: str, token: str = Depends(require_auth
 async def get_repository_branches(
     owner: str,
     repo: str,
-    token: str = Depends(require_auth)
+    token: Optional[str] = Depends(optional_auth)
 ):
     """Get repository branches."""
     try:
@@ -557,7 +557,7 @@ async def get_branch_data(
 async def get_repository_tree(
     owner: str,
     repo: str,
-    token: str = Depends(require_auth),
+    token: Optional[str] = Depends(optional_auth),
     branch: str = Query("main", description="Branch name")
 ):
     """Get repository tree (file/folder structure)."""
@@ -582,7 +582,7 @@ async def get_repository_tree(
 async def get_repository_trees_for_all_branches(
     owner: str,
     repo: str,
-    token: str = Depends(require_auth)
+    token: Optional[str] = Depends(optional_auth)
 ):
     """Get file trees from all branches for a repository."""
     try:
@@ -603,7 +603,7 @@ async def get_file_content(
     owner: str,
     repo: str,
     path: str,
-    token: str = Depends(require_auth),
+    token: Optional[str] = Depends(optional_auth),
     ref: str = Query("main", description="Branch or commit ref")
 ):
     """Get file content from a repository."""
@@ -630,7 +630,7 @@ async def get_file_content(
 async def get_branches_with_trees(
     owner: str,
     repo: str,
-    token: str = Depends(require_auth)
+    token: Optional[str] = Depends(optional_auth)
 ):
     """Get all branches with their file trees (comprehensive endpoint)."""
     try:

@@ -902,9 +902,10 @@ const BranchContent: React.FC<BranchContentProps> = ({
 export const ImportPanel: React.FC = () => {
   const { selectedBranch, getBranchInfo, branchList: contextBranchList } = useBranch();
   const { repository, setRepository } = useRepository();
-  const { token, user } = useAuth();
+  const { token, user, githubApi } = useAuth();
   const { updateKnowledgeBase } = useKnowledgeBase();
-  const githubAPI = new GitHubAPI(token || '');
+  // Use githubApi from AuthContext which handles optional tokens properly
+  const githubAPI = githubApi || new GitHubAPI(null);
   const router = useRouter();
 
   // Branches and file structure
