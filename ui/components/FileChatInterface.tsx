@@ -67,6 +67,7 @@ import {
   CheckSquare,
   Square,
   ChevronUp,
+  Minus,
   Bot,
   PlusCircle,
   Send,
@@ -417,19 +418,57 @@ interface BranchFileItemProps {
   level: number;
   selectedFiles: string[];
   onFileToggle: (path: string) => void;
+  onFolderToggle?: (folderPath: string, selectAll: boolean) => void;
 }
 
-const BranchFileItem: React.FC<BranchFileItemProps> = ({ item, level, selectedFiles, onFileToggle }) => {
+const BranchFileItem: React.FC<BranchFileItemProps> = ({ 
+  item, 
+  level, 
+  selectedFiles, 
+  onFileToggle, 
+  onFolderToggle 
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isFolder = item.type === 'folder';
   const filePath = item.path || item.name;
   const isSelected = selectedFiles.includes(filePath);
 
-  const handleClick = () => {
+  // For folders, calculate selection state
+  const getAllFilesInFolder = (folderItem: FileSystemItem, basePath: string = ''): string[] => {
+    const files: string[] = [];
+    const currentPath = basePath ? `${basePath}/${folderItem.name}` : folderItem.name;
+    
+    if (folderItem.children) {
+      folderItem.children.forEach(child => {
+        if (child.type === 'file') {
+          const childPath = child.path || `${currentPath}/${child.name}`;
+          files.push(childPath);
+        } else if (child.type === 'folder') {
+          files.push(...getAllFilesInFolder(child, currentPath));
+        }
+      });
+    }
+    
+    return files;
+  };
+
+  const folderFiles = isFolder ? getAllFilesInFolder(item, item.path ? item.path.split('/').slice(0, -1).join('/') : '') : [];
+  const selectedFolderFiles = folderFiles.filter(file => selectedFiles.includes(file));
+  const isFolderPartiallySelected = selectedFolderFiles.length > 0 && selectedFolderFiles.length < folderFiles.length;
+  const isFolderFullySelected = folderFiles.length > 0 && selectedFolderFiles.length === folderFiles.length;
+
+  const handleClick = (e: React.MouseEvent) => {
     if (isFolder) {
       setIsExpanded(!isExpanded);
     } else {
       onFileToggle(filePath);
+    }
+  };
+
+  const handleFolderCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isFolder && onFolderToggle) {
+      onFolderToggle(filePath, !isFolderFullySelected);
     }
   };
 
@@ -462,16 +501,38 @@ const BranchFileItem: React.FC<BranchFileItemProps> = ({ item, level, selectedFi
         
         <span className="flex-1 truncate">{item.name}</span>
         
-        {!isFolder && (
-          <div className={cn(
-            "w-4 h-4 border rounded flex-shrink-0 transition-colors",
-            isSelected 
-              ? "bg-primary border-primary" 
-              : "border-muted-foreground/30 hover:border-muted-foreground/50"
-          )}>
-            {isSelected && <Check size={12} className="text-primary-foreground m-auto" />}
-          </div>
+        {/* File count for folders */}
+        {isFolder && folderFiles.length > 0 && (
+          <span className="text-xs text-muted-foreground mr-2">
+            {selectedFolderFiles.length}/{folderFiles.length}
+          </span>
         )}
+        
+        {/* Checkbox for both files and folders */}
+        <div 
+          className={cn(
+            "w-4 h-4 border rounded flex-shrink-0 transition-colors cursor-pointer",
+            isFolder ? (
+              isFolderFullySelected 
+                ? "bg-primary border-primary" 
+                : isFolderPartiallySelected
+                  ? "bg-primary/50 border-primary"
+                  : "border-muted-foreground/30 hover:border-muted-foreground/50"
+            ) : (
+              isSelected 
+                ? "bg-primary border-primary" 
+                : "border-muted-foreground/30 hover:border-muted-foreground/50"
+            )
+          )}
+          onClick={isFolder ? handleFolderCheckboxClick : handleClick}
+        >
+          {(isSelected || isFolderFullySelected) && (
+            <Check size={12} className="text-primary-foreground m-auto" />
+          )}
+          {isFolderPartiallySelected && !isFolderFullySelected && (
+            <Minus size={12} className="text-primary-foreground m-auto" />
+          )}
+        </div>
       </div>
       
       {isFolder && isExpanded && item.children && (
@@ -483,6 +544,7 @@ const BranchFileItem: React.FC<BranchFileItemProps> = ({ item, level, selectedFi
               level={level + 1}
               selectedFiles={selectedFiles}
               onFileToggle={onFileToggle}
+              onFolderToggle={onFolderToggle}
             />
           ))}
         </div>
@@ -1856,6 +1918,138 @@ console.log('File: ${filePath}');`;
       }
     });
   };
+
+  // Handle folder selection in branch import
+  const handleBranchFolderToggle = async (folderPath: string, selectAll: boolean) => {
+    const branchName = importFormData.selectedBranch;
+    if (!branchName) return;
+
+    console.log('Folder toggle for:', folderPath, 'selectAll:', selectAll, 'in branch:', branchName);
+
+    // Find the folder in the file structure
+    const findFolderInStructure = (items: FileSystemItem[], targetPath: string): FileSystemItem | null => {
+      for (const item of items) {
+        if (item.type === 'folder') {
+          const itemPath = item.path || item.name;
+          if (itemPath === targetPath) {
+            return item;
+          }
+          if (item.children) {
+            const found = findFolderInStructure(item.children, targetPath);
+            if (found) return found;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Get all files in folder recursively
+    const getAllFilesInFolder = (folderItem: FileSystemItem, basePath: string = ''): string[] => {
+      const files: string[] = [];
+      const currentPath = basePath ? `${basePath}/${folderItem.name}` : folderItem.name;
+      
+      if (folderItem.children) {
+        folderItem.children.forEach(child => {
+          if (child.type === 'file') {
+            const childPath = child.path || `${currentPath}/${child.name}`;
+            files.push(childPath);
+          } else if (child.type === 'folder') {
+            files.push(...getAllFilesInFolder(child, currentPath));
+          }
+        });
+      }
+      
+      return files;
+    };
+
+    const currentStructure = branchFileStructures[branchName] || [];
+    const folderItem = findFolderInStructure(currentStructure, folderPath);
+    
+    if (!folderItem) {
+      console.warn('Folder not found:', folderPath);
+      return;
+    }
+
+    const folderFiles = getAllFilesInFolder(folderItem, folderItem.path ? folderItem.path.split('/').slice(0, -1).join('/') : '');
+    console.log('Files in folder:', folderFiles);
+
+    if (selectAll) {
+      // Add all files in folder to selection
+      setSelectedBranchFiles(prev => {
+        const newSelection = [...new Set([...prev, ...folderFiles])];
+        console.log('Added folder files to selection:', folderFiles);
+        
+        // Fetch content for each file
+        folderFiles.forEach(filePath => {
+          if (!prev.includes(filePath)) {
+            setTimeout(() => {
+              fetchFileContent(branchName, filePath).then((content) => {
+                let actualContent: string;
+                if (typeof content === 'string') {
+                  actualContent = content;
+                } else if (content && typeof content === 'object' && 'content' in content) {
+                  actualContent = (content as any).content;
+                } else {
+                  actualContent = String(content || '');
+                }
+                
+                if (actualContent && actualContent.trim()) {
+                  addSelectedFile({
+                    branch: branchName,
+                    path: filePath,
+                    content: actualContent,
+                    contentHash: getFileHash(actualContent)
+                  });
+                  console.log('Added folder file to context:', filePath);
+                } else {
+                  console.warn('Failed to get valid content for folder file:', filePath);
+                  setSelectedBranchFiles(prev => prev.filter(p => p !== filePath));
+                }
+              }).catch(error => {
+                console.error('Failed to fetch content for folder file:', filePath, error);
+                setSelectedBranchFiles(prev => prev.filter(p => p !== filePath));
+              });
+            }, 100);
+          }
+        });
+        
+        return newSelection;
+      });
+    } else {
+      // Remove all files in folder from selection
+      setSelectedBranchFiles(prev => {
+        const newSelection = prev.filter(path => !folderFiles.includes(path));
+        console.log('Removed folder files from selection:', folderFiles);
+        
+        // Remove from context
+        folderFiles.forEach(filePath => {
+          removeSelectedFile(branchName, filePath);
+        });
+        
+        return newSelection;
+      });
+    }
+  };
+
+  // Helper function to get all files from file structure recursively
+  const getAllFilesFromStructure = (items: FileSystemItem[]): string[] => {
+    const files: string[] = [];
+    
+    const traverseItems = (itemList: FileSystemItem[], basePath: string = '') => {
+      itemList.forEach(item => {
+        if (item.type === 'file') {
+          const filePath = item.path || (basePath ? `${basePath}/${item.name}` : item.name);
+          files.push(filePath);
+        } else if (item.type === 'folder' && item.children) {
+          const currentPath = item.path || (basePath ? `${basePath}/${item.name}` : item.name);
+          traverseItems(item.children, currentPath);
+        }
+      });
+    };
+    
+    traverseItems(items);
+    return files;
+  };
   
 
   
@@ -2519,9 +2713,64 @@ console.log('File: ${filePath}');`;
                 
                 {importFormData.selectedBranch && (
                   <div>
-                    <Label>Files to Import</Label>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Files to Import</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const allFiles = getAllFilesFromStructure(branchFileStructures[importFormData.selectedBranch] || []);
+                            setSelectedBranchFiles(allFiles);
+                            // Add all files to context
+                            allFiles.forEach(filePath => {
+                              setTimeout(() => {
+                                fetchFileContent(importFormData.selectedBranch, filePath).then((content) => {
+                                  let actualContent: string;
+                                  if (typeof content === 'string') {
+                                    actualContent = content;
+                                  } else if (content && typeof content === 'object' && 'content' in content) {
+                                    actualContent = (content as any).content;
+                                  } else {
+                                    actualContent = String(content || '');
+                                  }
+                                  
+                                  if (actualContent && actualContent.trim()) {
+                                    addSelectedFile({
+                                      branch: importFormData.selectedBranch,
+                                      path: filePath,
+                                      content: actualContent,
+                                      contentHash: getFileHash(actualContent)
+                                    });
+                                  }
+                                }).catch(console.error);
+                              }, 100);
+                            });
+                          }}
+                          className="text-xs h-7"
+                        >
+                          Select All
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBranchFiles([]);
+                            // Remove all files from context
+                            const allFiles = getAllFilesFromStructure(branchFileStructures[importFormData.selectedBranch] || []);
+                            allFiles.forEach(filePath => {
+                              removeSelectedFile(importFormData.selectedBranch, filePath);
+                            });
+                          }}
+                          className="text-xs h-7"
+                        >
+                          Deselect All
+                        </Button>
+                      </div>
+                    </div>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Select files from branch: {importFormData.selectedBranch}
+                      Select files and folders from branch: {importFormData.selectedBranch}. 
+                      <span className="font-medium"> Folders can be selected to include all files within them.</span>
                     </p>
                     
                     <div className="border rounded-lg max-h-64 overflow-y-auto">
@@ -2547,6 +2796,7 @@ console.log('File: ${filePath}');`;
                                 level={0}
                                 selectedFiles={selectedBranchFiles}
                                 onFileToggle={handleBranchFileToggle}
+                                onFolderToggle={handleBranchFolderToggle}
                               />
                             ))
                           ) : (
