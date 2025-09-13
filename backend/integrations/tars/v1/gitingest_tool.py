@@ -37,6 +37,8 @@ Usage Examples:
 
 import os
 import logging
+import asyncio
+import concurrent.futures
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 
@@ -48,7 +50,40 @@ except ImportError:
 
 # Handle different import paths depending on how the script is run
 try:
-    from config.key_manager import KeyManager
+    from config.key_manager import KeyManager as BaseKeyManager
+    
+    # Wrap the KeyManager to filter out invalid tokens
+    class KeyManager:
+        def __init__(self):
+            self.base_manager = BaseKeyManager()
+        
+        def get_github_token(self):
+            token = self.base_manager.get_github_token()
+            # Filter out known invalid tokens
+            invalid_tokens = [
+                "your_dummy_github_token", 
+                "your_github_token_here", 
+                "placeholder", 
+                "dummy",
+                None
+            ]
+            
+            if token in invalid_tokens:
+                # Clear the stored invalid token
+                if hasattr(self.base_manager, 'keys') and 'github_token' in self.base_manager.keys:
+                    del self.base_manager.keys['github_token']
+                return None
+                
+            # Also check for invalid token patterns
+            if token and not token.startswith(("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_")):
+                logger.debug(f"Filtering out invalid GitHub token pattern: {token[:10]}...")
+                # Clear the stored invalid token
+                if hasattr(self.base_manager, 'keys') and 'github_token' in self.base_manager.keys:
+                    del self.base_manager.keys['github_token']
+                return None
+                
+            return token
+            
 except ImportError:
     import sys
     import os
@@ -60,10 +95,14 @@ except ImportError:
     try:
         from config.key_manager import KeyManager
     except ImportError:
-        # If still can't import, create a mock KeyManager for testing
+        # Create a safer KeyManager for testing that doesn't return invalid tokens
         class KeyManager:
             def get_github_token(self):
-                return os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT")
+                token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT") or os.environ.get("GTM_GITHUB_TOKEN")
+                # Filter out known invalid tokens
+                if token and token in ["your_dummy_github_token", "your_github_token_here", "placeholder", "dummy"]:
+                    return None
+                return token
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +134,11 @@ class GitIngestTool:
             self.github_token = self.key_manager.get_github_token()
         
         # Clean up any placeholder environment tokens that might confuse gitingest
-        if os.environ.get("GITHUB_TOKEN") in ["your_github_token_here", "placeholder", "dummy", None]:
-            if "GITHUB_TOKEN" in os.environ:
-                del os.environ["GITHUB_TOKEN"]
+        invalid_env_tokens = ["your_dummy_github_token", "your_github_token_here", "placeholder", "dummy"]
+        for env_var in ["GITHUB_TOKEN", "GTM_GITHUB_TOKEN", "GITHUB_PAT"]:
+            if env_var in os.environ and os.environ[env_var] in invalid_env_tokens:
+                del os.environ[env_var]
+                logger.debug(f"Removed invalid {env_var} from environment")
         
         # Only set environment variable if we have a valid token
         if self.github_token and self._is_valid_token(self.github_token):
@@ -111,12 +152,26 @@ class GitIngestTool:
             return False
         if token.startswith("your_") or token in ["your_github_token_here", "placeholder", "dummy"]:
             return False
+        # Check for GitHub token patterns
+        if not (token.startswith(("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"))):
+            return False
         return True
     
     def get_token(self) -> Optional[str]:
         """Get GitHub token from instance or KeyManager."""
         token = self.github_token or self.key_manager.get_github_token()
-        return token if self._is_valid_token(token) else None
+        
+        if token:
+            # Debug log to see what token we're getting
+            logger.debug(f"Token received from KeyManager: {token[:10] if len(token) > 10 else token}... (length: {len(token)})")
+            
+            if not self._is_valid_token(token):
+                logger.debug(f"Invalid GitHub token format detected, filtering out")
+                return None
+        else:
+            logger.debug("No token available from KeyManager or instance")
+            
+        return token
     
     def analyze_repository(
         self, 
@@ -155,30 +210,73 @@ class GitIngestTool:
             
             logger.info(f"🔄 Analyzing repository: {repo_url}")
             
-            # Call gitingest library (synchronous version only to avoid async conflicts)
-            auth_token = token or self.get_token()  # This now returns None for invalid tokens
-            
-            if auth_token:
-                logger.info("🔐 Using GitHub authentication token")
+            # Check if we're in an async context and need to avoid asyncio.run()
+            def _run_ingest():
+                """Run gitingest in a safe context."""
+                # Double-check token validity before using it
+                valid_token = auth_token if auth_token and self._is_valid_token(auth_token) else None
+                
+                # Temporarily clear environment variables to prevent gitingest from using invalid tokens
+                env_backup = {}
+                env_vars_to_clear = ["GITHUB_TOKEN", "GTM_GITHUB_TOKEN", "GITHUB_PAT"]
+                
+                for env_var in env_vars_to_clear:
+                    if env_var in os.environ:
+                        env_backup[env_var] = os.environ[env_var]
+                        del os.environ[env_var]
+                
                 try:
-                    summary, tree, content = ingest(
-                        repo_url, 
-                        token=auth_token, 
-                        include_submodules=include_submodules
-                    )
-                except Exception as token_error:
-                    # If token fails, try without authentication
-                    logger.warning(f"Authentication failed, trying without token: {token_error}")
-                    summary, tree, content = ingest(
-                        repo_url, 
-                        include_submodules=include_submodules
-                    )
-            else:
-                logger.info("🌐 Analyzing public repository (no authentication)")
-                summary, tree, content = ingest(
-                    repo_url, 
-                    include_submodules=include_submodules
-                )
+                    if valid_token:
+                        logger.info("🔐 Using GitHub authentication token")
+                        # Set only the valid token
+                        os.environ["GITHUB_TOKEN"] = valid_token
+                        try:
+                            return ingest(
+                                repo_url, 
+                                token=valid_token, 
+                                include_submodules=include_submodules
+                            )
+                        except Exception as token_error:
+                            # If token fails, try without authentication
+                            logger.warning(f"Authentication failed, trying without token: {token_error}")
+                            if "GITHUB_TOKEN" in os.environ:
+                                del os.environ["GITHUB_TOKEN"]
+                            return ingest(
+                                repo_url, 
+                                include_submodules=include_submodules
+                            )
+                    else:
+                        if auth_token:
+                            logger.info(f"🌐 Invalid token format detected, using public access")
+                        else:
+                            logger.info("🌐 Analyzing public repository (no authentication)")
+                        return ingest(
+                            repo_url, 
+                            include_submodules=include_submodules
+                        )
+                finally:
+                    # Restore environment variables
+                    for env_var in env_vars_to_clear:
+                        if env_var in os.environ:
+                            del os.environ[env_var]
+                    for env_var, value in env_backup.items():
+                        os.environ[env_var] = value
+            
+            # Check if we're in an async event loop
+            try:
+                # If we're in an async context, run in thread pool to avoid conflicts
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    # We're in an async context, use thread pool
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(_run_ingest)
+                        summary, tree, content = future.result(timeout=300)  # 5 min timeout
+                else:
+                    # No running loop, safe to call directly
+                    summary, tree, content = _run_ingest()
+            except RuntimeError:
+                # No event loop, safe to call directly
+                summary, tree, content = _run_ingest()
             
             # Ensure we have strings, not None
             summary = summary or ""
@@ -189,7 +287,7 @@ class GitIngestTool:
                 "success": True,
                 "summary": summary,
                 "tree": tree,
-                "content": content,
+                "content": self._format_content_by_file_types(content),  # Enhanced content formatting
                 "metadata": {
                     "repo_url": repo_url,
                     "timestamp": datetime.now().isoformat(),
@@ -197,7 +295,8 @@ class GitIngestTool:
                     "summary_length": len(summary),
                     "tree_length": len(tree),
                     "content_length": len(content),
-                    "has_auth": bool(auth_token and auth_token.strip())
+                    "has_auth": bool(auth_token and auth_token.strip()),
+                    "file_types_detected": self._detect_file_types(content)
                 }
             })
             
@@ -208,6 +307,33 @@ class GitIngestTool:
             result["error"] = str(e)
         
         return result
+    
+    async def analyze_repository_async(
+        self,
+        repo_url: str,
+        include_submodules: bool = False,
+        token: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Async wrapper for analyze_repository to handle async contexts properly.
+        
+        Args:
+            repo_url: Repository URL to analyze
+            include_submodules: Whether to include repository submodules
+            token: GitHub token (overrides instance token and KeyManager)
+            
+        Returns:
+            Dictionary containing analysis results
+        """
+        # Run the sync version in a thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, 
+            self.analyze_repository,
+            repo_url,
+            include_submodules,
+            token
+        )
     
     def get_summary(self, repo_url: str, **kwargs) -> Optional[str]:
         """Get repository summary."""
@@ -223,6 +349,47 @@ class GitIngestTool:
         """Get repository content."""
         result = self.analyze_repository(repo_url, **kwargs)
         return result.get("content") if result["success"] else None
+    
+    def get_repository_metadata(self, repo_url: str, **kwargs) -> Dict[str, Any]:
+        """
+        Get repository metadata without full content analysis.
+        
+        Args:
+            repo_url: Repository URL
+            **kwargs: Additional parameters
+            
+        Returns:
+            Dictionary with repository metadata
+        """
+        try:
+            # Try to get basic info using the analyze method but only metadata
+            result = self.analyze_repository(repo_url, **kwargs)
+            
+            if result["success"]:
+                return {
+                    "accessible": True,
+                    "info": {
+                        "repo_url": repo_url,
+                        "updated_at": datetime.now().isoformat(),
+                        "size": len(result.get("content", "")),
+                        "has_content": bool(result.get("content"))
+                    },
+                    "metadata": result.get("metadata", {})
+                }
+            else:
+                return {
+                    "accessible": False,
+                    "error": result.get("error", "Unknown error"),
+                    "info": {"repo_url": repo_url}
+                }
+                
+        except Exception as e:
+            logger.warning(f"Failed to get repository metadata for {repo_url}: {e}")
+            return {
+                "accessible": False,
+                "error": str(e),
+                "info": {"repo_url": repo_url}
+            }
     
     def extract_details(self, repo_url: str, **kwargs) -> Dict[str, Any]:
         """
@@ -250,6 +417,72 @@ class GitIngestTool:
                 "error": result["error"],
                 "repo_url": repo_url
             }
+    
+    def _detect_file_types(self, content: str) -> Dict[str, int]:
+        """Detect and count different file types in the content."""
+        file_types = {}
+        import re
+        
+        # Look for file headers in the format "FILE: filename.ext"
+        file_headers = re.findall(r'FILE: ([^\n]+)', content)
+        
+        for file_header in file_headers:
+            # Extract extension
+            if '.' in file_header:
+                ext = file_header.split('.')[-1].lower()
+                file_types[ext] = file_types.get(ext, 0) + 1
+            else:
+                file_types['no_extension'] = file_types.get('no_extension', 0) + 1
+        
+        return file_types
+    
+    def _format_content_by_file_types(self, content: str) -> str:
+        """Format content with enhanced context for different file types."""
+        if not content:
+            return content
+        
+        # Add file type context header
+        file_types = self._detect_file_types(content)
+        
+        if file_types:
+            context_header = "\n=== REPOSITORY CONTENT ANALYSIS ===\n"
+            context_header += "This repository contains the following file types:\n"
+            
+            # Group by programming vs documentation files
+            code_files = {}
+            doc_files = {}
+            config_files = {}
+            
+            for ext, count in file_types.items():
+                if ext in ['py', 'js', 'ts', 'jsx', 'tsx', 'java', 'cpp', 'c', 'h', 'cs', 'php', 'rb', 'go', 'rs', 'swift']:
+                    code_files[ext] = count
+                elif ext in ['md', 'txt', 'rst', 'doc', 'docx']:
+                    doc_files[ext] = count
+                elif ext in ['json', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf']:
+                    config_files[ext] = count
+            
+            if code_files:
+                context_header += f"• Programming Files: {', '.join([f'{count} .{ext}' for ext, count in code_files.items()])}\n"
+            if doc_files:
+                context_header += f"• Documentation Files: {', '.join([f'{count} .{ext}' for ext, count in doc_files.items()])}\n"
+            if config_files:
+                context_header += f"• Configuration Files: {', '.join([f'{count} .{ext}' for ext, count in config_files.items()])}\n"
+            
+            context_header += "\n**ANALYSIS INSTRUCTIONS:**\n"
+            if code_files:
+                context_header += "- For programming files: Focus on functions, classes, imports, and language-specific patterns\n"
+            if doc_files:
+                context_header += "- For documentation: Focus on structure, content organization, and technical explanations\n"
+            if config_files:
+                context_header += "- For configuration: Focus on settings, dependencies, and project setup\n"
+            
+            context_header += "- Always reference specific files and line ranges when discussing code\n"
+            context_header += "- Never hallucinate functions or classes that don't exist in the provided content\n"
+            context_header += "=====================================\n\n"
+            
+            return context_header + content
+        
+        return content
 
 
 # Convenience functions

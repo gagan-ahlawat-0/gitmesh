@@ -175,11 +175,8 @@ class AcquisitionWorkflow(BaseWorkflow):
                         self.control_panel_monitor,
                         self.knowledge_orchestrator
                     ],
-                    tasks=tasks,
-                    process_type="workflow",
-                    memory=True,
-                    memory_config=self.memory_config,
-                    session=self.session
+                    tasks={task.name: task for task in tasks},
+                    verbose=True
                 )
             else:
                 # Create a temporary session
@@ -196,15 +193,15 @@ class AcquisitionWorkflow(BaseWorkflow):
                         self.control_panel_monitor,
                         self.knowledge_orchestrator
                     ],
-                    tasks=tasks,
-                    process_type="workflow",
-                    memory=True,
-                    memory_config=self.memory_config,
-                    session=temp_session
+                    tasks={task.name: task for task in tasks},
+                    verbose=True
                 )
             
             # Execute the workflow
-            results = await process.astart()
+            results = []
+            async for task_id in process.aworkflow():
+                results.append(task_id)
+                logger.info(f"Executed acquisition task: {task_id}")
             
             # Process results
             self.results = {
@@ -342,11 +339,8 @@ class AnalysisWorkflow(BaseWorkflow):
                         self.project_insights,
                         self.reasoning_agent
                     ],
-                    tasks=tasks,
-                    process_type="workflow",
-                    memory=True,
-                    memory_config=self.memory_config,
-                    session=self.session
+                    tasks={task.name: task for task in tasks},
+                    verbose=True
                 )
             else:
                 temp_session = Session(
@@ -360,15 +354,15 @@ class AnalysisWorkflow(BaseWorkflow):
                         self.project_insights,
                         self.reasoning_agent
                     ],
-                    tasks=tasks,
-                    process_type="workflow",
-                    memory=True,
-                    memory_config=self.memory_config,
-                    session=temp_session
+                    tasks={task.name: task for task in tasks},
+                    verbose=True
                 )
             
             # Execute the workflow
-            results = await process.astart()
+            results = []
+            async for task_id in process.aworkflow():
+                results.append(task_id)
+                logger.info(f"Executed analysis task: {task_id}")
             
             # Process results
             self.results = {
@@ -462,6 +456,58 @@ class ConversationWorkflow(BaseWorkflow):
         
         return True, output
     
+    def _create_context_aware_prompt(self, query: str) -> str:
+        """Create context-aware system prompt based on query content and file types."""
+        query_lower = query.lower()
+        
+        # Detect if query involves code analysis
+        code_keywords = ['code', 'function', 'class', 'method', 'programming', 'python', 'javascript', 
+                        'typescript', 'repository', 'repo', 'git', 'branch', 'commit', 'file', 'script']
+        has_code_context = any(keyword in query_lower for keyword in code_keywords)
+        
+        # Detect file extensions mentioned
+        file_extensions = []
+        import re
+        extension_matches = re.findall(r'\.(\w+)', query)
+        if extension_matches:
+            file_extensions = [ext.lower() for ext in extension_matches]
+        
+        # Base prompt
+        base_prompt = "You are TARS, an expert AI assistant specialized in software development and technical documentation analysis."
+        
+        if has_code_context or file_extensions:
+            # Enhanced prompt for code analysis
+            enhanced_prompt = f"""{base_prompt}
+
+**SPECIALIZED EXPERTISE:**
+- Programming Languages: Python (.py), JavaScript (.js), TypeScript (.ts), and other code files
+- Documentation: Markdown (.md), text files (.txt), README files
+- Configuration: JSON, YAML, TOML, and config files
+- Repository Analysis: Understanding project structure, dependencies, and code patterns
+
+**CODE ANALYSIS GUIDELINES:**
+1. When analyzing .py files: Focus on functions, classes, imports, docstrings, and Python-specific patterns
+2. When analyzing .js/.ts files: Focus on functions, classes, modules, exports, and JavaScript/TypeScript patterns
+3. When analyzing .md files: Focus on documentation structure, headings, code examples, and technical content
+4. When analyzing .txt files: Focus on plain text content and configuration data
+5. Always consider file context and programming language syntax
+
+**ACCURACY PRINCIPLES:**
+- Never hallucinate code that doesn't exist in the provided content
+- Always reference specific files, functions, or code sections when available
+- Distinguish between different file types and their purposes
+- Provide language-specific insights for programming files
+- Be precise about technical details and avoid generic responses
+
+Provide specific, contextual responses based on the actual file content and structure. Never use templates or make assumptions about code that isn't explicitly shown."""
+        else:
+            # Standard prompt for general queries
+            enhanced_prompt = f"""{base_prompt}
+
+Provide specific, contextual responses based on the available information. Focus on being helpful and accurate while avoiding generic templates or assumptions."""
+        
+        return enhanced_prompt
+
     async def start_conversation(self) -> None:
         """Start interactive conversation loop."""
         logger.info("Starting TARS Conversation Interface")
@@ -522,11 +568,8 @@ class ConversationWorkflow(BaseWorkflow):
                 if self.session:
                     process = Process(
                         agents=[self.conversation_orchestrator],
-                        tasks=[conversation_task],
-                        process_type="conversation",
-                        memory=True,
-                        memory_config=self.memory_config,
-                        session=self.session
+                        tasks={"conversation_task": conversation_task},
+                        verbose=True
                     )
                 else:
                     temp_session = Session(
@@ -535,14 +578,15 @@ class ConversationWorkflow(BaseWorkflow):
                     )
                     process = Process(
                         agents=[self.conversation_orchestrator],
-                        tasks=[conversation_task],
-                        process_type="conversation",
-                        memory=True,
-                        memory_config=self.memory_config,
-                        session=temp_session
+                        tasks={"conversation_task": conversation_task},
+                        verbose=True
                     )
                 
-                results = await process.astart()
+                # Execute the conversation workflow
+                results = []
+                async for task_id in process.aworkflow():
+                    results.append(task_id)
+                    logger.info(f"Executed conversation task: {task_id}")
                 
                 # Extract the response
                 if results and len(results) > 0:
@@ -592,7 +636,7 @@ Response:"""
                         try:
                             response = await self.reasoning_agent.llm_instance.get_response_async(
                                 prompt=enhanced_prompt,
-                                system_prompt="You are TARS, a helpful AI assistant. Provide specific, contextual responses. Never use templates or hardcoded content.",
+                                system_prompt=self._create_context_aware_prompt(query),
                                 temperature=0.7,
                                 tools=None,
                                 verbose=False
@@ -762,15 +806,15 @@ Commands:
                 )
                 process = Process(
                     agents=[self.conversation_orchestrator],
-                    tasks=[autonomous_task],
-                    process_type="autonomous_workflow",
-                    memory=True,
-                    memory_config=self.memory_config,
-                    session=temp_session
+                    tasks={"autonomous_task": autonomous_task},
+                    verbose=True
                 )
             
             # Execute
-            results = await process.astart()
+            results = []
+            async for task_id in process.aworkflow():
+                results.append(task_id)
+                logger.info(f"Executed autonomous task: {task_id}")
             
             self.end_time = datetime.now()
             
