@@ -107,9 +107,19 @@ class GitHubOAuth:
         origins = os.getenv('ALLOWED_ORIGINS', '').split(',')
         origins = [origin.strip() for origin in origins if origin.strip()]
         
+        # Add FRONTEND_URL to allowed origins if set
+        frontend_url = os.getenv('FRONTEND_URL')
+        if frontend_url:
+            frontend_url = frontend_url.rstrip('/')
+            if frontend_url not in origins:
+                origins.append(frontend_url)
+        
         # Add default development origins if not in production
         if os.getenv('NODE_ENV') != 'production':
-            origins.extend(['http://localhost:3000', 'http://127.0.0.1:3000','http://localhost:3002', 'http://127.0.0.1:3002'])
+            default_origins = ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3002', 'http://127.0.0.1:3002']
+            for origin in default_origins:
+                if origin not in origins:
+                    origins.append(origin)
         
         return origins
     
