@@ -521,6 +521,12 @@ async def reset_user_settings(user: User = Depends(get_current_user)):
 
 def _get_frontend_url() -> str:
     """Get frontend URL based on environment."""
+    frontend_url = os.getenv('FRONTEND_URL')
+    if frontend_url:
+        # Remove trailing slash if present
+        return frontend_url.rstrip('/')
+    
+    # Fallback based on environment
     if os.getenv('NODE_ENV') == 'production':
         return 'https://your-frontend-domain.com'
     return 'http://localhost:3002'
