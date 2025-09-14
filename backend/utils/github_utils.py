@@ -125,6 +125,25 @@ class GitHubCacheManager:
         self.cache.clear()
         self.statistics['size'] = 0
     
+    def clear_repository_cache(self, owner: str, repo: str):
+        """Clear cache entries for a specific repository."""
+        repo_prefix = f"/repos/{owner}/{repo}"
+        keys_to_remove = []
+        
+        # We need to regenerate keys and check which ones match the repository
+        for cached_item in list(self.cache.keys()):
+            # Since keys are MD5 hashes, we need to check against stored URLs
+            # This is a simplified approach - in production you might want to store URL->key mapping
+            pass
+        
+        # For now, we'll implement a simple TTL-based approach where we clear all cache
+        # This ensures no stale data but might reduce cache efficiency
+        # A more sophisticated approach would maintain a URL->key mapping
+        if len([k for k in self.cache.keys()]) > 0:
+            # Clear cache when switching repositories to prevent stale data
+            self.cache.clear()
+            self.statistics['size'] = 0
+    
     def get_statistics(self) -> Dict[str, Any]:
         """Get cache statistics."""
         total_requests = self.statistics['hits'] + self.statistics['misses']
@@ -642,6 +661,10 @@ class GitHubService:
     def clear_cache(self):
         """Clear API response cache."""
         self.client.cache_manager.clear()
+    
+    def clear_repository_cache(self, owner: str, repo: str):
+        """Clear cache for a specific repository."""
+        self.client.cache_manager.clear_repository_cache(owner, repo)
 
     # User Profile Methods
     async def get_user_profile_by_username(self, username: str, token: Optional[str] = None) -> Dict[str, Any]:

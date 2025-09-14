@@ -91,9 +91,14 @@ class ApiService {
     return this.request(`/github/repositories/${owner}/${repo}`);
   }
 
-  async getRepositoryBranches(owner: string, repo: string): Promise<ApiResponse<{ branches: any[]; total: number }>> {
-    console.log('Fetching branches for', owner, repo);
-    return this.request<{ branches: any[]; total: number }>(`/github/test-branches/${owner}/${repo}`);
+  async getRepositoryBranches(owner: string, repo: string, refresh = false): Promise<ApiResponse<{ branches: any[]; total: number }>> {
+    console.log('Fetching branches for', owner, repo, refresh ? '(forcing refresh)' : '');
+    const params = refresh ? '?refresh=true' : '';
+    return this.request<{ branches: any[]; total: number }>(`/github/repositories/${owner}/${repo}/branches${params}`);
+  }
+
+  async clearRepositoryCache(owner: string, repo: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request(`/github/cache?owner=${owner}&repo=${repo}`, { method: 'DELETE' });
   }
 
   async getRepositoryIssues(owner: string, repo: string, state = 'open', page = 1): Promise<ApiResponse<{ issues: any[]; pagination: any }>> {
