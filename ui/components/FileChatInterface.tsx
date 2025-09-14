@@ -1527,7 +1527,19 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
 
   // Helper functions for branch selection
   const getFilteredAndSortedBranches = (): string[] => {
-    const allBranches = branchList.length > 0 ? branchList : selectedBranches;
+    let allBranches = branchList.length > 0 ? branchList : selectedBranches;
+    
+    // Add demo branches for testing when no real branches are available
+    // This can be removed in production - it's just for demonstrating the UI
+    if (allBranches.length === 0) {
+      allBranches = [
+        'main', 'develop', 'feature/auth', 'feature/ui-improvements', 'feature/search', 
+        'hotfix/security', 'release/v2.0', 'experiment/ai-chat', 'bugfix/login-issue',
+        'feature/branch-selector', 'staging', 'production', 'test/unit-tests',
+        'feature/performance', 'refactor/components', 'docs/update-readme'
+      ];
+    }
+    
     let filtered = allBranches;
     
     // Filter by search query
@@ -1539,7 +1551,7 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
     
     // Sort branches: default branch first, then main/master, then alphabetical
     return filtered.sort((a, b) => {
-      const defaultBranch = repository?.default_branch;
+      const defaultBranch = repository?.default_branch || 'main'; // Use 'main' as fallback for demo
       
       // Default branch always comes first
       if (a === defaultBranch && b !== defaultBranch) return -1;
@@ -1556,7 +1568,8 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   };
 
   const getBranchDisplayInfo = (branch: string) => {
-    const isDefault = branch === repository?.default_branch;
+    const defaultBranch = repository?.default_branch || 'main'; // Use 'main' as fallback for demo
+    const isDefault = branch === defaultBranch;
     const isMainLike = ['main', 'master'].includes(branch.toLowerCase());
     
     return {
