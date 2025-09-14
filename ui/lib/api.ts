@@ -100,6 +100,27 @@ class ApiService {
     return this.request(`/github/repositories/${owner}/${repo}/issues?state=${state}&page=${page}`);
   }
 
+  async getAllRepositoryIssues(owner: string, repo: string): Promise<ApiResponse<{ 
+    issues: any[]; 
+    issues_breakdown: {
+      open: any[];
+      closed: any[];
+      total_open: number;
+      total_closed: number;
+      total: number;
+    };
+    pagination: any 
+  }>> {
+    return this.request(`/github/repositories/${owner}/${repo}/issues/all`);
+  }
+
+  async getIssueComments(owner: string, repo: string, issueNumber: number): Promise<ApiResponse<{ 
+    comments: any[]; 
+    total: number 
+  }>> {
+    return this.request(`/github/repositories/${owner}/${repo}/issues/${issueNumber}/comments`);
+  }
+
   async getRepositoryPullRequests(owner: string, repo: string, state = 'open', page = 1): Promise<ApiResponse<{ pullRequests: any[]; pagination: any }>> {
     return this.request(`/github/repositories/${owner}/${repo}/pulls?state=${state}&page=${page}`);
   }

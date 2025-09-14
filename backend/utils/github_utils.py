@@ -355,20 +355,118 @@ class GitHubService:
         repo: str, 
         state: str = 'open',
         page: int = 1, 
-        per_page: int = 30,
-        token: Optional[str] = None
+        per_page: int = 100,
+        token: Optional[str] = None,
+        fetch_all_pages: bool = False
     ) -> List[Dict[str, Any]]:
         """Get repository issues."""
         auth_token = token or self.get_token()
         if not auth_token:
             raise ValueError("GitHub token not provided and not found in KeyManager")
-        params = {
-            'state': state,
-            'page': page,
-            'per_page': per_page,
-            'sort': 'updated'
-        }
-        return await self.client.get(f'/repos/{owner}/{repo}/issues', auth_token, params)
+        
+        if not fetch_all_pages:
+            # Single page request (original behavior)
+            params = {
+                'state': state,
+                'page': page,
+                'per_page': per_page,
+                'sort': 'updated'
+            }
+            return await self.client.get(f'/repos/{owner}/{repo}/issues', auth_token, params)
+        
+        # Fetch all pages
+        all_issues = []
+        current_page = 1
+        
+        while True:
+            params = {
+                'state': state,
+                'page': current_page,
+                'per_page': per_page,
+                'sort': 'updated'
+            }
+            
+            try:
+                page_issues = await self.client.get(f'/repos/{owner}/{repo}/issues', auth_token, params)
+                
+                if not page_issues:
+                    break
+                    
+                all_issues.extend(page_issues)
+                
+                # If we got fewer issues than per_page, we've reached the last page
+                if len(page_issues) < per_page:
+                    break
+                    
+                current_page += 1
+                
+            except Exception as e:
+                logger.error(f"Error fetching issues page {current_page}: {e}")
+                break
+        
+        return all_issues
+
+    async def get_all_repository_issues(
+        self, 
+        owner: str, 
+        repo: str, 
+        token: Optional[str] = None
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Get all repository issues (both open and closed), excluding pull requests."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        
+        # Fetch both open and closed issues in parallel
+        import asyncio
+        
+        open_issues_task = self.get_repository_issues(owner, repo, 'open', 1, 100, auth_token, fetch_all_pages=True)
+        closed_issues_task = self.get_repository_issues(owner, repo, 'closed', 1, 100, auth_token, fetch_all_pages=True)
+        
+        try:
+            open_issues, closed_issues = await asyncio.gather(open_issues_task, closed_issues_task)
+            
+            # Filter out pull requests (issues with pull_request field)
+            def filter_issues(issues_list):
+                return [issue for issue in issues_list if 'pull_request' not in issue]
+            
+            open_issues_filtered = filter_issues(open_issues)
+            closed_issues_filtered = filter_issues(closed_issues)
+            all_issues_filtered = open_issues_filtered + closed_issues_filtered
+            
+            logger.info(f"Fetched {len(open_issues)} open items, {len(closed_issues)} closed items")
+            logger.info(f"After filtering PRs: {len(open_issues_filtered)} open issues, {len(closed_issues_filtered)} closed issues")
+            
+            return {
+                'open': open_issues_filtered,
+                'closed': closed_issues_filtered,
+                'all': all_issues_filtered
+            }
+        except Exception as e:
+            logger.error(f"Error fetching all repository issues: {e}")
+            return {
+                'open': [],
+                'closed': [],
+                'all': []
+            }
+
+    async def get_issue_comments(
+        self, 
+        owner: str, 
+        repo: str, 
+        issue_number: int,
+        token: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get comments for a specific issue."""
+        auth_token = token or self.get_token()
+        if not auth_token:
+            raise ValueError("GitHub token not provided and not found in KeyManager")
+        
+        try:
+            return await self.client.get(f'/repos/{owner}/{repo}/issues/{issue_number}/comments', auth_token)
+        except Exception as e:
+            logger.error(f"Error fetching comments for issue {issue_number}: {e}")
+            return []
 
     async def get_repository_pull_requests(
         self, 
@@ -376,20 +474,56 @@ class GitHubService:
         repo: str, 
         state: str = 'open',
         page: int = 1, 
-        per_page: int = 30,
-        token: Optional[str] = None
+        per_page: int = 100,
+        token: Optional[str] = None,
+        fetch_all_pages: bool = False
     ) -> List[Dict[str, Any]]:
         """Get repository pull requests."""
         auth_token = token or self.get_token()
         if not auth_token:
             raise ValueError("GitHub token not provided and not found in KeyManager")
-        params = {
-            'state': state,
-            'page': page,
-            'per_page': per_page,
-            'sort': 'updated'
-        }
-        return await self.client.get(f'/repos/{owner}/{repo}/pulls', auth_token, params)
+        
+        if not fetch_all_pages:
+            # Single page request (original behavior)
+            params = {
+                'state': state,
+                'page': page,
+                'per_page': per_page,
+                'sort': 'updated'
+            }
+            return await self.client.get(f'/repos/{owner}/{repo}/pulls', auth_token, params)
+        
+        # Fetch all pages
+        all_prs = []
+        current_page = 1
+        
+        while True:
+            params = {
+                'state': state,
+                'page': current_page,
+                'per_page': per_page,
+                'sort': 'updated'
+            }
+            
+            try:
+                page_prs = await self.client.get(f'/repos/{owner}/{repo}/pulls', auth_token, params)
+                
+                if not page_prs:
+                    break
+                    
+                all_prs.extend(page_prs)
+                
+                # If we got fewer PRs than per_page, we've reached the last page
+                if len(page_prs) < per_page:
+                    break
+                    
+                current_page += 1
+                
+            except Exception as e:
+                logger.error(f"Error fetching PRs page {current_page}: {e}")
+                break
+        
+        return all_prs
 
     async def get_repository_contributors(self, owner: str, repo: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get repository contributors."""

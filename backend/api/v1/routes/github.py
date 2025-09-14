@@ -132,6 +132,56 @@ async def get_repository_issues(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/repositories/{owner}/{repo}/issues/all")
+async def get_all_repository_issues(
+    owner: str,
+    repo: str,
+    token: str = Depends(require_auth)
+):
+    """Get all repository issues (both open and closed) with pagination."""
+    try:
+        all_issues_data = await github_service.get_all_repository_issues(owner, repo, token=token)
+        
+        return {
+            'issues': all_issues_data['all'],
+            'issues_breakdown': {
+                'open': all_issues_data['open'],
+                'closed': all_issues_data['closed'],
+                'total_open': len(all_issues_data['open']),
+                'total_closed': len(all_issues_data['closed']),
+                'total': len(all_issues_data['all'])
+            },
+            'pagination': {
+                'total_open': len(all_issues_data['open']),
+                'total_closed': len(all_issues_data['closed']),
+                'total': len(all_issues_data['all'])
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching all repository issues: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/repositories/{owner}/{repo}/issues/{issue_number}/comments")
+async def get_issue_comments(
+    owner: str,
+    repo: str,
+    issue_number: int,
+    token: str = Depends(require_auth)
+):
+    """Get comments for a specific issue."""
+    try:
+        comments = await github_service.get_issue_comments(owner, repo, issue_number, token=token)
+        
+        return {
+            'comments': comments,
+            'total': len(comments)
+        }
+    except Exception as e:
+        logger.error(f"Error fetching issue comments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/repositories/{owner}/{repo}/pulls", response_model=PullRequestsResponse)
 async def get_repository_pull_requests(
     owner: str,
@@ -518,8 +568,15 @@ async def get_branch_data(
         # Fetch branch-specific data
         branches = await github_service.get_repository_branches(owner, repo, token=token)
         commits = await github_service.get_repository_commits(owner, repo, branch, 1, 100, since, token=token)
-        issues = await github_service.get_repository_issues(owner, repo, 'all', 1, 100, token=token)
-        pull_requests = await github_service.get_repository_pull_requests(owner, repo, 'all', 1, 100, token=token)
+        
+        # Fetch all issues (both open and closed) with pagination
+        all_issues_data = await github_service.get_all_repository_issues(owner, repo, token=token)
+        all_issues = all_issues_data['all']
+        
+        # Fetch all pull requests (both open and closed) with pagination
+        open_prs = await github_service.get_repository_pull_requests(owner, repo, 'open', 1, 100, token=token, fetch_all_pages=True)
+        closed_prs = await github_service.get_repository_pull_requests(owner, repo, 'closed', 1, 100, token=token, fetch_all_pages=True)
+        all_pull_requests = open_prs + closed_prs
         
         # Find the specific branch
         branch_data = next((b for b in branches if b['name'] == branch), None)
@@ -528,17 +585,26 @@ async def get_branch_data(
             raise HTTPException(status_code=404, detail=f"Branch '{branch}' not found")
         
         # For now, return all issues and PRs since branch-specific filtering is complex
-        branch_issues = issues
-        branch_pull_requests = pull_requests
+        branch_issues = all_issues
+        branch_pull_requests = all_pull_requests
         
         branch_stats = {
             'branch': branch_data,
             'commits': commits,
             'issues': branch_issues,
+            'issues_breakdown': {
+                'open': all_issues_data['open'],
+                'closed': all_issues_data['closed'],
+                'total_open': len(all_issues_data['open']),
+                'total_closed': len(all_issues_data['closed']),
+                'total': len(all_issues)
+            },
             'pullRequests': branch_pull_requests,
             'summary': {
                 'totalCommits': len(commits),
                 'totalIssues': len(branch_issues),
+                'totalOpenIssues': len(all_issues_data['open']),
+                'totalClosedIssues': len(all_issues_data['closed']),
                 'totalPullRequests': len(branch_pull_requests),
                 'lastCommit': commits[0] if commits else None,
                 'lastActivity': branch_data.get('commit', {}).get('committer', {}).get('date')
