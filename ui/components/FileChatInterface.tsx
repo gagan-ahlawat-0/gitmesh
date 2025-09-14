@@ -1864,6 +1864,9 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
       const sourceType = activeImportType;
       let importedFiles: any[] = [];
 
+      // Close the dialog immediately when import starts
+      setShowImportDialog(false);
+
       switch (sourceType) {
         case 'csv':
           // Handle CSV import
@@ -2136,7 +2139,7 @@ console.log('File: ${filePath}');`;
         toast.success(`Successfully imported ${importedFiles.length} item(s) from ${sourceType}`);
       }
 
-      setShowImportDialog(false);
+      // Clean up form data after successful import
       setActiveImportType('');
       setImportFormData({});
       setSelectedBranchFiles([]);
@@ -2144,6 +2147,11 @@ console.log('File: ${filePath}');`;
     } catch (error) {
       console.error('Import error:', error);
       toast.error('Failed to import. Please try again.');
+      // Reset state on error and close dialog if it's still open
+      setShowImportDialog(false);
+      setActiveImportType('');
+      setImportFormData({});
+      setSelectedBranchFiles([]);
     }
   };
 
