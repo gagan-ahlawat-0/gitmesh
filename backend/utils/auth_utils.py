@@ -109,7 +109,7 @@ class GitHubOAuth:
         
         # Add default development origins if not in production
         if os.getenv('NODE_ENV') != 'production':
-            origins.extend(['http://localhost:3000', 'http://127.0.0.1:3000'])
+            origins.extend(['http://localhost:3000', 'http://127.0.0.1:3000','http://localhost:3002', 'http://127.0.0.1:3002'])
         
         return origins
     

@@ -91,6 +91,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import GitHubAPI from '@/lib/github-api';
+import { apiService } from '@/lib/api';
 import { fallbackContributionData } from './manage/contribution-data';
 import { ImportSource } from '@/lib/types';
 import ReactMarkdown from 'react-markdown';
@@ -145,6 +146,251 @@ const importSources: ImportSource[] = [
     description: 'Import context from other branches'
   }
 ];
+
+// Helper functions to format data for chat context
+const formatPullRequestsForChat = (pullRequests: any[], repository: any): string => {
+  if (!pullRequests || pullRequests.length === 0) {
+    return `# Pull Requests - ${repository.full_name}\n\nNo pull requests found in this repository.`;
+  }
+
+  let content = `# Pull Requests - ${repository.full_name}\n\n`;
+  content += `Total Pull Requests: ${pullRequests.length}\n\n`;
+
+  const openPRs = pullRequests.filter(pr => pr.state === 'open');
+  const closedPRs = pullRequests.filter(pr => pr.state === 'closed');
+  const mergedPRs = pullRequests.filter(pr => pr.merged);
+
+  content += `## Summary\n`;
+  content += `- 🟢 Open: ${openPRs.length}\n`;
+  content += `- 🔴 Closed: ${closedPRs.length}\n`;
+  content += `- 🟣 Merged: ${mergedPRs.length}\n\n`;
+
+  content += `## Recent Pull Requests\n\n`;
+  
+  pullRequests.slice(0, 20).forEach((pr, index) => {
+    const status = pr.merged ? '🟣 Merged' : pr.state === 'open' ? '🟢 Open' : '🔴 Closed';
+    content += `### ${index + 1}. ${pr.title}\n`;
+    content += `- **Status**: ${status}\n`;
+    content += `- **Author**: ${pr.user?.login || 'Unknown'}\n`;
+    content += `- **Branch**: ${pr.head?.ref} → ${pr.base?.ref}\n`;
+    content += `- **Created**: ${new Date(pr.created_at).toLocaleDateString()}\n`;
+    if (pr.body) {
+      content += `- **Description**: ${pr.body.substring(0, 200)}${pr.body.length > 200 ? '...' : ''}\n`;
+    }
+    content += `- **URL**: ${pr.html_url}\n`;
+    if (pr.comments > 0) {
+      content += `- **Comments**: ${pr.comments}\n`;
+    }
+    if (pr.review_comments > 0) {
+      content += `- **Review Comments**: ${pr.review_comments}\n`;
+    }
+    if (pr.additions && pr.deletions) {
+      content += `- **Changes**: +${pr.additions} -${pr.deletions}\n`;
+    }
+    content += '\n';
+  });
+
+  return content;
+};
+
+const formatIssuesForChat = (issues: any[], repository: any): string => {
+  if (!issues || issues.length === 0) {
+    return `# Issues - ${repository.full_name}\n\nNo issues found in this repository.`;
+  }
+
+  let content = `# Issues - ${repository.full_name}\n\n`;
+  content += `Total Issues: ${issues.length}\n\n`;
+
+  const openIssues = issues.filter(issue => issue.state === 'open');
+  const closedIssues = issues.filter(issue => issue.state === 'closed');
+
+  content += `## Summary\n`;
+  content += `- 🟢 Open: ${openIssues.length}\n`;
+  content += `- 🔴 Closed: ${closedIssues.length}\n\n`;
+
+  // Group by labels if available
+  const labelGroups: { [key: string]: any[] } = {};
+  issues.forEach(issue => {
+    if (issue.labels && issue.labels.length > 0) {
+      issue.labels.forEach((label: any) => {
+        if (!labelGroups[label.name]) {
+          labelGroups[label.name] = [];
+        }
+        labelGroups[label.name].push(issue);
+      });
+    }
+  });
+
+  if (Object.keys(labelGroups).length > 0) {
+    content += `## Issues by Label\n`;
+    Object.entries(labelGroups).slice(0, 10).forEach(([label, labelIssues]) => {
+      content += `- **${label}**: ${labelIssues.length} issues\n`;
+    });
+    content += '\n';
+  }
+
+  content += `## Recent Issues\n\n`;
+  
+  issues.slice(0, 20).forEach((issue, index) => {
+    const status = issue.state === 'open' ? '🟢 Open' : '🔴 Closed';
+    content += `### ${index + 1}. ${issue.title}\n`;
+    content += `- **Status**: ${status}\n`;
+    content += `- **Author**: ${issue.user?.login || 'Unknown'}\n`;
+    content += `- **Created**: ${new Date(issue.created_at).toLocaleDateString()}\n`;
+    content += `- **Comments**: ${issue.comments || 0}\n`;
+    if (issue.assignees && issue.assignees.length > 0) {
+      content += `- **Assignees**: ${issue.assignees.map((a: any) => a.login).join(', ')}\n`;
+    }
+    if (issue.labels && issue.labels.length > 0) {
+      content += `- **Labels**: ${issue.labels.map((label: any) => label.name).join(', ')}\n`;
+    }
+    if (issue.milestone) {
+      content += `- **Milestone**: ${issue.milestone.title}\n`;
+    }
+    if (issue.body) {
+      content += `- **Description**: ${issue.body.substring(0, 200)}${issue.body.length > 200 ? '...' : ''}\n`;
+    }
+    content += `- **URL**: ${issue.html_url}\n\n`;
+  });
+
+  return content;
+};
+
+const formatCommitsForChat = (commits: any[], repository: any, branch: string): string => {
+  if (!commits || commits.length === 0) {
+    return `# Recent Commits - ${repository.full_name} (${branch})\n\nNo commits found in this branch.`;
+  }
+
+  let content = `# Recent Commits - ${repository.full_name} (${branch})\n\n`;
+  content += `Total Commits: ${commits.length}\n\n`;
+
+  // Group commits by author
+  const authorGroups: { [key: string]: any[] } = {};
+  commits.forEach(commit => {
+    const author = commit.commit?.author?.name || commit.author?.login || 'Unknown';
+    if (!authorGroups[author]) {
+      authorGroups[author] = [];
+    }
+    authorGroups[author].push(commit);
+  });
+
+  content += `## Contributors\n`;
+  Object.entries(authorGroups).slice(0, 10).forEach(([author, authorCommits]) => {
+    content += `- **${author}**: ${authorCommits.length} commits\n`;
+  });
+  content += '\n';
+
+  content += `## Recent Commit History\n\n`;
+  
+  commits.slice(0, 30).forEach((commit, index) => {
+    const message = commit.commit?.message || 'No message';
+    const author = commit.commit?.author?.name || commit.author?.login || 'Unknown';
+    const date = commit.commit?.author?.date || commit.commit?.committer?.date;
+    
+    content += `### ${index + 1}. ${message.split('\n')[0]}\n`;
+    content += `- **Author**: ${author}\n`;
+    content += `- **SHA**: \`${commit.sha?.substring(0, 8)}\`\n`;
+    if (date) {
+      content += `- **Date**: ${new Date(date).toLocaleString()}\n`;
+    }
+    if (message.includes('\n')) {
+      const fullMessage = message.split('\n').slice(1).join('\n').trim();
+      if (fullMessage) {
+        content += `- **Details**: ${fullMessage.substring(0, 300)}${fullMessage.length > 300 ? '...' : ''}\n`;
+      }
+    }
+    content += `- **URL**: ${commit.html_url}\n\n`;
+  });
+
+  return content;
+};
+
+const formatActivitiesForChat = (activities: any[], repository: any): string => {
+  if (!activities || activities.length === 0) {
+    return `# User Activities - ${repository.full_name}\n\nNo recent activities found.`;
+  }
+
+  let content = `# User Activities - ${repository.full_name}\n\n`;
+  content += `Total Activities: ${activities.length}\n\n`;
+
+  // Group by activity type
+  const typeGroups: { [key: string]: any[] } = {};
+  activities.forEach(activity => {
+    const type = activity.type || 'Unknown';
+    if (!typeGroups[type]) {
+      typeGroups[type] = [];
+    }
+    typeGroups[type].push(activity);
+  });
+
+  content += `## Activity Types\n`;
+  Object.entries(typeGroups).forEach(([type, typeActivities]) => {
+    content += `- **${type}**: ${typeActivities.length} events\n`;
+  });
+  content += '\n';
+
+  content += `## Recent Activities\n\n`;
+  
+  activities.slice(0, 25).forEach((activity, index) => {
+    const actor = activity.actor?.login || 'Unknown';
+    const date = activity.created_at;
+    const type = activity.type;
+    
+    content += `### ${index + 1}. ${type}\n`;
+    content += `- **User**: ${actor}\n`;
+    content += `- **Repository**: ${activity.repo?.name || repository.full_name}\n`;
+    if (date) {
+      content += `- **Date**: ${new Date(date).toLocaleString()}\n`;
+    }
+    
+    // Add type-specific details
+    switch (type) {
+      case 'PushEvent':
+        if (activity.payload?.commits) {
+          content += `- **Commits**: ${activity.payload.commits.length}\n`;
+          content += `- **Branch**: ${activity.payload.ref?.replace('refs/heads/', '') || 'unknown'}\n`;
+          if (activity.payload.commits.length > 0) {
+            content += `- **Latest Commit**: ${activity.payload.commits[0].message?.substring(0, 100) || 'No message'}\n`;
+          }
+        }
+        break;
+      case 'PullRequestEvent':
+        if (activity.payload?.pull_request) {
+          content += `- **Action**: ${activity.payload.action}\n`;
+          content += `- **PR**: ${activity.payload.pull_request.title}\n`;
+          content += `- **PR URL**: ${activity.payload.pull_request.html_url}\n`;
+        }
+        break;
+      case 'IssuesEvent':
+        if (activity.payload?.issue) {
+          content += `- **Action**: ${activity.payload.action}\n`;
+          content += `- **Issue**: ${activity.payload.issue.title}\n`;
+          content += `- **Issue URL**: ${activity.payload.issue.html_url}\n`;
+        }
+        break;
+      case 'CreateEvent':
+        if (activity.payload?.ref_type) {
+          content += `- **Created**: ${activity.payload.ref_type}\n`;
+          if (activity.payload.ref) {
+            content += `- **Name**: ${activity.payload.ref}\n`;
+          }
+        }
+        break;
+      case 'WatchEvent':
+        content += `- **Action**: Started watching the repository\n`;
+        break;
+      case 'ForkEvent':
+        if (activity.payload?.forkee) {
+          content += `- **Forked to**: ${activity.payload.forkee.full_name}\n`;
+          content += `- **Fork URL**: ${activity.payload.forkee.html_url}\n`;
+        }
+        break;
+    }
+    content += '\n';
+  });
+
+  return content;
+};
 
 // Types for the chat interface
 interface ChatMessage {
@@ -844,12 +1090,12 @@ export const FileChatInterface: React.FC<FileChatInterfaceProps> = ({ importedDa
   const [selectedDataTypes, setSelectedDataTypes] = useState<{
     pullRequests: boolean;
     issues: boolean;
-    botLogs: boolean;
+    commits: boolean;
     activities: boolean;
   }>({
     pullRequests: false,
     issues: false,
-    botLogs: false,
+    commits: false,
     activities: false
   });
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
@@ -1750,14 +1996,123 @@ console.log('File: ${filePath}');`;
           
         case 'control-panel':
           // Handle control panel data import
-          if (importFormData.dataSource) {
-            importedFiles = [{
-              name: importFormData.dataSource,
-              source: 'control-panel',
-              content: 'Control panel data imported',
-              type: 'data'
-            }];
+          if (!repository) {
+            throw new Error('No repository selected');
           }
+
+          const selectedTypes = Object.entries(selectedDataTypes)
+            .filter(([_, selected]) => selected)
+            .map(([type, _]) => type);
+
+          if (selectedTypes.length === 0) {
+            throw new Error('Please select at least one data type to import');
+          }
+
+          setImportProgress({
+            isImporting: true,
+            progress: 0,
+            message: 'Fetching control panel data...',
+            importedFiles: 0,
+            totalFiles: selectedTypes.length
+          });
+
+          const { owner, name } = repository;
+          const branchFilter = importFormData.branchFilter || 'all';
+          const timeRange = importFormData.timeRange || '30d';
+          
+          let processedTypes = 0;
+          const controlPanelFiles: any[] = [];
+
+          for (const dataType of selectedTypes) {
+            try {
+              setImportProgress(prev => ({
+                ...prev,
+                message: `Fetching ${dataType}...`,
+                progress: (processedTypes / selectedTypes.length) * 90
+              }));
+
+              let data: any = null;
+              let content = '';
+
+              switch (dataType) {
+                case 'pullRequests':
+                  const prResponse = await apiService.getRepositoryPullRequests(owner.login, name, 'all');
+                  if (prResponse.data) {
+                    data = prResponse.data.pullRequests;
+                    content = formatPullRequestsForChat(data, repository);
+                  }
+                  break;
+
+                case 'issues':
+                  const issuesResponse = await apiService.getRepositoryIssues(owner.login, name, 'all');
+                  if (issuesResponse.data) {
+                    data = issuesResponse.data.issues;
+                    content = formatIssuesForChat(data, repository);
+                  }
+                  break;
+
+                case 'commits':
+                  const branch = branchFilter === 'current' ? selectedBranch : 
+                                branchFilter === 'main' ? repository.default_branch : 
+                                branchFilter === 'all' ? repository.default_branch : branchFilter;
+                  const commitsResponse = await apiService.getRepositoryCommits(owner.login, name, branch);
+                  if (commitsResponse.data) {
+                    data = commitsResponse.data.commits;
+                    content = formatCommitsForChat(data, repository, branch);
+                  }
+                  break;
+
+                case 'activities':
+                  const activitiesResponse = await apiService.getUserActivity(owner.login);
+                  if (activitiesResponse.data) {
+                    data = activitiesResponse.data.activity;
+                    content = formatActivitiesForChat(data, repository);
+                  }
+                  break;
+              }
+
+              if (content) {
+                controlPanelFiles.push({
+                  name: `${repository.name}-${dataType}.md`,
+                  source: 'control-panel',
+                  content: content,
+                  type: 'control-panel-data',
+                  dataType: dataType,
+                  repository: repository.full_name,
+                  fetchedAt: new Date().toISOString(),
+                  itemCount: Array.isArray(data) ? data.length : 0
+                });
+              }
+
+              processedTypes++;
+              setImportProgress(prev => ({
+                ...prev,
+                importedFiles: processedTypes,
+                progress: (processedTypes / selectedTypes.length) * 90
+              }));
+
+            } catch (error) {
+              console.error(`Failed to fetch ${dataType}:`, error);
+              // Add error placeholder
+              controlPanelFiles.push({
+                name: `${repository.name}-${dataType}-error.md`,
+                source: 'control-panel',
+                content: `# Error Loading ${dataType}\n\nFailed to load ${dataType} data: ${error}\n\nThis might be due to:\n- API rate limits\n- Network issues\n- Repository permissions\n- Invalid branch selection\n\nPlease try again or check your repository access.`,
+                type: 'control-panel-error',
+                dataType: dataType
+              });
+              processedTypes++;
+            }
+          }
+
+          importedFiles = controlPanelFiles;
+          
+          setImportProgress(prev => ({
+            ...prev,
+            isImporting: false,
+            progress: 100,
+            message: `Imported ${controlPanelFiles.length} control panel data files!`
+          }));
           break;
       }
 
@@ -2202,7 +2557,15 @@ console.log('File: ${filePath}');`;
                   key={message.id}
                   message={message}
                   onCopy={handleCopyMessage}
-                  messageStatus={getMessageStatus(message.id)}
+                  messageStatus={(() => {
+                    const status = getMessageStatus(message.id);
+                    return status ? {
+                      id: status.id,
+                      status: status.status,
+                      retryCount: status.retryCount,
+                      error: status.error
+                    } : undefined;
+                  })()}
                 />
               ))}
               
@@ -2359,8 +2722,8 @@ console.log('File: ${filePath}');`;
             </div>
             
             {/* Selected Files List */}
-            <div className="flex-1 overflow-hidden">
-              <div className="flex items-center justify-between mb-2">
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-2 flex-shrink-0">
                 <h4 className="font-medium text-sm">Selected Files</h4>
                 {selectedFiles.length > 0 && (
                   <Button
@@ -2374,7 +2737,7 @@ console.log('File: ${filePath}');`;
                 )}
               </div>
               
-              <div className="space-y-3 overflow-y-auto flex-1">
+              <div className="space-y-3 overflow-y-auto flex-1 min-h-0">
                 {selectedFiles.length > 0 ? (
                   <div className="space-y-3">
                     {/* Organize files by source */}
@@ -2598,21 +2961,126 @@ console.log('File: ${filePath}');`;
 
             {/* Control Panel Import Form */}
             {activeImportType === 'control-panel' && (
-              <div className="space-y-3">
+              <div className="space-y-4">
+                {/* Repository Context */}
                 <div>
-                  <Label htmlFor="data-source">Data Source</Label>
-                  <Select onValueChange={(value) => setImportFormData({...importFormData, dataSource: value})}>
+                  <Label>Repository</Label>
+                  <div className="text-sm text-muted-foreground mt-1 p-2 bg-muted/50 rounded">
+                    {repository ? (
+                      <div className="flex items-center gap-2">
+                        <Github size={14} />
+                        <span>{repository.owner.login}/{repository.name}</span>
+                      </div>
+                    ) : (
+                      'No repository selected'
+                    )}
+                  </div>
+                </div>
+
+                {/* Branch Filter */}
+                <div>
+                  <Label htmlFor="branch-filter">Branch Filter</Label>
+                  <Select onValueChange={(value) => setImportFormData({...importFormData, branchFilter: value})}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select data source" />
+                      <SelectValue placeholder="All branches" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="repositories">Repository Data</SelectItem>
-                      <SelectItem value="analytics">Analytics Data</SelectItem>
-                      <SelectItem value="settings">Configuration Data</SelectItem>
-                      <SelectItem value="users">User Data</SelectItem>
+                      <SelectItem value="all">All Branches</SelectItem>
+                      <SelectItem value="main">Main Branch Only</SelectItem>
+                      <SelectItem value="current">Current Branch ({selectedBranch})</SelectItem>
+                      {branchList.map(branch => (
+                        <SelectItem key={branch} value={branch}>{branch}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Data Types Selection */}
+                <div>
+                  <Label>Data Types to Import</Label>
+                  <div className="grid grid-cols-1 gap-3 mt-2">
+                    {[
+                      { 
+                        key: 'pullRequests', 
+                        label: 'Pull Requests', 
+                        icon: '🔀', 
+                        description: 'Open, closed, and merged PRs with details' 
+                      },
+                      { 
+                        key: 'issues', 
+                        label: 'Issues', 
+                        icon: '🐛', 
+                        description: 'Open and closed issues with labels and comments' 
+                      },
+                      { 
+                        key: 'commits', 
+                        label: 'Recent Commits', 
+                        icon: '💾', 
+                        description: 'Latest commits from selected branches' 
+                      },
+                      { 
+                        key: 'activities', 
+                        label: 'User Activities', 
+                        icon: '⚡', 
+                        description: 'Recent user activities and events' 
+                      }
+                    ].map(dataType => (
+                      <div key={dataType.key} className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
+                        <label className="flex items-start gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedDataTypes[dataType.key as keyof typeof selectedDataTypes]}
+                            onChange={(e) => setSelectedDataTypes(prev => ({
+                              ...prev,
+                              [dataType.key]: e.target.checked
+                            }))}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span>{dataType.icon}</span>
+                              <span className="font-medium text-sm">{dataType.label}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{dataType.description}</p>
+                          </div>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Time Range */}
+                <div>
+                  <Label htmlFor="time-range">Time Range</Label>
+                  <Select onValueChange={(value) => setImportFormData({...importFormData, timeRange: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Last 30 days" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7d">Last 7 days</SelectItem>
+                      <SelectItem value="30d">Last 30 days</SelectItem>
+                      <SelectItem value="90d">Last 3 months</SelectItem>
+                      <SelectItem value="1y">Last year</SelectItem>
+                      <SelectItem value="all">All time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Data Preview */}
+                {Object.values(selectedDataTypes).some(Boolean) && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <div className="text-sm font-medium mb-2">Will Import:</div>
+                    <div className="space-y-1 text-xs">
+                      {selectedDataTypes.pullRequests && <div>• Pull Requests (all states)</div>}
+                      {selectedDataTypes.issues && <div>• Issues (all states)</div>}
+                      {selectedDataTypes.commits && <div>• Recent Commits</div>}
+                      {selectedDataTypes.activities && <div>• User Activities</div>}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-2">
+                      Time range: {importFormData.timeRange || 'Last 30 days'}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2837,7 +3305,7 @@ console.log('File: ${filePath}');`;
                 (activeImportType === 'file' && (!importFormData.files || importFormData.files.length === 0)) ||
                 (activeImportType === 'text' && (!importFormData.title || !importFormData.text)) ||
                 (activeImportType === 'branch' && (!importFormData.selectedBranch || selectedBranchFiles.length === 0)) ||
-                (activeImportType === 'control-panel' && !importFormData.dataSource)
+                (activeImportType === 'control-panel' && !Object.values(selectedDataTypes).some(Boolean))
               }
             >
               Import

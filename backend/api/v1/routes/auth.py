@@ -523,7 +523,7 @@ def _get_frontend_url() -> str:
     """Get frontend URL based on environment."""
     if os.getenv('NODE_ENV') == 'production':
         return 'https://your-frontend-domain.com'
-    return 'http://localhost:3000'
+    return 'http://localhost:3002'
 
 
 def _redirect_with_error(error_title: str, error_message: str) -> RedirectResponse:
