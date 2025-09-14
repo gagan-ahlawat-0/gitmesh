@@ -112,7 +112,6 @@ GitMesh is ready to revolutionize the open source world with improved collaborat
 
 - Node.js v18+ and npm
 - Python 3.12
-- Qdrant database (cloud or local)
 - Git
 
 ### 👾 Clone the repository
