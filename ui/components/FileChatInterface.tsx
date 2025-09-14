@@ -2722,8 +2722,8 @@ console.log('File: ${filePath}');`;
             </div>
             
             {/* Selected Files List */}
-            <div className="flex-1 overflow-hidden">
-              <div className="flex items-center justify-between mb-2">
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-2 flex-shrink-0">
                 <h4 className="font-medium text-sm">Selected Files</h4>
                 {selectedFiles.length > 0 && (
                   <Button
@@ -2737,7 +2737,7 @@ console.log('File: ${filePath}');`;
                 )}
               </div>
               
-              <div className="space-y-3 overflow-y-auto flex-1">
+              <div className="space-y-3 overflow-y-auto flex-1 min-h-0">
                 {selectedFiles.length > 0 ? (
                   <div className="space-y-3">
                     {/* Organize files by source */}
