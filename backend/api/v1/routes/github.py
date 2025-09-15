@@ -90,10 +90,15 @@ async def test_branches(owner: str, repo: str, token: str = Depends(require_auth
 async def get_repository_branches(
     owner: str,
     repo: str,
-    token: Optional[str] = Depends(optional_auth)
+    token: Optional[str] = Depends(optional_auth),
+    refresh: bool = Query(False, description="Force refresh cache")
 ):
     """Get repository branches."""
     try:
+        # Clear repository cache if refresh is requested
+        if refresh:
+            github_service.clear_repository_cache(owner, repo)
+            
         branches = await github_service.get_repository_branches(owner, repo, token=token)
         
         return BranchesResponse(
@@ -762,11 +767,16 @@ async def get_rate_limit_status(token: str = Depends(require_auth)):
 @router.delete("/cache", response_model=CacheResponse)
 async def clear_github_cache(
     token: str = Depends(require_auth),
-    type: Optional[str] = Query(None, description="Cache type to clear")
+    type: Optional[str] = Query(None, description="Cache type to clear"),
+    owner: Optional[str] = Query(None, description="Repository owner for specific cache clear"),
+    repo: Optional[str] = Query(None, description="Repository name for specific cache clear")
 ):
     """Clear GitHub API cache."""
     try:
-        if type:
+        if owner and repo:
+            github_service.clear_repository_cache(owner, repo)
+            return CacheResponse(message=f"GitHub API cache cleared for {owner}/{repo}")
+        elif type:
             return CacheResponse(message=f"Cache type '{type}' clearing not implemented")
         else:
             github_service.clear_cache()
