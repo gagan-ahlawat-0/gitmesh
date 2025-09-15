@@ -81,24 +81,32 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
         const { owner, name } = repository;
         const now = new Date();
         const since = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        // Fetch both branch-specific data and all repo PRs
-        const [branchResponse, prResponse] = await Promise.all([
-          apiService.getBranchData(owner.login, name, selectedBranch, { since }),
-          apiService.getRepositoryPullRequests(owner.login, name, 'all')
-        ]);
+        
+        // Fetch branch-specific data (which now includes all issues and PRs)
+        const branchResponse = await apiService.getBranchData(owner.login, name, selectedBranch, { since });
+        
         if (branchResponse.error) {
           setBeetleData(null);
           setDataError(branchResponse.error.message);
         } else {
           setBeetleData(branchResponse.data);
+          
+          // Extract PRs from branch data (which now includes all PRs)
+          if (branchResponse.data && branchResponse.data.pullRequests) {
+            setAllRepoPRs(branchResponse.data.pullRequests);
+          } else {
+            setAllRepoPRs([]);
+          }
         }
-        if (prResponse.error) {
-          setAllRepoPRs([]);
-        } else if (prResponse.data && prResponse.data.pullRequests) {
-          setAllRepoPRs(prResponse.data.pullRequests);
-        } else {
-          setAllRepoPRs([]);
-        }
+        
+        console.log('[GitMesh] Branch data fetched:', {
+          totalIssues: branchResponse.data?.summary?.totalIssues || 0,
+          totalOpenIssues: branchResponse.data?.summary?.totalOpenIssues || 0,
+          totalClosedIssues: branchResponse.data?.summary?.totalClosedIssues || 0,
+          totalPRs: branchResponse.data?.summary?.totalPullRequests || 0,
+          issuesBreakdown: branchResponse.data?.issues_breakdown
+        });
+        
       } catch (err: any) {
         setBeetleData(null);
         setAllRepoPRs([]);
@@ -117,11 +125,22 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
     }
     
     console.log('[GitMesh Overview] beetleData structure:', beetleData);
+    console.log('[GitMesh Overview] Issues breakdown:', beetleData.issues_breakdown);
+    
+    // Use the complete issues data from the backend
+    const allIssues = beetleData.issues || [];
+    const issuesBreakdown = beetleData.issues_breakdown || {
+      open: [],
+      closed: [],
+      total_open: 0,
+      total_closed: 0,
+      total: 0
+    };
     
     const transformedData = transformGitHubData(
       beetleData.activity || [],
       allRepoPRs || [],
-      beetleData.issues || [],
+      allIssues, // Use all issues (both open and closed)
       beetleData.commits || [],
       user
     );
@@ -148,6 +167,7 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
     return {
       pullRequests: filteredPRs,
       issues: transformedData.issues || [],
+      issuesBreakdown, // Include the breakdown for UI display
       activity,
     };
   }, [beetleData, allRepoPRs, selectedBranch, prFilters]);
@@ -189,6 +209,7 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
     return {
       pullRequests: prs,
       issues,
+      issuesBreakdown: branchData.issuesBreakdown,
       activity: branchData.activity
     };
   }, [branchData, searchQuery, prFilters, issueFilters, selectedSection]);
@@ -242,6 +263,7 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
           <PRIssuesCombined 
             pullRequests={filteredData.pullRequests}
             issues={filteredData.issues}
+            issuesBreakdown={filteredData.issuesBreakdown}
             branch={selectedBranch}
             searchQuery={searchQuery}
           />
@@ -258,6 +280,7 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
         return (
           <IssueTracker 
             issues={filteredData.issues}
+            issuesBreakdown={filteredData.issuesBreakdown}
             branch={selectedBranch}
             searchQuery={searchQuery}
           />
@@ -355,9 +378,9 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-screen">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-background border-b border-border/50">
+      <div className="sticky top-0 z-10 bg-background border-b border-border/50 flex-shrink-0">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-4">
             <div>
@@ -388,7 +411,7 @@ const BranchContributionManager = ({ selectedSection = 'overview' }: BranchContr
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-auto pb-0 mb-0">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-8">
         {renderSectionContent()}
       </div>
 
