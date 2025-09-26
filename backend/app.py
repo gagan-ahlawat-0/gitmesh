@@ -5,13 +5,20 @@ Main entry point for the system.
 import sys
 import os
 
-# Add the parent directory to the sys.path to allow for absolute imports
+# Add the parent directory to allow for absolute imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Initialize Cosmos configuration early
+try:
+    from integrations.cosmos.v1.cosmos.config import initialize_configuration
+    initialize_configuration()
+    print("✅ Cosmos configuration initialized successfully")
+except Exception as e:
+    print(f"⚠️ Cosmos configuration initialization failed: {e}")
 
 import asyncio
 import os
@@ -27,6 +34,16 @@ from pydantic import BaseModel
 # Import core components
 from config.settings import get_settings
 from utils.tracing import trace
+
+# Import error handling middleware
+from api.middleware.error_middleware import ErrorMiddleware, RequestLoggingMiddleware
+from services.graceful_degradation import get_graceful_degradation_service
+
+# Import security middleware
+from api.middleware.security_middleware import (
+    SecurityHeadersMiddleware, CORSSecurityMiddleware,
+    InputValidationMiddleware, RateLimitingMiddleware
+)
 
 # Import API routes
 from api.v1.routes import health
@@ -63,6 +80,48 @@ async def lifespan(app: FastAPI):
         
         logger.info("✅ Database initialized successfully")
         
+        # Initialize graceful degradation service
+        try:
+            degradation_service = get_graceful_degradation_service()
+            app.state.degradation_service = degradation_service
+            logger.info("✅ Graceful degradation service initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Graceful degradation service initialization failed: {e}")
+        
+        # Initialize Cosmos integration service
+        try:
+            from services.cosmos_integration_service import initialize_cosmos_integration, get_integration_service
+            
+            cosmos_initialized = await initialize_cosmos_integration()
+            if cosmos_initialized:
+                integration_service = await get_integration_service()
+                app.state.cosmos_integration = integration_service
+                logger.info("✅ Cosmos Chat integration initialized successfully")
+            else:
+                logger.warning("⚠️ Cosmos Chat integration initialization failed")
+        except Exception as e:
+            logger.warning(f"⚠️ Cosmos integration initialization error: {e}")
+        
+        # Initialize cache cleanup scheduler
+        try:
+            from services.cache_cleanup_scheduler import start_cache_cleanup_scheduler, SchedulerConfig
+            
+            scheduler_config = SchedulerConfig(
+                expired_cleanup_interval=300,  # 5 minutes
+                memory_optimization_interval=1800,  # 30 minutes
+                health_check_interval=60,  # 1 minute
+                memory_warning_threshold_mb=80.0,
+                memory_critical_threshold_mb=100.0,
+                enable_health_monitoring=True,
+                enable_memory_alerts=True,
+                log_cleanup_results=True
+            )
+            
+            await start_cache_cleanup_scheduler(scheduler_config)
+            logger.info("✅ Cache cleanup scheduler started successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ Cache cleanup scheduler initialization failed: {e}")
+        
         logger.info("✅ Gitmesh System started successfully")
         trace("app_started", {"status": "success"})
         
@@ -76,6 +135,19 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("🛑 Shutting down Gitmesh System...")
     try:
+        # Shutdown cache cleanup scheduler
+        try:
+            from services.cache_cleanup_scheduler import stop_cache_cleanup_scheduler
+            await stop_cache_cleanup_scheduler()
+            logger.info("✅ Cache cleanup scheduler stopped")
+        except Exception as e:
+            logger.warning(f"⚠️ Error stopping cache cleanup scheduler: {e}")
+        
+        # Shutdown Cosmos integration service
+        if hasattr(app.state, 'cosmos_integration'):
+            await app.state.cosmos_integration.shutdown()
+            logger.info("✅ Cosmos integration service shutdown")
+        
         # Shutdown database connections
         from config.database import close_database
         await close_database()
@@ -95,14 +167,24 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Add security middleware stack (order is important)
+# 1. Security headers (outermost)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# 2. Rate limiting and abuse prevention
+app.add_middleware(RateLimitingMiddleware)
+
+# 3. Input validation and sanitization
+app.add_middleware(InputValidationMiddleware)
+
+# 4. Enhanced CORS with security validation
+app.add_middleware(CORSSecurityMiddleware)
+
+# 5. Error handling middleware (catches security errors)
+app.add_middleware(ErrorMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+
+# Note: Removed basic CORSMiddleware as it's replaced by CORSSecurityMiddleware
 
 # Include API routes
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
@@ -119,25 +201,145 @@ app.include_router(file_upload_router, prefix="/api/v1", tags=["file_upload"])
 app.include_router(static_router, tags=["static_files"])
 app.include_router(hub_router, prefix="/api/v1/hub", tags=["hub"])
 
-# Include AI import routes (TARS v1 integration)
+# Include AI import routes (Cosmos integration)
 try:
     from api.v1.routes.ai_import import router as ai_import_router
     app.include_router(ai_import_router, prefix="/api/ai", tags=["ai_import"])
-    logger.info("✅ AI Import routes (TARS v1) loaded successfully")
+    logger.info("✅ AI Import routes (Cosmos) loaded successfully")
 except ImportError as e:
     logger.warning(f"⚠️ AI Import routes not available: {e}")
 except Exception as e:
     logger.error(f"❌ Error loading AI Import routes: {e}")
 
-# Include Chat routes (bridges to TARS v1)
+# Include Chat routes (Cosmos AI integration)
 try:
     from api.v1.routes.chat import router as chat_router
     app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
-    logger.info("✅ Chat routes (TARS v1 bridge) loaded successfully")
+    logger.info("✅ Chat routes (Cosmos AI) loaded successfully")
 except ImportError as e:
     logger.warning(f"⚠️ Chat routes not available: {e}")
 except Exception as e:
     logger.error(f"❌ Error loading Chat routes: {e}")
+
+# Include Simple Chat routes (fallback chat functionality)
+try:
+    from api.v1.routes.simple_chat import router as simple_chat_router
+    app.include_router(simple_chat_router, prefix="/api/v1", tags=["simple_chat"])
+    logger.info("✅ Simple Chat routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Simple Chat routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Simple Chat routes: {e}")
+
+# Include Cosmos Chat API routes (New comprehensive chat API)
+try:
+    from api.v1.routes.cosmos_chat import router as cosmos_chat_router
+    app.include_router(cosmos_chat_router, prefix="/api/v1/cosmos/chat", tags=["cosmos_chat"])
+    logger.info("✅ Cosmos Chat API routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Cosmos Chat API routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Cosmos Chat API routes: {e}")
+
+# Include Cosmos Health Check routes
+try:
+    from api.v1.routes.cosmos_health import router as cosmos_health_router
+    app.include_router(cosmos_health_router, prefix="/api/v1", tags=["cosmos_health"])
+    logger.info("✅ Cosmos Health Check routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Cosmos Health Check routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Cosmos Health Check routes: {e}")
+
+# Include Tier-based Chat Integration routes
+try:
+    from api.v1.routes.chat_tier_integration import router as tier_chat_router
+    app.include_router(tier_chat_router, prefix="/api/v1/chat/tier", tags=["tier_chat"])
+    logger.info("✅ Tier-based Chat Integration routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Tier-based Chat Integration routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Tier-based Chat Integration routes: {e}")
+
+# Include Real-time Chat WebSocket routes
+try:
+    from api.v1.routes.chat_websocket import router as chat_websocket_router
+    app.include_router(chat_websocket_router, prefix="/api/v1", tags=["chat_websocket"])
+    logger.info("✅ Real-time Chat WebSocket routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Real-time Chat WebSocket routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Real-time Chat WebSocket routes: {e}")
+
+# Include System Health and Monitoring routes
+try:
+    from api.v1.routes.system_health import router as system_health_router
+    app.include_router(system_health_router, prefix="/api/v1", tags=["system_health"])
+    logger.info("✅ System Health and Monitoring routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ System Health routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading System Health routes: {e}")
+
+# Include Session Persistence and Recovery routes
+try:
+    from api.v1.routes.session_persistence import router as session_persistence_router
+    app.include_router(session_persistence_router, prefix="/api/v1", tags=["session_persistence"])
+    logger.info("✅ Session Persistence and Recovery routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Session Persistence routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Session Persistence routes: {e}")
+
+# Include Performance Optimization and Caching routes
+try:
+    from api.v1.routes.performance_metrics import router as performance_metrics_router
+    app.include_router(performance_metrics_router, prefix="/api/v1", tags=["performance_metrics"])
+    logger.info("✅ Performance Optimization and Caching routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Performance Metrics routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Performance Metrics routes: {e}")
+
+# Include Chat Analytics and Monitoring routes
+try:
+    from api.v1.routes.chat_analytics import router as chat_analytics_router
+    app.include_router(chat_analytics_router, prefix="/api/v1/chat", tags=["chat_analytics"])
+    logger.info("✅ Chat Analytics and Monitoring routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Chat Analytics routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Chat Analytics routes: {e}")
+
+# Include Repository Validation routes
+try:
+    from api.v1.routes.repository_validation import router as repository_validation_router
+    app.include_router(repository_validation_router, prefix="/api/v1/repository", tags=["repository_validation"])
+    logger.info("✅ Repository Validation routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Repository Validation routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Repository Validation routes: {e}")
+
+# Include Security Monitoring routes
+try:
+    from api.v1.routes.security_monitoring import router as security_monitoring_router
+    app.include_router(security_monitoring_router, prefix="/api/v1", tags=["security_monitoring"])
+    logger.info("✅ Security Monitoring routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Security Monitoring routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Security Monitoring routes: {e}")
+
+# Include Repository Cache Management routes
+try:
+    from api.v1.routes.repository_cache import router as repository_cache_router
+    app.include_router(repository_cache_router, prefix="/api/v1", tags=["repository_cache"])
+    logger.info("✅ Repository Cache Management routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Repository Cache routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Repository Cache routes: {e}")
 
 # Add a test endpoint to verify the connection
 @app.get("/test")

@@ -16,8 +16,6 @@ import {
   Settings,
   Bot,
   Zap,
-  Sparkles,
-  BookOpen,
   Search,
   Filter,
   Users,
@@ -25,16 +23,12 @@ import {
   TrendingUp,
   Shield,
   Globe,
-  Database,
-  Upload,
-  Type,
-  ChevronRight,
-  ChevronLeft,
-  Maximize2,
-  Minimize2
 } from 'lucide-react';
 import { VSCodeInterface } from '@/components/VSCodeInterface';
 import { ChatProvider } from '@/contexts/ChatContext';
+import { RepositoryCacheManager } from '@/components/RepositoryCacheManager';
+import { useRepositoryCache } from '@/hooks/useRepositoryCache';
+import { useNavigationCache } from '@/hooks/useNavigationCache';
 import { toast } from 'sonner';
 
 interface ImportedData {
@@ -53,6 +47,17 @@ export default function ChatPage() {
   const { repository } = useRepository();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [importedData, setImportedData] = useState<ImportedData | null>(null);
+  const [showCacheManager, setShowCacheManager] = useState(false);
+  
+  // Initialize repository caching hook
+  useRepositoryCache();
+  
+  // Initialize navigation cache management with notifications
+  useNavigationCache({
+    enableAutoCleanup: true,
+    cleanupDelay: 1000,
+    showNotifications: false // Set to true for debugging
+  });
 
   // Demo repository setup for testing
   React.useEffect(() => {
@@ -101,33 +106,43 @@ export default function ChatPage() {
   const features = [
     {
       icon: <Code2 size={20} />,
-      title: "Code Analysis",
-      description: "Ask questions about your codebase and get intelligent responses"
+      title: "Advanced Code Analysis",
+      description: "Cosmos AI provides deep code understanding and intelligent responses"
     },
     {
       icon: <FileText size={20} />,
-      title: "File Context",
-      description: "Select specific files to focus the AI's attention"
+      title: "Repository-Wide Context",
+      description: "Analyze entire codebases with Cosmos's powerful context engine"
     },
     {
       icon: <GitBranch size={20} />,
-      title: "Multi-Branch Support",
-      description: "Chat across different branches and compare code"
+      title: "Multi-Model Support",
+      description: "Choose from multiple AI models including GPT-4, Claude, and more"
     },
     {
       icon: <Search size={20} />,
-      title: "Smart Search",
-      description: "Find specific functions, classes, or patterns in your code"
+      title: "Semantic Code Search",
+      description: "Find code patterns and structures using natural language queries"
     },
     {
       icon: <Bot size={20} />,
-      title: "AI-Powered",
-      description: "Powered by advanced AI models for accurate code understanding"
+      title: "Cosmos AI Integration",
+      description: "Powered by Cosmos - the most advanced AI coding assistant"
+    },
+    {
+      icon: <Zap size={20} />,
+      title: "Real-time Processing",
+      description: "Get instant responses with streaming AI capabilities"
     },
     {
       icon: <Shield size={20} />,
-      title: "Secure",
-      description: "Your code stays private and secure during analysis"
+      title: "Cloud-Based Security",
+      description: "Enterprise-grade security with cloud-based processing"
+    },
+    {
+      icon: <TrendingUp size={20} />,
+      title: "Code Improvements",
+      description: "Get suggestions for code optimization and best practices"
     }
   ];
 
@@ -181,6 +196,13 @@ export default function ChatPage() {
     <ChatProvider>
       <div className="fixed inset-0 bg-background">
         <VSCodeInterface />
+        
+        {/* Repository Cache Manager - Floating */}
+        {repository && (
+          <div className="fixed bottom-4 right-4 z-50 space-y-2">
+            <RepositoryCacheManager />
+          </div>
+        )}
       </div>
     </ChatProvider>
   );

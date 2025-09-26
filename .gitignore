@@ -288,3 +288,5 @@ qdrant_storage/
 .gitmesh
 .tars
 tars_sessions
+secret.yaml
+data/
