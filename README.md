@@ -230,117 +230,62 @@ Mesh & Meshy are excited to see what amazing contributions you'll bring to the G
 
 ## </> Our Maintainers
 
-<style>
-/* Optional: Center the entire table content */
-.maintainer-table {
-  display: flex;
-  justify-content: center;
-}
+<table width="100%">
+  <tr align="center">
+    <td valign="top" width="33%">
+      <a href="https://github.com/RAWx18" target="_blank">
+        <img src="https://avatars.githubusercontent.com/RAWx18?s=150" width="120" alt="RAWx18"/><br/>
+        <strong>RAWx18</strong>
+      </a>
+      <p>
+        <a href="https://github.com/RAWx18" target="_blank">
+          <img src="https://img.shields.io/badge/GitHub-100000?style=flat&logo=github&logoColor=white" alt="GitHub"/>
+        </a>
+        <a href="https://www.linkedin.com/in/ryanmadhuwala" target="_blank">
+          <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" alt="LinkedIn"/>
+        </a>
+        <a href="mailto:the.ryan@gitmesh.dev">
+          <img src="https://img.shields.io/badge/Email-D14836?style=flat&logo=gmail&logoColor=white" alt="Email"/>
+        </a>
+      </p>
+    </td>
+    <td valign="top" width="33%">
+      <a href="https://github.com/parvm1102" target="_blank">
+        <img src="https://avatars.githubusercontent.com/parvm1102?s=150" width="120" alt="parvm1102"/><br/>
+        <strong>parvm1102</strong>
+      </a>
+      <p>
+        <a href="https://github.com/parvm1102" target="_blank">
+          <img src="https://img.shields.io/badge/GitHub-100000?style=flat&logo=github&logoColor=white" alt="GitHub"/>
+        </a>
+        <a href="https://linkedin.com/in/mittal-parv" target="_blank">
+          <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" alt="LinkedIn"/>
+        </a>
+        <a href="mailto:mittal@gitmesh.dev">
+          <img src="https://img.shields.io/badge/Email-D14836?style=flat&logo=gmail&logoColor=white" alt="Email"/>
+        </a>
+      </p>
+    </td>
+    <td valign="top" width="33%">
+      <a href="https://github.com/Ronit-Raj9" target="_blank">
+        <img src="https://avatars.githubusercontent.com/Ronit-Raj9?s=150" width="120" alt="Ronit-Raj9"/><br/>
+        <strong>Ronit-Raj9</strong>
+      </a>
+      <p>
+        <a href="https://github.com/Ronit-Raj9" target="_blank">
+          <img src="https://img.shields.io/badge/GitHub-100000?style=flat&logo=github&logoColor=white" alt="GitHub"/>
+        </a>
+        <a href="https://www.linkedin.com/in/ronitraj-ai" target="_blank">
+          <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" alt="LinkedIn"/>
+        </a>
+        <a href="mailto:ronii@gitmesh.dev">
+          <img src="https://img.shields.io/badge/Email-D14836?style=flat&logo=gmail&logoColor=white" alt="Email"/>
+        </a>
+      </p>
+    </td>
+  </tr>
+</table>
 
-/* Style for the container of each maintainer */
-.maintainer-card {
-  /* Set a slight transition for a smooth "pop" effect */
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-  border-radius: 8px; /* Slightly rounded corners */
-  padding: 10px;
-  margin: 10px;
-  text-align: center;
-  /* Initial state: slightly subtle box shadow */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* Hover effect: Scale up and make the shadow more prominent */
-.maintainer-card:hover {
-  transform: scale(1.05); /* Zoom in slightly */
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2); /* Deeper shadow */
-  /* You can even change the background color on hover if you like, e.g., background-color: #f0f0f0; */
-}
-
-/* Style for the avatar image */
-.maintainer-avatar {
-  border-radius: 50%; /* Make the image perfectly round */
-  border: 4px solid transparent; /* Initial border */
-  transition: border-color 0.2s ease-in-out;
-}
-
-/* Hover effect for the avatar */
-.maintainer-card:hover .maintainer-avatar {
-  /* Give it a subtle highlight color on hover, like a project-specific blue */
-  border-color: #0077B5; /* Using LinkedIn's blue for example */
-}
-
-/* Style for the social links */
-.maintainer-links a {
-  display: inline-block;
-  margin: 3px;
-  /* Subtle link transition */
-  transition: transform 0.1s ease-in-out;
-}
-
-/* Hover effect for the social links */
-.maintainer-links a:hover {
-  transform: translateY(-2px); /* Makes the badge "lift" */
-}
-</style>
-
-<div class="maintainer-table">
-  <div class="maintainer-card">
-    <a href="https://github.com/RAWx18">
-      <img class="maintainer-avatar" src="https://avatars.githubusercontent.com/RAWx18?s=150" width="120" alt="RAWx18"/><br/>
-      <sub><b>RAWx18</b></sub>
-    </a>
-    <br/>
-    <div class="maintainer-links">
-      <a href="https://github.com/RAWx18">
-        <img src="https://img.shields.io/badge/GitHub-100000?style=flat&logo=github&logoColor=white" />
-      </a>
-      <a href="https://linkedin.com/in/RAWx18">
-        <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" />
-      </a>
-      <a href="mailto:rawx18@example.com">
-        <img src="https://img.shields.io/badge/Email-D14836?style=flat&logo=gmail&logoColor=white" />
-      </a>
-    </div>
-  </div>
-  
-  <div class="maintainer-card">
-    <a href="https://github.com/parvm1102">
-      <img class="maintainer-avatar" src="https://avatars.githubusercontent.com/parvm1102?s=150" width="120" alt="parvm1102"/><br/>
-      <sub><b>parvm1102</b></sub>
-    </a>
-    <br/>
-    <div class="maintainer-links">
-      <a href="https://github.com/parvm1102">
-        <img src="https://img.shields.io/badge/GitHub-100000?style=flat&logo=github&logoColor=white" />
-      </a>
-      <a href="https://linkedin.com/in/parvm1102">
-        <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" />
-      </a>
-      <a href="mailto:parvm1102@example.com">
-        <img src="https://img.shields.io/badge/Email-D14836?style=flat&logo=gmail&logoColor=white" />
-      </a>
-    </div>
-  </div>
-  
-  <div class="maintainer-card">
-    <a href="https://github.com/Ronit-Raj9">
-      <img class="maintainer-avatar" src="https://avatars.githubusercontent.com/Ronit-Raj9?s=150" width="120" alt="Ronit-Raj9"/><br/>
-      <sub><b>Ronit-Raj9</b></sub>
-    </a>
-    <br/>
-    <div class="maintainer-links">
-      <a href="https://github.com/Ronit-Raj9">
-        <img src="https://img.shields.io/badge/GitHub-100000?style=flat&logo=github&logoColor=white" />
-      </a>
-      <a href="https://linkedin.com/in/Ronit-Raj9">
-        <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white" />
-      </a>
-      <a href="mailto:ronit.raj9@example.com">
-        <img src="https://img.shields.io/badge/Email-D14836?style=flat&logo=gmail&logoColor=white" />
-      </a>
-    </div>
-  </div>
-</div>
 
 
 ## </> Community & Support
