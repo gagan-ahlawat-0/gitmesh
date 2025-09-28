@@ -2,7 +2,7 @@ from pathlib import Path
 
 from cosmos import diffs
 
-from ..dump import dump  # noqa: F401
+from cosmos.dump import dump  # noqa: F401
 from .base_coder import Coder
 from .wholefile_prompts import WholeFilePrompts
 

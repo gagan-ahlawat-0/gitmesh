@@ -12,12 +12,12 @@ import asyncio
 from datetime import datetime
 import logging
 
-from ....services.cosmos_integration_service import get_cosmos_integration_service
-from ....config.production import get_production_settings, is_feature_enabled, FeatureFlag
-from ....config.deployment import get_deployment_settings
-from ....config.monitoring import get_monitoring_settings
-from ....services.error_monitoring import get_monitoring_service
-from ....utils.error_handling import ErrorHandler
+from services.cosmos_integration_service import get_cosmos_integration_service
+from config.production import get_production_settings, is_feature_enabled, FeatureFlag
+from config.deployment import get_deployment_settings
+from config.monitoring import get_monitoring_settings
+from services.error_monitoring import get_monitoring_service
+from utils.error_handling import ErrorHandler
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-from ..dump import dump  # noqa: F401
+from cosmos.dump import dump  # noqa: F401
 from .base_coder import Coder
 from .help_prompts import HelpPrompts
 

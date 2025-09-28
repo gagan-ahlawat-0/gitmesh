@@ -18,11 +18,11 @@ import structlog
 
 try:
     # Try relative imports first (when used as module)
-    from backend.services.cosmos_web_service import CosmosWebService
-    from backend.services.cosmos_web_wrapper import CosmosWebWrapper
-    from backend.services.redis_repo_manager import RedisRepoManager
-    from backend.services.response_processor import ResponseProcessor
-    from backend.utils.auth_utils import jwt_handler
+    from services.cosmos_web_service import CosmosWebService
+    from services.cosmos_web_wrapper import CosmosWebWrapper
+    from services.redis_repo_manager import RedisRepoManager
+    from services.response_processor import ResponseProcessor
+    from utils.auth_utils import jwt_handler
 except ImportError:
     # Fall back to absolute imports (when used directly)
     from services.cosmos_web_service import CosmosWebService

@@ -107,14 +107,23 @@ class OptimizedRepoCache:
         self._prefetch_task: Optional[asyncio.Task] = None
         self._warming_task: Optional[asyncio.Task] = None
         
-        # Start background tasks
+        # Background task state
+        self._background_started = False
+        
+        # Start background tasks if event loop is available
         self._start_background_tasks()
     
     def _start_background_tasks(self) -> None:
         """Start background prefetching and cache warming tasks."""
-        self._prefetch_task = asyncio.create_task(self._prefetch_worker())
-        if self.cache_warming_enabled:
-            self._warming_task = asyncio.create_task(self._cache_warming_worker())
+        try:
+            if not self._background_started:
+                self._prefetch_task = asyncio.create_task(self._prefetch_worker())
+                if self.cache_warming_enabled:
+                    self._warming_task = asyncio.create_task(self._cache_warming_worker())
+                self._background_started = True
+        except RuntimeError:
+            # No event loop running, will start later when needed
+            pass
     
     async def _prefetch_worker(self) -> None:
         """Background worker for prefetching repositories."""
@@ -138,6 +147,15 @@ class OptimizedRepoCache:
             except Exception as e:
                 logger.error(f"Error in prefetch worker: {e}")
                 await asyncio.sleep(30)
+    
+    def _ensure_background_tasks(self) -> None:
+        """Ensure background tasks are started."""
+        if not self._background_started:
+            try:
+                self._start_background_tasks()
+            except RuntimeError:
+                # No event loop, tasks will start when one is available
+                pass
     
     async def _cache_warming_worker(self) -> None:
         """Background worker for cache warming."""
@@ -283,6 +301,9 @@ class OptimizedRepoCache:
         Returns:
             Repository data dictionary or None
         """
+        # Ensure background tasks are running
+        self._ensure_background_tasks()
+        
         repo_key = f"{repo_name}:{branch}"
         cache_key = f"optimized_repo:{repo_key}"
         

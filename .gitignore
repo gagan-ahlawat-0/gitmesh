@@ -290,3 +290,4 @@ qdrant_storage/
 tars_sessions
 secret.yaml
 data/
+backend/scripts/performance_validation_results.json

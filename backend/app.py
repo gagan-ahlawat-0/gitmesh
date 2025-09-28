@@ -23,7 +23,7 @@ except Exception as e:
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from typing import Dict, Any
+from typing import Dict, Any, List
 import structlog
 from datetime import datetime
 
@@ -340,6 +340,26 @@ except ImportError as e:
     logger.warning(f"⚠️ Repository Cache routes not available: {e}")
 except Exception as e:
     logger.error(f"❌ Error loading Repository Cache routes: {e}")
+
+# Include Status Broadcasting WebSocket routes
+try:
+    from api.v1.routes.status_websocket import router as status_websocket_router
+    app.include_router(status_websocket_router, prefix="/api/v1", tags=["status_websocket"])
+    logger.info("✅ Status Broadcasting WebSocket routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Status Broadcasting WebSocket routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Status Broadcasting WebSocket routes: {e}")
+
+# Include Auto-initialization routes
+try:
+    from api.v1.routes.auto_init import router as auto_init_router
+    app.include_router(auto_init_router, prefix="/api/v1/auto-init", tags=["auto_init"])
+    logger.info("✅ Auto-initialization routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Auto-initialization routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Auto-initialization routes: {e}")
 
 # Add a test endpoint to verify the connection
 @app.get("/test")

@@ -11,9 +11,9 @@ import logging
 
 try:
     # Try relative imports first (when used as module)
-    from ....services.alerting_service import get_alerting_service, AlertSeverity, AlertStatus
-    from ....models.api.auth_models import User
-    from ....api.v1.routes.dependencies import get_current_user
+    from services.alerting_service import get_alerting_service, AlertSeverity, AlertStatus
+    from models.api.auth_models import User
+    from api.v1.routes.dependencies import get_current_user
 except ImportError:
     # Fall back to absolute imports (when used directly)
     from services.alerting_service import get_alerting_service, AlertSeverity, AlertStatus
@@ -348,7 +348,7 @@ async def test_alert_system(
             )
         
         # Only allow in development/testing environments
-        from ....config.settings import get_settings
+        from config.settings import get_settings
         settings = get_settings()
         if getattr(settings, 'environment', 'development') not in ['development', 'testing']:
             raise HTTPException(

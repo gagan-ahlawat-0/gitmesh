@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Code, Github, Star, GitBranch, Calendar, User, Lock, Globe, ExternalLink, Heart, GitFork, Globe2, Users, Zap, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 // Custom CSS for animations
 const customStyles = `
@@ -102,36 +103,119 @@ const RepositoryView = ({ repository }: { repository: any }) => {
   const [packages, setPackages] = useState<any[]>([]);
   const [deployments, setDeployments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token || !repository?.owner?.login || !repository?.name) return;
     const githubAPI = new GitHubAPI(token);
     setLoading(true);
     
-    // Fetch all repository data
-    Promise.all([
-      githubAPI.getRepositoryContributors(repository.owner.login, repository.name),
-      githubAPI.getRepositoryLanguages(repository.owner.login, repository.name),
-      // Note: These endpoints might not exist in the current API, so we'll handle gracefully
-      Promise.resolve([]), // stargazers
-      Promise.resolve([]), // forks
-      Promise.resolve([]), // watchers
-      Promise.resolve([]), // releases
-      Promise.resolve([]), // packages
-      Promise.resolve([]), // deployments
-    ])
-      .then(([contributors, languages, stargazers, forks, watchers, releases, packages, deployments]) => {
-        setContributors(contributors || []);
-        setLanguages(languages || {});
-        setStargazers(stargazers || []);
-        setForks(forks || []);
-        setWatchers(watchers || []);
-        setReleases(releases || []);
-        setPackages(packages || []);
-        setDeployments(deployments || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    // Check if we're currently rate limited
+    if (githubAPI.isCurrentlyRateLimited()) {
+      const timeUntilReset = githubAPI.getTimeUntilReset();
+      const resetTime = new Date(Date.now() + timeUntilReset);
+      toast.error('GitHub API rate limit exceeded', {
+        description: `Service will be available again at ${resetTime.toLocaleTimeString()}`,
+        duration: 10000,
+      });
+      setLoading(false);
+      return;
+    }
+    
+    // Fetch repository data with proper error handling
+    const fetchRepositoryData = async () => {
+      try {
+        setError(null); // Clear any previous errors
+        
+        // Fetch contributors and languages with rate limit protection
+        const [contributors, languages] = await Promise.allSettled([
+          githubAPI.getRepositoryContributors(repository.owner.login, repository.name),
+          githubAPI.getRepositoryLanguages(repository.owner.login, repository.name),
+        ]);
+
+        // Handle contributors result
+        if (contributors.status === 'fulfilled') {
+          setContributors(contributors.value || []);
+        } else {
+          console.warn('Failed to fetch contributors:', contributors.reason);
+          setContributors([]);
+        }
+
+        // Handle languages result
+        if (languages.status === 'fulfilled') {
+          setLanguages(languages.value || {});
+        } else {
+          console.warn('Failed to fetch languages:', languages.reason);
+          setLanguages({});
+        }
+
+        // Set empty arrays for other data (not implemented in API yet)
+        setStargazers([]);
+        setForks([]);
+        setWatchers([]);
+        setReleases([]);
+        setPackages([]);
+        setDeployments([]);
+
+      } catch (error: any) {
+        console.error('Error fetching repository data:', error);
+        
+        // Handle rate limit errors specifically
+        if (error?.message?.includes('rate limit') || error?.message?.includes('Rate limit exceeded')) {
+          const errorMsg = 'GitHub API rate limit exceeded. Please wait before making more requests.';
+          setError(errorMsg);
+          toast.error('Rate limit exceeded', {
+            description: 'The limit resets every hour. You can still view basic repository information.',
+            duration: 10000,
+          });
+          return;
+        }
+
+        // Handle authentication errors
+        if (error?.message?.includes('401') || error?.message?.includes('Unauthorized')) {
+          const errorMsg = 'Authentication required to view detailed repository information.';
+          setError(errorMsg);
+          toast.error('Authentication required', {
+            description: 'Please log in to view repository details.',
+            duration: 5000,
+          });
+          return;
+        }
+
+        // Handle network errors
+        if (error?.message?.includes('fetch') || error?.message?.includes('Network')) {
+          const errorMsg = 'Network error occurred while loading repository data.';
+          setError(errorMsg);
+          toast.error('Network error', {
+            description: 'Please check your connection and try again.',
+            duration: 5000,
+          });
+          return;
+        }
+
+        // Handle other errors gracefully
+        const errorMsg = 'Some repository information may not be available.';
+        setError(errorMsg);
+        toast.error('Failed to load repository data', {
+          description: 'Basic repository information is still available.',
+          duration: 5000,
+        });
+        
+        // Set empty data to prevent crashes
+        setContributors([]);
+        setLanguages({});
+        setStargazers([]);
+        setForks([]);
+        setWatchers([]);
+        setReleases([]);
+        setPackages([]);
+        setDeployments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRepositoryData();
   }, [token, repository]);
 
   const getRelativeTime = (dateString: string) => {
@@ -232,10 +316,53 @@ const RepositoryView = ({ repository }: { repository: any }) => {
 
   const totalBytes = Object.values(languages).reduce((sum: number, bytes: number) => sum + bytes, 0);
 
+  // Show loading state
+  if (loading) {
+    return (
+      <>
+        <style dangerouslySetInnerHTML={{ __html: customStyles }} />
+        <div className="max-w-6xl mx-auto space-y-12 bg-black-900 p-8">
+          <div className="text-center space-y-8">
+            <div className="flex flex-col items-center space-y-6">
+              <div className="w-24 h-24 rounded-full bg-gray-300 animate-pulse"></div>
+              <div className="space-y-4">
+                <div className="h-12 bg-gray-300 rounded animate-pulse w-96"></div>
+                <div className="h-6 bg-gray-300 rounded animate-pulse w-64 mx-auto"></div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="text-center p-6 bg-black-800 rounded-2xl animate-pulse">
+                <div className="h-8 bg-gray-300 rounded mb-2"></div>
+                <div className="h-4 bg-gray-300 rounded"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
       <div className="max-w-6xl mx-auto space-y-12 bg-black-900 p-8">
+        {/* Error Banner */}
+        {error && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-800">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Hero Section with Owner Profile */}
         <div className="text-center space-y-8">
           <div className="flex flex-col items-center space-y-6">

@@ -111,7 +111,9 @@ class RedisCloudConfig:
             '.redis-cloud.com',
             '.aws.redislabs.com',
             '.gcp.redislabs.com',
-            '.azure.redislabs.com'
+            '.azure.redislabs.com',
+            '.redns.redis-cloud.com',  # Added pattern for your Redis Cloud instance
+            '.ec2.redns.redis-cloud.com'  # Added specific pattern for AWS EC2 Redis Cloud
         ]
         
         return any(pattern in hostname.lower() for pattern in redis_cloud_patterns)
@@ -204,8 +206,8 @@ class RedisCloudConfig:
             ssl_check_hostname = os.getenv('REDIS_SSL_CHECK_HOSTNAME', 'true').lower() == 'true'
             
             # Connection settings
-            socket_timeout = float(os.getenv('REDIS_SOCKET_TIMEOUT', '5.0'))
-            socket_connect_timeout = float(os.getenv('REDIS_CONNECT_TIMEOUT', '5.0'))
+            socket_timeout = float(os.getenv('REDIS_SOCKET_TIMEOUT', '60.0'))
+            socket_connect_timeout = float(os.getenv('REDIS_CONNECT_TIMEOUT', '30.0'))
             socket_keepalive = os.getenv('REDIS_SOCKET_KEEPALIVE', 'true').lower() == 'true'
             retry_on_timeout = os.getenv('REDIS_RETRY_ON_TIMEOUT', 'true').lower() == 'true'
             health_check_interval = int(os.getenv('REDIS_HEALTH_CHECK_INTERVAL', '30'))

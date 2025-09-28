@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     github_callback_url: Optional[str] = Field(default=None, env="GITHUB_CALLBACK_URL")
     github_webhook_secret: Optional[str] = Field(default=None, env="GITHUB_WEBHOOK_SECRET")
     
+    # Database Configuration
+    database_url: Optional[str] = Field(default=None, env="DATABASE_URL")
+    supabase_url: Optional[str] = Field(default=None, env="SUPABASE_URL")
+    supabase_key: Optional[str] = Field(default=None, env="SUPABASE_KEY")
+    supabase_service_role_key: Optional[str] = Field(default=None, env="SUPABASE_SERVICE_ROLE_KEY")
+    
     # Allowed origins for CORS and security
     allowed_origins: Optional[str] = Field(default=None, env="ALLOWED_ORIGINS")
     
@@ -241,6 +247,25 @@ class Settings(BaseSettings):
     @property
     def ENVIRONMENT(self) -> str:
         return self.environment
+    
+    # ========================
+    # DATABASE CONFIGURATION (Environment Variables)
+    # ========================
+    @property
+    def DATABASE_URL(self) -> Optional[str]:
+        return self.database_url
+    
+    @property
+    def SUPABASE_URL(self) -> Optional[str]:
+        return self.supabase_url
+    
+    @property
+    def SUPABASE_KEY(self) -> Optional[str]:
+        return self.supabase_key
+    
+    @property
+    def SUPABASE_SERVICE_ROLE_KEY(self) -> Optional[str]:
+        return self.supabase_service_role_key
   
     model_config = {
         "env_file": ".env",

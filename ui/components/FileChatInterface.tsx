@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { FileSelector } from '@/components/ui/file-selector';
+import { RealTimeStatusIndicator } from './chat/RealTimeStatusIndicator';
 import {
   Dialog,
   DialogContent,
@@ -2698,7 +2699,10 @@ console.log('File: ${filePath}');`;
                   <div className="bg-muted rounded-lg p-4">
                     <div className="flex items-center gap-2">
                       <Loader2 size={16} className="animate-spin" />
-                      <span className="text-sm">TARS is thinking...</span>
+                      <RealTimeStatusIndicator 
+                        sessionId={activeSession?.id}
+                        className="text-sm"
+                      />
                     </div>
                   </div>
                 </div>

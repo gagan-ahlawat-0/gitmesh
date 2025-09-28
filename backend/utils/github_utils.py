@@ -205,21 +205,28 @@ class GitHubAPIClient:
                                 continue
                             else:
                                 # No more retries, raise detailed error
-                                error_data = {
-                                    "error": {
-                                        "error_code": "RATE_LIMIT_EXCEEDED",
-                                        "message": "Rate limit exceeded for requests_per_minute",
-                                        "category": "rate_limit",
-                                        "retry_after": retry_after,
-                                        "details": {
-                                            "limit_type": "requests_per_minute",
-                                            "max_requests": int(response.headers.get('x-ratelimit-limit', 60)),
-                                            "current_count": int(response.headers.get('x-ratelimit-used', 0)),
-                                            "reset_time": datetime.fromtimestamp(reset_time).isoformat() if reset_time else None
-                                        }
-                                    }
+                                try:
+                                    from utils.error_handling import RateLimitError
+                                except ImportError:
+                                    # Fallback to HTTPException if RateLimitError not available
+                                    from fastapi import HTTPException
+                                    raise HTTPException(
+                                        status_code=429,
+                                        detail=f"GitHub API rate limit exceeded. Try again in {retry_after} seconds."
+                                    )
+                                
+                                details = {
+                                    "limit_type": "requests_per_minute",
+                                    "max_requests": int(response.headers.get('x-ratelimit-limit', 60)),
+                                    "current_count": int(response.headers.get('x-ratelimit-used', 0)),
+                                    "reset_time": datetime.fromtimestamp(reset_time).isoformat() if reset_time else None
                                 }
-                                raise Exception(f"GitHub API error: 429 Too Many Requests - {error_data}")
+                                
+                                raise RateLimitError(
+                                    message="Rate limit exceeded for requests_per_minute",
+                                    retry_after=retry_after,
+                                    details=details
+                                )
                         
                         if response.status == 404:
                             raise Exception(f"Resource not found: {endpoint}")

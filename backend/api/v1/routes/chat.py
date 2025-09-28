@@ -1,17 +1,33 @@
 """
-Chat API routes using Cosmos AI Integration
+Chat API routes using Cosmos AI Integration with Enhanced Architecture
 """
 import os
 import uuid
 import json
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
+from fastapi.websockets import WebSocketState
 import structlog
 
 from .dependencies import get_current_user
 from models.api.auth_models import User
+
+# Import new architecture services
+try:
+    from services.status_broadcaster import get_status_broadcaster, OperationType, OperationStatus
+    from services.auto_init_service import get_auto_init_service
+    from services.metrics_collection_service import get_metrics_collector
+    STATUS_BROADCASTING_AVAILABLE = True
+except ImportError:
+    STATUS_BROADCASTING_AVAILABLE = False
+
+try:
+    from services.enhanced_session_service import get_enhanced_session_service
+    ENHANCED_SESSION_AVAILABLE = True
+except ImportError:
+    ENHANCED_SESSION_AVAILABLE = False
 
 # Safe imports for Cosmos integration
 try:
@@ -35,20 +51,247 @@ except ImportError:
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 
+# WebSocket connection manager for real-time status updates
+class ChatWebSocketManager:
+    def __init__(self):
+        self.connections: Dict[str, WebSocket] = {}
+        self.session_connections: Dict[str, set] = {}
+    
+    async def connect(self, websocket: WebSocket, session_id: str, connection_id: str):
+        await websocket.accept()
+        self.connections[connection_id] = websocket
+        if session_id not in self.session_connections:
+            self.session_connections[session_id] = set()
+        self.session_connections[session_id].add(connection_id)
+        
+        # Integrate with status broadcaster if available
+        if STATUS_BROADCASTING_AVAILABLE:
+            status_broadcaster = get_status_broadcaster()
+            await status_broadcaster.add_connection(websocket, connection_id, session_id)
+    
+    def disconnect(self, connection_id: str, session_id: str = None):
+        if connection_id in self.connections:
+            del self.connections[connection_id]
+        if session_id and session_id in self.session_connections:
+            self.session_connections[session_id].discard(connection_id)
+            if not self.session_connections[session_id]:
+                del self.session_connections[session_id]
+        
+        # Remove from status broadcaster if available
+        if STATUS_BROADCASTING_AVAILABLE:
+            status_broadcaster = get_status_broadcaster()
+            status_broadcaster.remove_connection(connection_id)
+    
+    async def send_to_session(self, session_id: str, message: dict):
+        if session_id not in self.session_connections:
+            return False
+        
+        success_count = 0
+        for connection_id in list(self.session_connections[session_id]):
+            if connection_id in self.connections:
+                websocket = self.connections[connection_id]
+                if websocket.client_state == WebSocketState.CONNECTED:
+                    try:
+                        await websocket.send_json(message)
+                        success_count += 1
+                    except Exception as e:
+                        logger.error(f"Error sending WebSocket message: {e}")
+                        self.disconnect(connection_id, session_id)
+        
+        return success_count > 0
+
+# Global WebSocket manager
+ws_manager = ChatWebSocketManager()
+
+# WebSocket endpoint for real-time chat status updates
+@router.websocket("/ws/{session_id}")
+async def chat_websocket_endpoint(
+    websocket: WebSocket,
+    session_id: str,
+    token: str = None
+):
+    """WebSocket endpoint for real-time chat status updates and communication."""
+    connection_id = str(uuid.uuid4())
+    user_id = None
+    
+    # Validate authentication if token provided
+    if token:
+        try:
+            from utils.auth_utils import jwt_handler
+            payload = jwt_handler.decode_token(token)
+            user_id = payload.get("user_id")
+        except Exception as e:
+            await websocket.close(code=1008, reason="Invalid authentication token")
+            return
+    
+    try:
+        # Connect to WebSocket
+        await ws_manager.connect(websocket, session_id, connection_id)
+        
+        # Send connection established message
+        await websocket.send_json({
+            "type": "connection_established",
+            "session_id": session_id,
+            "connection_id": connection_id,
+            "user_id": user_id,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # Initialize auto-init service if available and trigger repository caching
+        if STATUS_BROADCASTING_AVAILABLE:
+            try:
+                auto_init_service = get_auto_init_service()
+                # This would be called when user visits /contribution/[repo] page
+                # The frontend should send repository info via WebSocket message
+                logger.info(f"Auto-init service available for session {session_id}")
+            except Exception as e:
+                logger.error(f"Error initializing auto-init service: {e}")
+        
+        # Keep connection alive and handle messages
+        try:
+            while True:
+                data = await websocket.receive_text()
+                try:
+                    message = json.loads(data)
+                    message_type = message.get("type")
+                    
+                    if message_type == "heartbeat":
+                        await websocket.send_json({
+                            "type": "heartbeat_ack",
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    
+                    elif message_type == "init_repository":
+                        # Handle repository initialization request
+                        await handle_repository_initialization(
+                            websocket, session_id, message, user_id
+                        )
+                    
+                    elif message_type == "get_status":
+                        # Send current status
+                        await websocket.send_json({
+                            "type": "status_update",
+                            "session_id": session_id,
+                            "status": "connected",
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    
+                    else:
+                        await websocket.send_json({
+                            "type": "error",
+                            "error": f"Unknown message type: {message_type}",
+                            "timestamp": datetime.now().isoformat()
+                        })
+                
+                except json.JSONDecodeError:
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": "Invalid JSON format",
+                        "timestamp": datetime.now().isoformat()
+                    })
+        
+        except WebSocketDisconnect:
+            ws_manager.disconnect(connection_id, session_id)
+    
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        if websocket.client_state == WebSocketState.CONNECTED:
+            await websocket.close(code=1011, reason="Internal server error")
+        ws_manager.disconnect(connection_id, session_id)
+
+async def handle_repository_initialization(websocket: WebSocket, session_id: str, message: dict, user_id: str):
+    """Handle repository initialization request via WebSocket."""
+    try:
+        repo_url = message.get("repository_url")
+        if not repo_url:
+            await websocket.send_json({
+                "type": "error",
+                "error": "Repository URL is required",
+                "timestamp": datetime.now().isoformat()
+            })
+            return
+        
+        if STATUS_BROADCASTING_AVAILABLE:
+            # Use auto-init service to start repository caching
+            auto_init_service = get_auto_init_service()
+            status_broadcaster = get_status_broadcaster()
+            
+            # Start repository initialization
+            operation_id = str(uuid.uuid4())
+            await status_broadcaster.broadcast_operation_start(
+                operation_id=operation_id,
+                operation_type=OperationType.GITINGEST,
+                description=f"Mapping codebase: {repo_url}",
+                session_id=session_id,
+                metadata={"repository_url": repo_url}
+            )
+            
+            # Trigger auto-initialization
+            init_session_id = await auto_init_service.on_page_visit(repo_url, user_id or "anonymous")
+            
+            # Send initialization started response
+            await websocket.send_json({
+                "type": "repository_init_started",
+                "session_id": session_id,
+                "operation_id": operation_id,
+                "init_session_id": init_session_id,
+                "repository_url": repo_url,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            # Monitor initialization progress (this would be handled by the auto-init service)
+            # The status broadcaster will send progress updates automatically
+            
+        else:
+            await websocket.send_json({
+                "type": "error",
+                "error": "Auto-initialization service not available",
+                "timestamp": datetime.now().isoformat()
+            })
+    
+    except Exception as e:
+        logger.error(f"Error handling repository initialization: {e}")
+        await websocket.send_json({
+            "type": "error",
+            "error": f"Repository initialization failed: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        })
+
 # Navigation cache management endpoints
 @router.post("/navigation-cleanup")
 async def handle_navigation_cleanup(
     request: Request,
     current_user: User = Depends(get_current_user)
 ):
-    """Handle cache cleanup during navigation transitions."""
+    """Handle cache cleanup during navigation transitions with enhanced architecture."""
     try:
         data = await request.json()
         from_page = data.get('from_page', '')
         to_page = data.get('to_page', '')
         user_id = data.get('user_id') or current_user.id
         
-        # logger.info(f"Navigation cleanup requested: {from_page} -> {to_page} for user {user_id}")
+        # Track metrics if available
+        if STATUS_BROADCASTING_AVAILABLE:
+            try:
+                metrics_collector = get_metrics_collector()
+                operation_start = datetime.now()
+            except Exception:
+                metrics_collector = None
+        
+        # Broadcast navigation cleanup start if status broadcasting is available
+        if STATUS_BROADCASTING_AVAILABLE:
+            try:
+                status_broadcaster = get_status_broadcaster()
+                operation_id = str(uuid.uuid4())
+                await status_broadcaster.broadcast_operation_start(
+                    operation_id=operation_id,
+                    operation_type=OperationType.REDIS_CACHE,
+                    description=f"Cleaning up cache during navigation: {from_page} → {to_page}",
+                    user_id=str(user_id),
+                    metadata={"from_page": from_page, "to_page": to_page}
+                )
+            except Exception as e:
+                logger.error(f"Error broadcasting navigation cleanup start: {e}")
         
         if CACHE_MANAGEMENT_AVAILABLE:
             # Create navigation cache manager
@@ -59,6 +302,41 @@ async def handle_navigation_cleanup(
                 from_page=from_page,
                 to_page=to_page
             )
+            
+            # Broadcast completion if available
+            if STATUS_BROADCASTING_AVAILABLE:
+                try:
+                    await status_broadcaster.broadcast_operation_complete(
+                        operation_id=operation_id,
+                        result={
+                            "entries_cleaned": cleanup_result.entries_cleaned,
+                            "memory_freed_mb": cleanup_result.memory_freed_mb,
+                            "cleanup_time_ms": cleanup_result.cleanup_time_ms
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Error broadcasting navigation cleanup completion: {e}")
+            
+            # Track metrics if available
+            if metrics_collector:
+                try:
+                    operation_end = datetime.now()
+                    latency = (operation_end - operation_start).total_seconds() * 1000
+                    await metrics_collector.record_request_latency(
+                        session_id=session_id,
+                        request_id="navigation_cleanup",
+                        latency_ms=latency,
+                        operation_type="navigation_cleanup"
+                    )
+                    await metrics_collector.track_cache_operation(
+                        operation_type="cleanup",
+                        cache_type="navigation",
+                        success=True,
+                        entries_affected=cleanup_result.entries_cleaned,
+                        memory_freed_mb=cleanup_result.memory_freed_mb
+                    )
+                except Exception as e:
+                    logger.error(f"Error tracking navigation cleanup metrics: {e}")
             
             return JSONResponse(content={
                 "repository_cache_cleared": cleanup_result.repository_cache_cleared,
@@ -84,6 +362,19 @@ async def handle_navigation_cleanup(
             
     except Exception as e:
         logger.error(f"Navigation cleanup error: {e}")
+        
+        # Broadcast error if available
+        if STATUS_BROADCASTING_AVAILABLE:
+            try:
+                status_broadcaster = get_status_broadcaster()
+                await status_broadcaster.broadcast_operation_error(
+                    operation_id=operation_id if 'operation_id' in locals() else str(uuid.uuid4()),
+                    error_message=str(e),
+                    error_details={"from_page": from_page, "to_page": to_page}
+                )
+            except Exception:
+                pass
+        
         return JSONResponse(
             status_code=500,
             content={
@@ -643,7 +934,7 @@ class ChatCosmosService:
         return session
     
     async def send_message(self, session_id: str, user_id: str, message: str, context: Dict[str, Any] = None, model_name: str = "gpt-4o-mini"):
-        """Send a message and get AI response via Cosmos"""
+        """Send a message and get AI response via Cosmos with enhanced architecture integration"""
         session = get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -651,8 +942,33 @@ class ChatCosmosService:
         if session.get("userId") != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
+        # Start metrics tracking if available
+        request_start = datetime.now()
+        operation_id = str(uuid.uuid4())
+        
+        if STATUS_BROADCASTING_AVAILABLE:
+            try:
+                metrics_collector = get_metrics_collector()
+                status_broadcaster = get_status_broadcaster()
+                
+                # Broadcast message processing start
+                await status_broadcaster.broadcast_operation_start(
+                    operation_id=operation_id,
+                    operation_type=OperationType.AI_PROCESSING,
+                    description=f"Processing message with {model_name}",
+                    session_id=session_id,
+                    user_id=user_id,
+                    metadata={"model": model_name, "message_length": len(message)}
+                )
+            except Exception as e:
+                logger.error(f"Error starting status broadcast: {e}")
+                metrics_collector = None
+                status_broadcaster = None
+        else:
+            metrics_collector = None
+            status_broadcaster = None
+        
         # Debug: Log the incoming request
-        # logger.info(f"Chat request - session: {session_id}, model: {model_name}, message: {message[:100]}...")
         logger.info(f"Chat context received: {context}")
         if context and context.get("files"):
             files = context.get("files", [])
@@ -675,6 +991,17 @@ class ChatCosmosService:
         messages.append(user_message)
         store_messages(session_id, messages, ttl_hours=24)
         
+        # Broadcast progress update
+        if status_broadcaster:
+            try:
+                await status_broadcaster.broadcast_operation_progress(
+                    operation_id=operation_id,
+                    progress=0.2,
+                    message="Message stored, initializing AI processing..."
+                )
+            except Exception as e:
+                logger.error(f"Error broadcasting progress: {e}")
+        
         # Generate AI response via Cosmos with full AI capabilities
         confidence = 0.8
         knowledge_used = 0
@@ -683,13 +1010,37 @@ class ChatCosmosService:
         
         try:
             if self.cosmos_available and COSMOS_AVAILABLE:
+                # Broadcast AI processing start
+                if status_broadcaster:
+                    try:
+                        await status_broadcaster.broadcast_operation_progress(
+                            operation_id=operation_id,
+                            progress=0.4,
+                            message="Initializing Cosmos AI system..."
+                        )
+                    except Exception as e:
+                        logger.error(f"Error broadcasting AI processing start: {e}")
                 # Initialize Cosmos configuration first
                 try:
                     from integrations.cosmos.v1.cosmos.config import initialize_configuration
                     initialize_configuration()
                     logger.info("Cosmos configuration initialized successfully")
+                    
+                    # Broadcast configuration success
+                    if status_broadcaster:
+                        await status_broadcaster.broadcast_operation_progress(
+                            operation_id=operation_id,
+                            progress=0.5,
+                            message="Cosmos configuration initialized"
+                        )
                 except Exception as e:
                     logger.warning(f"Could not initialize Cosmos configuration: {e}")
+                    if status_broadcaster:
+                        await status_broadcaster.broadcast_operation_progress(
+                            operation_id=operation_id,
+                            progress=0.5,
+                            message=f"Configuration warning: {str(e)}"
+                        )
                 
                 # Import optimized services with fallback
                 try:
@@ -747,11 +1098,25 @@ class ChatCosmosService:
                                 page_context['repo'] = first_file.get("repo")
                 
                 # Detect repository context
+                if status_broadcaster:
+                    await status_broadcaster.broadcast_operation_progress(
+                        operation_id=operation_id,
+                        progress=0.6,
+                        message="Detecting repository context..."
+                    )
+                
                 repository_context = repository_context_service.detect_repository_context(page_context)
                 
                 if repository_context:
                     repository_url = repository_context.url
                     logger.info(f"Repository context detected: {repository_url} (branch: {repository_context.branch})")
+                    
+                    if status_broadcaster:
+                        await status_broadcaster.broadcast_operation_progress(
+                            operation_id=operation_id,
+                            progress=0.7,
+                            message=f"Repository context detected: {repository_context.name}"
+                        )
                     
                     # Validate repository size before processing
                     repository_context = await repository_context_service.validate_repository_size(
@@ -960,17 +1325,43 @@ class ChatCosmosService:
                     )
                 
                 # Process message through Cosmos AI system
+                if status_broadcaster:
+                    await status_broadcaster.broadcast_operation_progress(
+                        operation_id=operation_id,
+                        progress=0.8,
+                        message="Processing message with AI..."
+                    )
+                
                 cosmos_response = await wrapper.process_message(
                     message=message,
                     context=enhanced_context
                 )
                 
+                if status_broadcaster:
+                    await status_broadcaster.broadcast_operation_progress(
+                        operation_id=operation_id,
+                        progress=0.9,
+                        message="AI processing complete, preparing response..."
+                    )
+                
                 # Extract content and metadata
-                assistant_content = cosmos_response.content
+                raw_assistant_content = cosmos_response.content
                 confidence = cosmos_response.confidence
                 sources = cosmos_response.sources
                 knowledge_used = len(sources) if sources else 0
                 model_used = cosmos_response.model_used or model_name
+                
+                # Apply tool command filtering for security
+                try:
+                    from services.tool_command_filter import filter_tool_commands
+                    assistant_content = filter_tool_commands(raw_assistant_content)
+                    logger.debug("Applied tool command filtering to response")
+                except ImportError:
+                    logger.warning("Tool command filter not available, using raw content")
+                    assistant_content = raw_assistant_content
+                except Exception as filter_error:
+                    logger.error(f"Error applying tool command filter: {filter_error}")
+                    assistant_content = raw_assistant_content
                 
                 # Add metadata to response if available
                 if knowledge_used > 0:
@@ -983,15 +1374,46 @@ class ChatCosmosService:
                 # Cleanup wrapper
                 wrapper.cleanup()
                 
+                # Broadcast successful completion
+                if status_broadcaster:
+                    await status_broadcaster.broadcast_operation_complete(
+                        operation_id=operation_id,
+                        result={
+                            "model_used": model_used,
+                            "confidence": confidence,
+                            "knowledge_used": knowledge_used,
+                            "sources_count": len(sources),
+                            "response_length": len(assistant_content)
+                        }
+                    )
+                
             else:
                 # When Cosmos is not available, return an error message
                 assistant_content = "I'm sorry, but the Cosmos AI system is currently unavailable. Please ensure that Cosmos is properly installed and configured to use the chat functionality."
+                
+                if status_broadcaster:
+                    await status_broadcaster.broadcast_operation_error(
+                        operation_id=operation_id,
+                        error_message="Cosmos AI system unavailable",
+                        error_details={"cosmos_available": False}
+                    )
                 model_used = "unavailable"
         
         except Exception as e:
             logger.error(f"Error processing message with Cosmos: {e}")
             assistant_content = f"I encountered an error while processing your message through Cosmos AI: {str(e)}. Please try again or check the Cosmos configuration."
             model_used = "error"
+            
+            # Broadcast error if available
+            if status_broadcaster:
+                try:
+                    await status_broadcaster.broadcast_operation_error(
+                        operation_id=operation_id,
+                        error_message=str(e),
+                        error_details={"phase": "cosmos_processing", "model": model_name}
+                    )
+                except Exception as broadcast_error:
+                    logger.error(f"Error broadcasting operation error: {broadcast_error}")
         
         # Create assistant message
         assistant_message = {
@@ -1018,6 +1440,41 @@ class ChatCosmosService:
         session["updatedAt"] = datetime.now().isoformat()
         session["messages"] = messages
         store_session(session_id, session, ttl_hours=24)
+        
+        # Track final metrics if available
+        if metrics_collector:
+            try:
+                request_end = datetime.now()
+                total_latency = (request_end - request_start).total_seconds() * 1000
+                
+                await metrics_collector.record_request_latency(
+                    session_id=session_id,
+                    request_id="chat_message",
+                    latency_ms=total_latency,
+                    operation_type="chat_message"
+                )
+                await metrics_collector.track_token_usage(session_id, len(message.split()) + len(assistant_content.split()))
+                await metrics_collector.track_ai_operation(
+                    model=model_used,
+                    success=True,
+                    confidence=confidence,
+                    knowledge_used=knowledge_used,
+                    response_time_ms=total_latency
+                )
+            except Exception as e:
+                logger.error(f"Error tracking final metrics: {e}")
+        
+        # Send WebSocket update to connected clients
+        try:
+            await ws_manager.send_to_session(session_id, {
+                "type": "message_complete",
+                "user_message": user_message,
+                "assistant_message": assistant_message,
+                "session_updated": True,
+                "timestamp": datetime.now().isoformat()
+            })
+        except Exception as e:
+            logger.error(f"Error sending WebSocket update: {e}")
         
         return {
             "userMessage": user_message,
@@ -1354,6 +1811,23 @@ async def send_message(
     except HTTPException:
         raise
     except Exception as e:
+        # Handle rate limit errors specifically
+        from utils.error_handling import RateLimitError
+        if isinstance(e, RateLimitError):
+            logger.warning(f"Rate limit exceeded for user {current_user.id}: {e.message}")
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": {
+                        "error_code": "RATE_LIMIT_EXCEEDED",
+                        "message": e.message,
+                        "category": "rate_limit",
+                        "retry_after": e.retry_after,
+                        "details": e.details
+                    }
+                }
+            )
+        
         logger.error(f"Error sending message: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
 
@@ -1383,7 +1857,7 @@ async def get_chat_history(
 
 @router.get("/health")
 async def chat_health_check():
-    """Health check endpoint for chat service"""
+    """Enhanced health check endpoint for chat service with performance monitoring"""
     health_status = {
         "status": "healthy",
         "redis_available": REDIS_AVAILABLE,
@@ -1392,14 +1866,20 @@ async def chat_health_check():
             "failure_count": redis_circuit_breaker.failure_count
         },
         "cosmos_available": COSMOS_AVAILABLE,
+        "status_broadcasting_available": STATUS_BROADCASTING_AVAILABLE,
+        "enhanced_session_available": ENHANCED_SESSION_AVAILABLE,
         "timestamp": datetime.now().isoformat()
     }
     
     # Test Redis connection if available
     if REDIS_AVAILABLE and redis_circuit_breaker.can_execute():
         try:
+            start_time = datetime.now()
             session_redis.ping()
+            ping_time = (datetime.now() - start_time).total_seconds() * 1000
+            
             health_status["redis_ping"] = "success"
+            health_status["redis_ping_time_ms"] = ping_time
             redis_circuit_breaker.record_success()
         except Exception as e:
             health_status["redis_ping"] = f"failed: {str(e)}"
@@ -1410,7 +1890,442 @@ async def chat_health_check():
         if not REDIS_AVAILABLE:
             health_status["status"] = "degraded"
     
+    # Test enhanced services if available
+    if STATUS_BROADCASTING_AVAILABLE:
+        try:
+            status_broadcaster = get_status_broadcaster()
+            health_status["status_broadcaster"] = {
+                "active_connections": len(status_broadcaster.connections),
+                "active_sessions": len(status_broadcaster.session_connections),
+                "active_operations": len(status_broadcaster.active_operations)
+            }
+        except Exception as e:
+            health_status["status_broadcaster"] = {"error": str(e)}
+            health_status["status"] = "degraded"
+    
+    # Add WebSocket connection stats
+    health_status["websocket_connections"] = {
+        "active_connections": len(ws_manager.connections),
+        "active_sessions": len(ws_manager.session_connections)
+    }
+    
     return health_status
+
+@router.get("/metrics")
+async def get_performance_metrics(
+    current_user: User = Depends(get_current_user),
+    session_id: str = None,
+    time_range: str = "1h"  # 1h, 24h, 7d, 30d
+):
+    """Get performance metrics for chat operations."""
+    try:
+        if not STATUS_BROADCASTING_AVAILABLE:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "Performance monitoring not available",
+                    "metrics": {}
+                }
+            )
+        
+        metrics_collector = get_metrics_collector()
+        user_id = str(current_user.id)
+        
+        # Get metrics based on time range
+        time_ranges = {
+            "1h": 3600,
+            "24h": 86400,
+            "7d": 604800,
+            "30d": 2592000
+        }
+        
+        seconds = time_ranges.get(time_range, 3600)
+        
+        # Collect various metrics
+        metrics = {
+            "request_metrics": await metrics_collector.get_request_metrics(
+                user_id=user_id,
+                session_id=session_id,
+                time_window_seconds=seconds
+            ),
+            "token_usage": await metrics_collector.get_token_usage_metrics(
+                user_id=user_id,
+                session_id=session_id,
+                time_window_seconds=seconds
+            ),
+            "cache_metrics": await metrics_collector.get_cache_metrics(
+                user_id=user_id,
+                time_window_seconds=seconds
+            ),
+            "ai_operation_metrics": await metrics_collector.get_ai_operation_metrics(
+                user_id=user_id,
+                session_id=session_id,
+                time_window_seconds=seconds
+            ),
+            "error_metrics": await metrics_collector.get_error_metrics(
+                user_id=user_id,
+                time_window_seconds=seconds
+            ),
+            "timestamp": datetime.now().isoformat(),
+            "time_range": time_range
+        }
+        
+        return JSONResponse(content={
+            "success": True,
+            "metrics": metrics
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting performance metrics: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "metrics": {}
+            }
+        )
+
+@router.get("/metrics/realtime")
+async def get_realtime_metrics(
+    current_user: User = Depends(get_current_user),
+    session_id: str = None
+):
+    """Get real-time performance metrics for active sessions."""
+    try:
+        if not STATUS_BROADCASTING_AVAILABLE:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "Real-time monitoring not available",
+                    "metrics": {}
+                }
+            )
+        
+        metrics_collector = get_metrics_collector()
+        status_broadcaster = get_status_broadcaster()
+        user_id = str(current_user.id)
+        
+        # Get current system status
+        realtime_metrics = {
+            "system_status": {
+                "active_operations": len(status_broadcaster.active_operations),
+                "active_connections": len(status_broadcaster.connections),
+                "active_sessions": len(status_broadcaster.session_connections),
+                "websocket_connections": len(ws_manager.connections)
+            },
+            "current_operations": [
+                {
+                    "operation_id": op_id,
+                    "operation_type": op_data.get("operation_type"),
+                    "description": op_data.get("description"),
+                    "progress": op_data.get("progress", 0.0),
+                    "started_at": op_data.get("started_at").isoformat() if op_data.get("started_at") else None,
+                    "status": op_data.get("status")
+                }
+                for op_id, op_data in status_broadcaster.active_operations.items()
+                if not session_id or op_data.get("session_id") == session_id
+            ],
+            "recent_metrics": await metrics_collector.get_recent_metrics(
+                user_id=user_id,
+                session_id=session_id,
+                limit=10
+            ),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return JSONResponse(content={
+            "success": True,
+            "metrics": realtime_metrics
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting real-time metrics: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "metrics": {}
+            }
+        )
+
+@router.get("/metrics/system")
+async def get_system_metrics(
+    current_user: User = Depends(get_current_user)
+):
+    """Get system-wide performance metrics (admin endpoint)."""
+    try:
+        # This could be restricted to admin users in production
+        if not STATUS_BROADCASTING_AVAILABLE:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "System monitoring not available",
+                    "metrics": {}
+                }
+            )
+        
+        metrics_collector = get_metrics_collector()
+        
+        # Get system-wide metrics
+        system_metrics = {
+            "redis_metrics": await metrics_collector.get_redis_system_metrics(),
+            "cosmos_metrics": await metrics_collector.get_cosmos_system_metrics(),
+            "session_metrics": await metrics_collector.get_session_system_metrics(),
+            "error_summary": await metrics_collector.get_system_error_summary(),
+            "performance_summary": await metrics_collector.get_system_performance_summary(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return JSONResponse(content={
+            "success": True,
+            "metrics": system_metrics
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting system metrics: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "metrics": {}
+            }
+        )
+
+@router.post("/admin/cache/optimize")
+async def optimize_system_cache(
+    current_user: User = Depends(get_current_user)
+):
+    """Admin endpoint to optimize system cache performance."""
+    try:
+        # This should be restricted to admin users in production
+        if not CACHE_MANAGEMENT_AVAILABLE:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "Cache management not available",
+                    "result": {}
+                }
+            )
+        
+        # Start cache optimization operation
+        operation_id = str(uuid.uuid4())
+        
+        if STATUS_BROADCASTING_AVAILABLE:
+            status_broadcaster = get_status_broadcaster()
+            await status_broadcaster.broadcast_operation_start(
+                operation_id=operation_id,
+                operation_type=OperationType.REDIS_CACHE,
+                description="System-wide cache optimization",
+                user_id=str(current_user.id),
+                metadata={"admin_operation": True}
+            )
+        
+        # Perform cache optimization
+        cache_service = create_cache_management_service("system")
+        optimization_results = cache_service.optimize_memory_usage()
+        
+        # Cleanup expired entries
+        expired_cleaned = cache_service.cleanup_expired_caches()
+        
+        # Get final cache stats
+        cache_stats = cache_service.get_cache_stats()
+        
+        result = {
+            "optimization_results": optimization_results,
+            "expired_entries_cleaned": expired_cleaned,
+            "final_cache_stats": {
+                "total_keys": cache_stats.total_keys,
+                "memory_usage_mb": cache_stats.memory_usage_mb,
+                "hit_rate": cache_stats.hit_rate,
+                "miss_rate": cache_stats.miss_rate
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if STATUS_BROADCASTING_AVAILABLE:
+            await status_broadcaster.broadcast_operation_complete(
+                operation_id=operation_id,
+                result=result
+            )
+        
+        return JSONResponse(content={
+            "success": True,
+            "result": result
+        })
+        
+    except Exception as e:
+        logger.error(f"Error optimizing system cache: {e}")
+        
+        if STATUS_BROADCASTING_AVAILABLE:
+            try:
+                await status_broadcaster.broadcast_operation_error(
+                    operation_id=operation_id if 'operation_id' in locals() else str(uuid.uuid4()),
+                    error_message=str(e),
+                    error_details={"operation": "cache_optimization"}
+                )
+            except Exception:
+                pass
+        
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "result": {}
+            }
+        )
+
+@router.get("/admin/cache/stats")
+async def get_admin_cache_stats(
+    current_user: User = Depends(get_current_user)
+):
+    """Admin endpoint to get detailed cache statistics."""
+    try:
+        if not CACHE_MANAGEMENT_AVAILABLE:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "Cache management not available",
+                    "stats": {}
+                }
+            )
+        
+        cache_service = create_cache_management_service("system")
+        
+        # Get comprehensive cache statistics
+        cache_stats = cache_service.get_cache_stats()
+        health_status = cache_service.health_check()
+        
+        # Get user-specific cache counts
+        user_cache_breakdown = {}
+        if hasattr(cache_service, 'get_user_cache_breakdown'):
+            user_cache_breakdown = cache_service.get_user_cache_breakdown()
+        
+        stats = {
+            "cache_stats": {
+                "total_keys": cache_stats.total_keys,
+                "memory_usage_mb": cache_stats.memory_usage_mb,
+                "hit_rate": cache_stats.hit_rate,
+                "miss_rate": cache_stats.miss_rate,
+                "expired_keys": cache_stats.expired_keys,
+                "user_cache_count": cache_stats.user_cache_count,
+                "repository_cache_count": cache_stats.repository_cache_count,
+                "session_cache_count": cache_stats.session_cache_count,
+                "last_cleanup": cache_stats.last_cleanup.isoformat() if cache_stats.last_cleanup else None
+            },
+            "health_status": {
+                "is_healthy": health_status.is_healthy,
+                "connection_status": health_status.connection_status,
+                "memory_usage_percent": health_status.memory_usage_percent,
+                "response_time_ms": health_status.response_time_ms,
+                "error_count": health_status.error_count,
+                "last_error": health_status.last_error,
+                "uptime_seconds": health_status.uptime_seconds
+            },
+            "user_cache_breakdown": user_cache_breakdown,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return JSONResponse(content={
+            "success": True,
+            "stats": stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting admin cache stats: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "stats": {}
+            }
+        )
+
+@router.delete("/admin/cache/clear")
+async def clear_system_cache(
+    current_user: User = Depends(get_current_user),
+    cache_type: str = "all"  # all, repository, session, user
+):
+    """Admin endpoint to clear system cache."""
+    try:
+        if not CACHE_MANAGEMENT_AVAILABLE:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "Cache management not available",
+                    "result": {}
+                }
+            )
+        
+        operation_id = str(uuid.uuid4())
+        
+        if STATUS_BROADCASTING_AVAILABLE:
+            status_broadcaster = get_status_broadcaster()
+            await status_broadcaster.broadcast_operation_start(
+                operation_id=operation_id,
+                operation_type=OperationType.REDIS_CACHE,
+                description=f"System cache clear: {cache_type}",
+                user_id=str(current_user.id),
+                metadata={"admin_operation": True, "cache_type": cache_type}
+            )
+        
+        cache_service = create_cache_management_service("system")
+        
+        # Clear cache based on type
+        if cache_type == "all":
+            result = {
+                "repository_cleared": cache_service.clear_all_repository_cache(),
+                "session_cleared": cache_service.clear_all_session_cache(),
+                "user_cleared": cache_service.clear_all_user_cache()
+            }
+        elif cache_type == "repository":
+            result = {"repository_cleared": cache_service.clear_all_repository_cache()}
+        elif cache_type == "session":
+            result = {"session_cleared": cache_service.clear_all_session_cache()}
+        elif cache_type == "user":
+            result = {"user_cleared": cache_service.clear_all_user_cache()}
+        else:
+            raise ValueError(f"Invalid cache_type: {cache_type}")
+        
+        result["timestamp"] = datetime.now().isoformat()
+        result["cache_type"] = cache_type
+        
+        if STATUS_BROADCASTING_AVAILABLE:
+            await status_broadcaster.broadcast_operation_complete(
+                operation_id=operation_id,
+                result=result
+            )
+        
+        return JSONResponse(content={
+            "success": True,
+            "result": result
+        })
+        
+    except Exception as e:
+        logger.error(f"Error clearing system cache: {e}")
+        
+        if STATUS_BROADCASTING_AVAILABLE:
+            try:
+                await status_broadcaster.broadcast_operation_error(
+                    operation_id=operation_id if 'operation_id' in locals() else str(uuid.uuid4()),
+                    error_message=str(e),
+                    error_details={"operation": "cache_clear", "cache_type": cache_type}
+                )
+            except Exception:
+                pass
+        
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "result": {}
+            }
+        )
 
 @router.get("/sessions/{session_id}/context/stats")
 async def get_session_context_stats(

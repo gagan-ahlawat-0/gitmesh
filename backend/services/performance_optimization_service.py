@@ -536,11 +536,17 @@ class PerformanceOptimizationService:
         
         # Background tasks
         self._cleanup_task: Optional[asyncio.Task] = None
-        self._start_background_tasks()
+        self._background_started = False
     
     def _start_background_tasks(self) -> None:
         """Start background maintenance tasks."""
-        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+        try:
+            if not self._background_started:
+                self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+                self._background_started = True
+        except RuntimeError:
+            # No event loop running, will start later when needed
+            pass
     
     async def _cleanup_loop(self) -> None:
         """Background cleanup loop."""
@@ -565,6 +571,15 @@ class PerformanceOptimizationService:
                 logger.error(f"Error in cleanup loop: {e}")
                 await asyncio.sleep(60)  # Wait 1 minute on error
     
+    def _ensure_background_tasks(self) -> None:
+        """Ensure background tasks are started."""
+        if not self._background_started:
+            try:
+                self._start_background_tasks()
+            except RuntimeError:
+                # No event loop, tasks will start when one is available
+                pass
+    
     async def cache_response(
         self, 
         query_hash: str, 
@@ -572,6 +587,7 @@ class PerformanceOptimizationService:
         ttl: Optional[int] = None
     ) -> None:
         """Cache a response."""
+        self._ensure_background_tasks()
         await self.response_cache.set(query_hash, response, ttl)
     
     async def get_cached_response(self, query_hash: str) -> Optional[Any]:

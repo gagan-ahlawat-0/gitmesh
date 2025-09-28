@@ -37,6 +37,7 @@ import { useTheme } from 'next-themes';
 import { useRouter, usePathname } from 'next/navigation';
 import { ChatSessionManager } from './ChatSessionManager';
 import { ChatInterface } from './chat';
+import ErrorBoundary from './ErrorBoundary';
 
 // Tab interface for chat sessions
 interface ChatTab {
@@ -527,7 +528,9 @@ export const VSCodeInterface: React.FC<VSCodeInterfaceProps> = ({ children }) =>
             ) : (
               <>
                 {tabs.find(tab => tab.id === activeTab)?.type === 'chat' && (
-                  <ChatInterface />
+                  <ErrorBoundary>
+                    <ChatInterface />
+                  </ErrorBoundary>
                 )}
 
                 {tabs.find(tab => tab.id === activeTab)?.type === 'cosmos' && (

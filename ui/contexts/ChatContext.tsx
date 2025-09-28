@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { useRepository } from './RepositoryContext';
-import ChatAPI, { ChatMessage, ChatSession } from '@/lib/chat-api';
+import ChatAPI, { ChatMessage, ChatSession, RateLimitError } from '@/lib/chat-api';
 
 // Types for chat state management
 // ChatMessage and ChatSession are now imported from chat-api.ts
@@ -597,6 +597,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Failed to send message');
       }
     } catch (error) {
+      // Handle rate limit errors specifically
+      if (error instanceof RateLimitError) {
+        console.log('Rate limit error detected in ChatContext sendMessage, handling gracefully');
+        // Don't set general chat error for rate limit errors - they're handled by the global handler
+        console.warn('Rate limit error in sendMessage - handled gracefully');
+        throw error; // Re-throw so it can be caught by the calling component
+      }
+      
       dispatch({ type: 'SET_ERROR', payload: { type: 'chat', error: error instanceof Error ? error.message : 'Failed to send message' } });
       throw error;
     } finally {
@@ -700,6 +708,34 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error(`Attempt ${attempt + 1} failed:`, error);
         lastError = error instanceof Error ? error : new Error('Unknown error');
         
+        // Handle rate limit errors specifically - don't retry, just fail gracefully
+        if (error instanceof RateLimitError) {
+          console.log('Rate limit error detected in ChatContext, handling gracefully');
+          
+          // Update message status to failed with rate limit info
+          updateMessageStatus(messageId, { 
+            status: 'failed', 
+            error: 'Rate limit exceeded' 
+          });
+          
+          // Don't set general chat error for rate limit errors - they're handled by the global handler
+          console.warn('Rate limit error in sendMessageWithRetry - handled gracefully');
+          
+          // Don't throw the error - return gracefully to prevent unhandled runtime errors
+          dispatch({ type: 'SET_LOADING_STATE', payload: { type: 'chat', loading: false } });
+          
+          // The rate limit event has already been emitted by the ChatAPI
+          // Just return a placeholder message to prevent crashes
+          const placeholderMessage: ChatMessage = {
+            id: generateMessageId(),
+            type: 'assistant',
+            content: 'Rate limit exceeded. Please wait before sending another message.',
+            timestamp: new Date()
+          };
+          
+          return placeholderMessage;
+        }
+        
         // Check if this is a repository size error
         const errorMessage = lastError.message.toLowerCase();
         if (errorMessage.includes('repository size') && errorMessage.includes('exceeds') && errorMessage.includes('mb')) {
@@ -748,8 +784,33 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     
-    // This should never be reached, but TypeScript requires it
-    throw lastError || new Error('Unknown error occurred');
+    // If we reach here, all retries failed - handle gracefully
+    const finalError = lastError || new Error('Unknown error occurred');
+    console.error('All retry attempts failed:', finalError);
+    
+    // Check if this is a rate limit error and handle it specially
+    if (finalError instanceof RateLimitError || finalError.message.includes('Rate limit exceeded')) {
+      console.warn('Rate limit error in sendMessageWithRetry - handled gracefully');
+      
+      // Update message status to failed
+      updateMessageStatus(messageId, { 
+        status: 'failed', 
+        error: 'Rate limit exceeded' 
+      });
+      
+      // Return a placeholder message instead of throwing to prevent crashes
+      const placeholderMessage: ChatMessage = {
+        id: generateMessageId(),
+        type: 'assistant',
+        content: 'Rate limit exceeded. Please wait before sending another message.',
+        timestamp: new Date()
+      };
+      
+      return placeholderMessage;
+    }
+    
+    // For other errors, throw them normally
+    throw finalError;
   }, [chatAPI, state.selectedFiles, repository, generateMessageId, setMessageStatus, updateMessageStatus, setRepositorySizeError]);
 
   // File management

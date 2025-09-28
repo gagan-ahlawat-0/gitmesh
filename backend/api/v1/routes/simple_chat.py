@@ -42,7 +42,7 @@ async def send_message(chat_request: ChatMessage):
         
         # Try to use the actual AI service if available
         try:
-            from backend.services.ai_service import get_ai_service
+            from services.ai_service import get_ai_service
             ai_service = get_ai_service()
             
             # Prepare the prompt with repository context if available

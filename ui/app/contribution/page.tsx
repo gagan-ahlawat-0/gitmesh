@@ -7,6 +7,8 @@ import { BranchWhat } from '@/components/branch-content/BranchWhat';
 import AnimatedTransition from '@/components/AnimatedTransition';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import ContributionRateLimitHandler from '@/components/ContributionRateLimitHandler';
 
 export default function ContributionPage() {
   const [authProcessed, setAuthProcessed] = useState(false);
@@ -85,12 +87,16 @@ export default function ContributionPage() {
   }, [isAuthenticated, searchParams, authProcessed, router]);
 
   return (
-    <div className="w-full h-full overflow-y-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <AnimatedTransition show={showContent} animation="fade" duration={800}>
-          <BranchWhat />
-        </AnimatedTransition>
+    <ContributionRateLimitHandler>
+      <div className="w-full h-full overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <ErrorBoundary>
+            <AnimatedTransition show={showContent} animation="fade" duration={800}>
+              <BranchWhat />
+            </AnimatedTransition>
+          </ErrorBoundary>
+        </div>
       </div>
-    </div>
+    </ContributionRateLimitHandler>
   );
 }

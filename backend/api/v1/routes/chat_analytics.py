@@ -10,8 +10,8 @@ import structlog
 
 try:
     # Try relative imports first (when used as module)
-    from ....services.chat_analytics_service import chat_analytics_service
-    from ....models.api.chat_analytics_models import (
+    from services.chat_analytics_service import chat_analytics_service
+    from models.api.chat_analytics_models import (
         SessionAnalyticsRequest, SessionAnalyticsResponse,
         UserEngagementResponse, ModelUsageRequest, ModelUsageResponse,
         ErrorAnalyticsRequest, ErrorAnalyticsResponse,
@@ -19,7 +19,7 @@ try:
         AlertsResponse, AnalyticsDashboardResponse,
         RealtimeMetrics, AnalyticsSummary, AlertSeverity
     )
-    from ....utils.auth_utils import get_current_user
+    from utils.auth_utils import get_current_user
 except ImportError:
     # Fall back to absolute imports (when used directly)
     from services.chat_analytics_service import chat_analytics_service

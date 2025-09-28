@@ -1,5 +1,17 @@
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
+export class RateLimitError extends Error {
+  public retryAfter: number;
+  public details: any;
+
+  constructor(message: string, retryAfter: number, details: any = {}) {
+    super(message);
+    this.name = 'RateLimitError';
+    this.retryAfter = retryAfter;
+    this.details = details;
+  }
+}
+
 export interface ChatMessage {
   id: string;
   type: 'user' | 'assistant';
@@ -67,6 +79,8 @@ class ChatAPI {
     this.token = token;
   }
 
+
+
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     
@@ -91,6 +105,48 @@ class ChatAPI {
         const errorData = await response.json().catch(() => ({}));
         console.error(`ChatAPI: Error response:`, errorData);
         
+        // Handle rate limiting specifically
+        if (response.status === 429 || (errorData.error && errorData.error.error_code === 'RATE_LIMIT_EXCEEDED')) {
+          const rateLimitError = errorData.error || errorData;
+          const retryAfter = rateLimitError.retry_after || 60;
+          const details = rateLimitError.details || {};
+          
+          // Handle rate limit error and store info
+          const resetTime = new Date(Date.now() + (retryAfter * 1000));
+          const rateLimitData = {
+            timestamp: Date.now(),
+            retryAfter,
+            resetTime: resetTime.getTime(),
+            errorData: { error: { message: rateLimitError.message || 'Rate limit exceeded', details } }
+          };
+          
+          try {
+            localStorage.setItem('github_rate_limit', JSON.stringify(rateLimitData));
+          } catch (e) {
+            console.warn('Failed to store rate limit info:', e);
+          }
+
+          // Emit custom event for the rate limit handler
+          if (typeof window !== 'undefined') {
+            const event = new CustomEvent('github-rate-limit-exceeded', {
+              detail: {
+                errorData: rateLimitData.errorData,
+                retryAfter,
+                resetTime: resetTime.getTime()
+              }
+            });
+            window.dispatchEvent(event);
+          }
+          
+          // Create a specific RateLimitError that can be caught and handled
+          const error = new RateLimitError(
+            `Rate limit exceeded. Please wait ${retryAfter} seconds before trying again.`,
+            retryAfter,
+            details
+          );
+          throw error;
+        }
+        
         // Handle different error response formats
         let errorMessage = `HTTP error! status: ${response.status}`;
         
@@ -112,6 +168,55 @@ class ChatAPI {
       return await response.json();
     } catch (error) {
       console.error(`API request failed for ${endpoint}:`, error);
+      
+      // Handle rate limit errors from backend
+      if (error instanceof Error && error.message.includes('RATE_LIMIT_EXCEEDED')) {
+        try {
+          const errorMatch = error.message.match(/GitHub API error: 429 Too Many Requests - (.+)/);
+          if (errorMatch) {
+            const errorData = JSON.parse(errorMatch[1]);
+            const rateLimitInfo = errorData.error;
+            
+            // Handle rate limit error and store info
+            const retryAfter = rateLimitInfo.retry_after || 60;
+            const resetTime = new Date(Date.now() + (retryAfter * 1000));
+            const rateLimitData = {
+              timestamp: Date.now(),
+              retryAfter,
+              resetTime: resetTime.getTime(),
+              errorData: { error: { message: rateLimitInfo.message, details: rateLimitInfo.details || {} } }
+            };
+            
+            try {
+              localStorage.setItem('github_rate_limit', JSON.stringify(rateLimitData));
+            } catch (e) {
+              console.warn('Failed to store rate limit info:', e);
+            }
+
+            // Emit custom event
+            if (typeof window !== 'undefined') {
+              const event = new CustomEvent('github-rate-limit-exceeded', {
+                detail: {
+                  errorData: rateLimitData.errorData,
+                  retryAfter,
+                  resetTime: resetTime.getTime()
+                }
+              });
+              window.dispatchEvent(event);
+            }
+            
+            // Create a specific RateLimitError that can be caught and handled
+            const rateLimitError = new RateLimitError(
+              `Rate limit exceeded. Please wait ${retryAfter} seconds before trying again.`,
+              retryAfter,
+              rateLimitInfo.details || {}
+            );
+            throw rateLimitError;
+          }
+        } catch (parseError) {
+          // If parsing fails, fall through to generic error
+        }
+      }
       
       // Ensure we always throw a proper Error with a string message
       if (error instanceof Error) {

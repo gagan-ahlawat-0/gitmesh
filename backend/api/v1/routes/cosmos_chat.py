@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 
 # Import models and services
-from backend.models.api.cosmos_response import (
+from models.api.cosmos_response import (
     CosmosMessageRequest,
     CosmosMessageResponse,
     ProcessedCosmosResponse,
@@ -25,10 +25,10 @@ from backend.models.api.cosmos_response import (
     ConversionStatusResponse,
     CosmosErrorResponse
 )
-from backend.services.cosmos_web_service import CosmosWebService
-from backend.services.cosmos_web_wrapper import CosmosWebWrapper
-from backend.services.redis_repo_manager import RedisRepoManager
-from backend.services.response_processor import ResponseProcessor
+from services.cosmos_web_service import CosmosWebService
+from services.cosmos_web_wrapper import CosmosWebWrapper
+from services.redis_repo_manager import RedisRepoManager
+from services.response_processor import ResponseProcessor
 
 # Configure logging
 logger = logging.getLogger(__name__)

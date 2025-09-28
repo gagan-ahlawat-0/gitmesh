@@ -1,6 +1,6 @@
 from cosmos import diffs
 
-from ..dump import dump  # noqa: F401
+from cosmos.dump import dump  # noqa: F401
 from .base_coder import Coder
 from .single_wholefile_func_prompts import SingleWholeFileFunctionPrompts
 

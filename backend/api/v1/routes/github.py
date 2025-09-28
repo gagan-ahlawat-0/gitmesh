@@ -425,14 +425,31 @@ async def get_repository_stats(
 ):
     """Get repository statistics."""
     try:
-        # Fetch various repository data in parallel
-        details = await github_service.get_repository_details(owner, repo, token=token)
-        branches = await github_service.get_repository_branches(owner, repo, token=token)
-        issues = await github_service.get_repository_issues(owner, repo, 'open', token=token)
-        pull_requests = await github_service.get_repository_pull_requests(owner, repo, 'open', token=token)
-        commits = await github_service.get_repository_commits(owner, repo, 'main', 1, 100, token=token)
-        contributors = await github_service.get_repository_contributors(owner, repo, token=token)
-        languages = await github_service.get_repository_languages(owner, repo, token=token)
+        # Fetch various repository data in parallel with better error handling
+        import asyncio
+        
+        # Create tasks for parallel execution
+        tasks = [
+            github_service.get_repository_details(owner, repo, token=token),
+            github_service.get_repository_branches(owner, repo, token=token),
+            github_service.get_repository_issues(owner, repo, 'open', token=token),
+            github_service.get_repository_pull_requests(owner, repo, 'open', token=token),
+            github_service.get_repository_commits(owner, repo, 'main', 1, 100, token=token),
+            github_service.get_repository_contributors(owner, repo, token=token),
+            github_service.get_repository_languages(owner, repo, token=token)
+        ]
+        
+        # Execute all tasks concurrently with error handling
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Extract results with fallbacks for failed requests
+        details = results[0] if not isinstance(results[0], Exception) else {}
+        branches = results[1] if not isinstance(results[1], Exception) else []
+        issues = results[2] if not isinstance(results[2], Exception) else []
+        pull_requests = results[3] if not isinstance(results[3], Exception) else []
+        commits = results[4] if not isinstance(results[4], Exception) else []
+        contributors = results[5] if not isinstance(results[5], Exception) else []
+        languages = results[6] if not isinstance(results[6], Exception) else {}
         
         # Calculate statistics
         stats = {
@@ -515,11 +532,22 @@ async def get_branch_data(
 ):
     """Get branch-specific data for GitMesh."""
     try:
-        # Fetch branch-specific data
-        branches = await github_service.get_repository_branches(owner, repo, token=token)
-        commits = await github_service.get_repository_commits(owner, repo, branch, 1, 100, since, token=token)
-        issues = await github_service.get_repository_issues(owner, repo, 'all', 1, 100, token=token)
-        pull_requests = await github_service.get_repository_pull_requests(owner, repo, 'all', 1, 100, token=token)
+        # Fetch branch-specific data in parallel
+        import asyncio
+        
+        tasks = [
+            github_service.get_repository_branches(owner, repo, token=token),
+            github_service.get_repository_commits(owner, repo, branch, 1, 100, since, token=token),
+            github_service.get_repository_issues(owner, repo, 'all', 1, 100, token=token),
+            github_service.get_repository_pull_requests(owner, repo, 'all', 1, 100, token=token)
+        ]
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        branches = results[0] if not isinstance(results[0], Exception) else []
+        commits = results[1] if not isinstance(results[1], Exception) else []
+        issues = results[2] if not isinstance(results[2], Exception) else []
+        pull_requests = results[3] if not isinstance(results[3], Exception) else []
         
         # Find the specific branch
         branch_data = next((b for b in branches if b['name'] == branch), None)
@@ -634,9 +662,18 @@ async def get_branches_with_trees(
 ):
     """Get all branches with their file trees (comprehensive endpoint)."""
     try:
-        # Try GitHub API first
-        branches = await github_service.get_repository_branches(owner, repo, token=token)
-        trees_by_branch = await github_service.get_repository_trees_for_all_branches(owner, repo, token=token)
+        # Try GitHub API first - fetch branches and trees in parallel
+        import asyncio
+        
+        tasks = [
+            github_service.get_repository_branches(owner, repo, token=token),
+            github_service.get_repository_trees_for_all_branches(owner, repo, token=token)
+        ]
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        branches = results[0] if not isinstance(results[0], Exception) else []
+        trees_by_branch = results[1] if not isinstance(results[1], Exception) else {}
         
         result = BranchesWithTreesResponse(
             branches=branches,

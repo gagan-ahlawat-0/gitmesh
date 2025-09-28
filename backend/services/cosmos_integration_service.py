@@ -13,16 +13,16 @@ from datetime import datetime
 import redis
 from contextlib import asynccontextmanager
 
-from ..config.production import get_production_settings, FeatureFlag, is_feature_enabled
-from ..config.deployment import get_deployment_settings
-from ..config.monitoring import get_monitoring_settings
-from ..services.cosmos_web_service import CosmosWebService
-from ..services.enhanced_session_service import EnhancedSessionService
-from ..services.tier_access_service import TierAccessService
-from ..services.cache_management_service import CacheManagementService
-from ..services.navigation_cache_manager import NavigationCacheManager
-from ..services.error_monitoring import get_monitoring_service
-from ..services.graceful_degradation import get_graceful_degradation_service
+from config.production import get_production_settings, FeatureFlag, is_feature_enabled
+from config.deployment import get_deployment_settings
+from config.monitoring import get_monitoring_settings
+from services.cosmos_web_service import CosmosWebService
+from services.enhanced_session_service import EnhancedSessionService
+from services.tier_access_service import WebTierAccessController
+from services.cache_management_service import CacheManagementService
+from services.navigation_cache_manager import NavigationCacheManager
+from services.error_monitoring import get_monitoring_service
+from services.graceful_degradation import get_graceful_degradation_service
 from ..services.chat_analytics_service import ChatAnalyticsService
 from ..services.cosmos_compatibility_layer import get_compatibility_layer, CosmosCompatibilityLayer
 from ..utils.audit_logging import AuditLogger
@@ -47,7 +47,7 @@ class CosmosIntegrationService:
         # Core services
         self.cosmos_web_service: Optional[CosmosWebService] = None
         self.session_service: Optional[EnhancedSessionService] = None
-        self.tier_access_service: Optional[TierAccessService] = None
+        self.tier_access_service: Optional[WebTierAccessController] = None
         self.cache_management_service: Optional[CacheManagementService] = None
         self.navigation_cache_manager: Optional[NavigationCacheManager] = None
         self.analytics_service: Optional[ChatAnalyticsService] = None
@@ -137,7 +137,7 @@ class CosmosIntegrationService:
             
             # Initialize tier access service
             if is_feature_enabled(FeatureFlag.TIER_ACCESS_CONTROL):
-                self.tier_access_service = TierAccessService(self.redis_client)
+                self.tier_access_service = WebTierAccessController(self.redis_client)
                 await self.tier_access_service.initialize()
                 logger.info("Tier access service initialized")
             

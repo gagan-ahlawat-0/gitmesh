@@ -9,13 +9,13 @@ from datetime import datetime
 import logging
 
 try:
-    from ....services.session_persistence_service import (
+    from services.session_persistence_service import (
         session_persistence_service,
         SessionShareType,
         SessionBackupStatus
     )
-    from ....utils.auth_utils import get_current_user
-    from ....models.api.session_models import SessionStatus
+    from utils.auth_utils import get_current_user
+    from models.api.session_models import SessionStatus
 except ImportError:
     from services.session_persistence_service import (
         session_persistence_service,

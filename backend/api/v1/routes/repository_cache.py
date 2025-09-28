@@ -5,14 +5,14 @@ API endpoints for managing repository caching when users navigate to/from contri
 """
 
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime
 from pydantic import BaseModel
 
 # Use the optimized service instead of the async version
-from backend.services.optimized_repo_service import get_optimized_repo_service
-from backend.config.auth import get_current_user
+from services.optimized_repo_service import get_optimized_repo_service
+from .dependencies import get_current_user
 import os
 
 # Configure logging
@@ -48,7 +48,7 @@ class ClearCacheResponse(BaseModel):
     """Response model for cache clearing."""
     success: bool
     message: str
-    cleared_repositories: list[str]
+    cleared_repositories: List[str]
 
 
 @router.post("/cache", response_model=CacheRepositoryResponse)
@@ -81,7 +81,7 @@ async def cache_repository(
         )
         
         # Extract repo name for response
-        from backend.integrations.cosmos.v1.cosmos.repo_fetch import _get_repo_name_from_url
+        from integrations.cosmos.v1.cosmos.repo_fetch import _get_repo_name_from_url
         repo_name = _get_repo_name_from_url(request.repo_url)
         
         return CacheRepositoryResponse(
@@ -183,7 +183,7 @@ async def clear_repository_cache(
             success = repo_service.clear_cache(request.repo_url)
             
             if success:
-                from backend.integrations.cosmos.v1.cosmos.repo_fetch import _get_repo_name_from_url
+                from integrations.cosmos.v1.cosmos.repo_fetch import _get_repo_name_from_url
                 repo_name = _get_repo_name_from_url(request.repo_url)
                 cleared_repos.append(repo_name)
                 logger.info(f"Cleared cache for repository: {repo_name}")
@@ -269,7 +269,7 @@ def _cache_repository_background(
             stats = repo_service.get_repository_stats(repo_url)
             file_count = stats.get('total_files', 0)
             
-            from backend.integrations.cosmos.v1.cosmos.repo_fetch import _get_repo_name_from_url
+            from integrations.cosmos.v1.cosmos.repo_fetch import _get_repo_name_from_url
             repo_name = _get_repo_name_from_url(repo_url)
             
             logger.info(

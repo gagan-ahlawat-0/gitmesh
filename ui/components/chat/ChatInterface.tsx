@@ -6,12 +6,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRepository } from '@/contexts/RepositoryContext';
 import { useChat } from '@/contexts/ChatContext';
 import { useBranch } from '@/contexts/BranchContext';
+import { RateLimitError } from '@/lib/chat-api';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RealTimeStatusIndicator } from './RealTimeStatusIndicator';
 import {
   Send,
   Bot,
@@ -31,6 +33,7 @@ import { ModelSelector } from './ModelSelector';
 import { RepositorySelector } from './RepositorySelector';
 import { ContextPanel } from './ContextPanel';
 import { RepositorySizeErrorDialog } from './RepositorySizeErrorDialog';
+// Removed problematic imports that don't exist
 import { ChatMessage } from '@/lib/chat-api';
 
 interface ChatInterfaceProps {
@@ -55,6 +58,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [selectedModel, setSelectedModel] = useState('gemini');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showContextPanel, setShowContextPanel] = useState(true);
+  const [showMetrics, setShowMetrics] = useState(false);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,6 +89,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     adjustTextareaHeight();
   }, [message, adjustTextareaHeight]);
 
+  // Removed problematic functions that depend on missing components
+
   // Handle message submission
   const handleSendMessage = useCallback(async () => {
     if (!message.trim() || !activeSession || state.loadingStates.chat) {
@@ -106,9 +112,36 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
           files: state.selectedFiles
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to send message:', error);
-      toast.error('Failed to send message. Please try again.');
+      
+      // Handle rate limit errors specifically
+      if (error instanceof RateLimitError || error?.name === 'RateLimitError' || error?.message?.includes('Rate limit exceeded')) {
+        // Rate limit error is already handled by the ChatAPI and events are emitted
+        // Just show a user-friendly message
+        toast.error('Rate limit exceeded. Please wait before sending another message.');
+        console.warn('Rate limit error handled gracefully in ChatInterface');
+        return; // Don't re-throw the error
+      }
+      
+      // Handle authentication errors
+      if (error?.message?.includes('No authentication token')) {
+        toast.error('Please log in to send messages.');
+        return;
+      }
+      
+      // Handle network errors
+      if (error?.message?.includes('fetch') || error?.message?.includes('Network')) {
+        toast.error('Network error. Please check your connection and try again.');
+        return;
+      }
+      
+      // Handle other errors
+      const errorMessage = error?.message || 'Unknown error occurred';
+      toast.error(`Failed to send message: ${errorMessage}`);
+      
+      // Don't re-throw the error to prevent unhandled runtime errors
+      console.warn('Message sending failed, but error was handled gracefully');
     }
   }, [message, activeSession, state.loadingStates.chat, state.selectedFiles, isAuthenticated, sendMessageWithRetry, selectedModel]);
 
@@ -200,6 +233,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
             <RepositorySelector />
 
             <Separator orientation="vertical" className="h-6" />
+            
+            {/* Metrics toggle removed - component doesn't exist */}
+
             {/* Context Panel Toggle */}
             <Button
               variant="ghost"
@@ -219,6 +255,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
         {/* Messages Area */}
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-6 max-w-4xl mx-auto">
+            {/* Performance metrics components removed - don't exist */}
             {!activeSession?.messages || activeSession.messages.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -276,8 +313,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                   <Bot size={16} />
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Thinking...</span>
+                  <RealTimeStatusIndicator 
+                    sessionId={activeSession?.id}
+                    userId={user?.id}
+                    className="flex items-center gap-2"
+                  />
                 </div>
               </motion.div>
             )}
@@ -480,29 +520,7 @@ const ChatMessageComponent: React.FC<ChatMessageComponentProps> = ({
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
-              components={{
-                h1: ({ children }) => <h1 className="text-xl font-bold mb-2 break-words">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-lg font-semibold mb-2 break-words">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-base font-medium mb-1 break-words">{children}</h3>,
-                p: ({ children }) => <p className="mb-2 leading-relaxed break-words">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                code: ({ children, className }) => {
-                  const isInline = !className;
-                  return isInline ? (
-                    <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono break-all">
-                      {children}
-                    </code>
-                  ) : (
-                    <code className={className}>{children}</code>
-                  );
-                },
-                pre: ({ children }) => (
-                  <pre className="bg-muted p-3 rounded-lg overflow-x-auto text-sm max-w-full whitespace-pre-wrap">
-                    {children}
-                  </pre>
-                ),
-              }}
+              components={getMarkdownComponents()}
             >
               {message.content}
             </ReactMarkdown>
@@ -528,6 +546,33 @@ const ChatMessageComponent: React.FC<ChatMessageComponentProps> = ({
     </motion.div>
   );
 };
+
+// Removed MessageContentRenderer - used missing SearchAnimation component
+
+// Markdown components configuration
+const getMarkdownComponents = () => ({
+  h1: ({ children }: any) => <h1 className="text-xl font-bold mb-2 break-words">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-lg font-semibold mb-2 break-words">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-base font-medium mb-1 break-words">{children}</h3>,
+  p: ({ children }: any) => <p className="mb-2 leading-relaxed break-words">{children}</p>,
+  ul: ({ children }: any) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+  code: ({ children, className }: any) => {
+    const isInline = !className;
+    return isInline ? (
+      <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono break-all">
+        {children}
+      </code>
+    ) : (
+      <code className={className}>{children}</code>
+    );
+  },
+  pre: ({ children }: any) => (
+    <pre className="bg-muted p-3 rounded-lg overflow-x-auto text-sm max-w-full whitespace-pre-wrap">
+      {children}
+    </pre>
+  ),
+});
 
 // Message Status Indicator Component
 const MessageStatusIndicator: React.FC<{

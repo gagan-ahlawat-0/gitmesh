@@ -11,10 +11,10 @@ from datetime import datetime
 
 try:
     # Try relative imports first (when used as module)
-    from ....services.performance_monitoring_service import get_performance_monitoring_service
-    from ....services.smart_redis_repo_manager import SmartRedisRepoManager
-    from ....services.intelligent_vfs import IntelligentVFS
-    from ....config.settings import get_settings
+    from services.performance_monitoring_service import get_performance_monitoring_service
+    from services.smart_redis_repo_manager import SmartRedisRepoManager
+    from services.intelligent_vfs import IntelligentVFS
+    from config.settings import get_settings
 except ImportError:
     # Fall back to absolute imports (when used directly)
     from services.performance_monitoring_service import get_performance_monitoring_service

@@ -10,8 +10,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 
 try:
-    from ....services.conversion_tracking_service import conversion_tracking_service
-    from ....models.api.conversion_tracking import (
+    from services.conversion_tracking_service import conversion_tracking_service
+    from models.api.conversion_tracking import (
         ConversionOperation, ConversionProgress, ConversionMetrics,
         ConversionNote, ConversionReport, ConversionRequest, ConversionUpdateRequest,
         ConversionListResponse, ConversionStatsResponse, ConversionStatus, ConversionType

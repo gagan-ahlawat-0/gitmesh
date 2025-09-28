@@ -7,7 +7,7 @@ import uuid
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from fastapi import Request, HTTPException, status
 import jwt
 

@@ -51,7 +51,7 @@ from cosmos.run_cmd import run_cmd
 from cosmos.utils import format_content, format_messages, format_tokens, is_image_file
 from cosmos.waiting import WaitingSpinner
 
-from ..dump import dump  # noqa: F401
+from cosmos.dump import dump  # noqa: F401
 from .chat_chunks import ChatChunks
 
 
