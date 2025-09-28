@@ -121,14 +121,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return false;
       }
 
+      // First check if token exists in localStorage - if so, assume authenticated during validation
+      const storedToken = keyManager.getGitmeshToken();
+      if (storedToken === tokenToUse) {
+        // Set authenticated state immediately to prevent redirects during validation
+        setIsAuthenticated(true);
+        console.log('Token exists in storage, setting authenticated state immediately');
+      }
+
       console.log('Making validation request to:', `${API_BASE_URL}/auth/validate`);
+      
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(`${API_BASE_URL}/auth/validate`, {
         headers: {
           'Authorization': `Bearer ${tokenToUse}`,
           'Content-Type': 'application/json'
-        }
+        },
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
       console.log('Validation response status:', response.status);
       console.log('Validation response ok:', response.ok);
 
@@ -155,6 +170,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error) {
       console.error('Token validation error:', error);
+      
+      // If it's an abort error (timeout), and we have a stored token, 
+      // don't immediately clear auth state - keep it for offline scenarios
+      if (error instanceof Error && error.name === 'AbortError') {
+        const storedToken = keyManager.getGitmeshToken();
+        if (storedToken && storedToken === (authToken || token)) {
+          console.log('Token validation timed out, but token exists - maintaining auth state');
+          setIsAuthenticated(true);
+          setLoading(false);
+          return true;
+        }
+      }
+      
       setIsAuthenticated(false);
       setUser(null);
       setToken(null);

@@ -8,6 +8,7 @@ import AnimatedTransition from '@/components/AnimatedTransition';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { WithAuthPersistence, useAuthDebug } from '@/utils/authPersistence';
 import ContributionRateLimitHandler from '@/components/ContributionRateLimitHandler';
 
 export default function ContributionPage() {
@@ -15,7 +16,8 @@ export default function ContributionPage() {
   const showContent = useAnimateIn(false, 300);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setUserFromCallback, isAuthenticated } = useAuth();
+  const { setUserFromCallback, isAuthenticated, loading } = useAuth();
+  const { logAuthState } = useAuthDebug();
 
   // Handle authentication parameters from OAuth callback
   useEffect(() => {
@@ -72,9 +74,18 @@ export default function ContributionPage() {
     const authToken = searchParams.get('auth_token');
     const authUser = searchParams.get('auth_user');
     
-    // If no auth params and not authenticated, redirect to home
+    logAuthState('ContributionPage:AuthCheck');
+    
+    // Wait for auth loading to complete before making redirect decisions
+    if (loading) {
+      console.log('Auth still loading, waiting...');
+      return;
+    }
+    
+    // If no auth params and not authenticated after loading, redirect to home
     if (!authToken && !authUser && !isAuthenticated) {
-      console.log('Not authenticated, redirecting to landing page');
+      console.log('Not authenticated after loading completed, redirecting to landing page');
+      logAuthState('ContributionPage:BeforeRedirect');
       router.push('/');
       return;
     }
@@ -82,9 +93,10 @@ export default function ContributionPage() {
     // If auth processing is complete and still not authenticated, redirect
     if (authProcessed && !isAuthenticated && !authToken) {
       console.log('Authentication processing complete but not authenticated, redirecting to landing page');
+      logAuthState('ContributionPage:BeforeProcessedRedirect');
       router.push('/');
     }
-  }, [isAuthenticated, searchParams, authProcessed, router]);
+  }, [isAuthenticated, loading, searchParams, authProcessed, router, logAuthState]);
 
   return (
     <ContributionRateLimitHandler>
