@@ -248,6 +248,16 @@ try:
     logger.info("✅ Cosmos Health Check routes loaded successfully")
 except ImportError as e:
     logger.warning(f"⚠️ Cosmos Health Check routes not available: {e}")
+
+# Include Intelligent File Suggestions routes
+try:
+    from api.v1.routes.intelligent_suggestions import router as intelligent_suggestions_router
+    app.include_router(intelligent_suggestions_router, prefix="/api/v1", tags=["intelligent_suggestions"])
+    logger.info("✅ Intelligent File Suggestions routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Intelligent File Suggestions routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading Intelligent File Suggestions routes: {e}")
 except Exception as e:
     logger.error(f"❌ Error loading Cosmos Health Check routes: {e}")
 
@@ -360,6 +370,16 @@ except ImportError as e:
     logger.warning(f"⚠️ Auto-initialization routes not available: {e}")
 except Exception as e:
     logger.error(f"❌ Error loading Auto-initialization routes: {e}")
+
+# Include File Request routes
+try:
+    from api.v1.routes.file_requests import router as file_requests_router
+    app.include_router(file_requests_router, prefix="/api/v1/file-requests", tags=["file_requests"])
+    logger.info("✅ File Request routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ File Request routes not available: {e}")
+except Exception as e:
+    logger.error(f"❌ Error loading File Request routes: {e}")
 
 # Add a test endpoint to verify the connection
 @app.get("/test")

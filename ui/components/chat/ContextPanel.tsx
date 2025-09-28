@@ -57,6 +57,8 @@ import {
   Copy as CopyIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { IntelligentFileSuggestions } from '@/components/IntelligentFileSuggestions';
+import { useIntelligentSuggestions } from '@/hooks/useIntelligentSuggestions';
 
 interface FileSystemItem {
   name: string;
@@ -109,7 +111,8 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ className }) => {
     removeSelectedFile, 
     setFileStructure,
     setLoadingState,
-    setError 
+    setError,
+    getActiveSession
   } = useChat();
   
   // Use repository context detection
@@ -121,6 +124,16 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ className }) => {
     detectContext,
     getSuggestedFiles
   } = useRepositoryContext();
+
+  // Use intelligent suggestions
+  const {
+    triggerAutoSuggestions,
+    clearSuggestions
+  } = useIntelligentSuggestions({
+    enableAutoSuggestions: true,
+    showNotifications: true,
+    maxAutoAddFiles: 3
+  });
 
   // Local state
   const [isAddFileDialogOpen, setIsAddFileDialogOpen] = useState(false);
@@ -809,92 +822,44 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ className }) => {
         )}
       </div>
 
-      {/* Suggested Files Section */}
-      {suggestedFiles.length > 0 && (
-        <div className="border-b border-border">
-          <div className="p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-muted-foreground">Suggested Files</h4>
-              <Badge variant="outline" className="text-xs">
-                {suggestedFiles.length}
-              </Badge>
-            </div>
-            <div className="space-y-1">
-              {suggestedFiles.slice(0, 5).map((file) => {
-                const isInContext = contextFiles.some(f => f.path === file.path);
+      {/* Intelligent File Suggestions */}
+      <div className="border-b border-border">
+        <IntelligentFileSuggestions
+          sessionId={getActiveSession()?.id || 'default'}
+          currentFiles={contextFiles.map(f => f.path)}
+          onFileAdd={async (filePath: string, branch: string) => {
+            // Add file to context using existing logic
+            try {
+              setLoadingState('files', `adding-${filePath}`, true);
+              
+              // Fetch file content (you may need to implement this)
+              const content = await githubApi?.getFileContent(
+                repository?.owner?.login || '',
+                repository?.name || '',
+                filePath,
+                branch
+              );
+              
+              if (content) {
+                addSelectedFile({
+                  branch,
+                  path: filePath,
+                  content: content
+                });
                 
-                return (
-                  <div
-                    key={file.path}
-                    className={cn(
-                      "flex items-center justify-between p-2 rounded border transition-colors",
-                      isInContext 
-                        ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800" 
-                        : "bg-muted/30 border-border hover:border-primary/50 cursor-pointer"
-                    )}
-                    onClick={() => !isInContext && addSuggestedFileToContext(file)}
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {getFileIcon(file.path)}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium truncate">
-                            {file.name}
-                          </span>
-                          {file.language && (
-                            <Badge variant="outline" className="text-xs px-1 py-0">
-                              {file.language}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {file.path}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-1">
-                      {file.size_bytes && (
-                        <span className="text-xs text-muted-foreground">
-                          {formatFileSize(file.size_bytes)}
-                        </span>
-                      )}
-                      {isInContext ? (
-                        <Check size={16} className="text-green-500" />
-                      ) : (
-                        file.show_plus_icon && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 hover:bg-primary/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addSuggestedFileToContext(file);
-                            }}
-                          >
-                            <Plus size={14} className="text-primary" />
-                          </Button>
-                        )
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {suggestedFiles.length > 5 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full mt-2 text-xs"
-                onClick={() => setIsAddFileDialogOpen(true)}
-              >
-                View all {suggestedFiles.length} suggested files
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
+                toast.success(`Added ${filePath.split('/').pop()} to context`);
+              }
+            } catch (error) {
+              console.error(`Failed to add file ${filePath}:`, error);
+              toast.error(`Failed to add ${filePath.split('/').pop()}`);
+              throw error;
+            } finally {
+              setLoadingState('files', `adding-${filePath}`, false);
+            }
+          }}
+          className="p-3"
+        />
+      </div>
 
       {/* Context Files List */}
       <ScrollArea className="flex-1 p-2">

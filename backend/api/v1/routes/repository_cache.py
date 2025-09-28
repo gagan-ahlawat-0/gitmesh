@@ -160,6 +160,69 @@ async def get_cache_status(
         )
 
 
+@router.post("/navigation-cleanup")
+async def handle_navigation_cleanup(
+    from_page: str,
+    to_page: str,
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Handle automatic cleanup when user navigates between pages.
+    
+    This endpoint is called automatically when users navigate from /contribution to /hub
+    to clear sessions and cache data.
+    """
+    try:
+        username = current_user.get("username") or current_user.get("login")
+        user_id = current_user.get("user_id") or current_user.get("id")
+        
+        logger.info(f"Navigation cleanup for user {username}: {from_page} -> {to_page}")
+        
+        cleanup_actions = []
+        
+        # Clear repository cache when leaving /contribution for /hub
+        if from_page.startswith('/contribution') and to_page.startswith('/hub'):
+            repo_service = get_optimized_repo_service(username)
+            success = repo_service.clear_cache()
+            if success:
+                cleanup_actions.append("repository_cache_cleared")
+            
+            # Also clear session cache
+            from services.cache_management_service import CacheManagementService
+            cache_service = CacheManagementService(user_id)
+            session_cleared = cache_service.clear_user_session_cache()
+            if session_cleared:
+                cleanup_actions.append("session_cache_cleared")
+        
+        # Clear session cache when leaving chat
+        if from_page.startswith('/contribution/chat') and not to_page.startswith('/contribution/chat'):
+            from services.cache_management_service import CacheManagementService
+            cache_service = CacheManagementService(user_id)
+            session_cleared = cache_service.clear_user_session_cache()
+            if session_cleared:
+                cleanup_actions.append("session_cache_cleared")
+        
+        return {
+            "success": True,
+            "message": f"Navigation cleanup completed: {', '.join(cleanup_actions) if cleanup_actions else 'no cleanup needed'}",
+            "from_page": from_page,
+            "to_page": to_page,
+            "cleanup_actions": cleanup_actions,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during navigation cleanup: {e}")
+        return {
+            "success": False,
+            "message": f"Navigation cleanup failed: {str(e)}",
+            "from_page": from_page,
+            "to_page": to_page,
+            "cleanup_actions": [],
+            "timestamp": datetime.now().isoformat()
+        }
+
+
 @router.delete("/clear", response_model=ClearCacheResponse)
 async def clear_repository_cache(
     request: ClearCacheRequest,

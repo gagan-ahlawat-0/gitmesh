@@ -82,7 +82,7 @@ class DiffBlock:
 @dataclass
 class InteractiveElement:
     """Interactive UI element for web display."""
-    element_type: str  # 'button', 'dropdown', 'checkbox', 'input'
+    element_type: str  # 'button', 'dropdown', 'checkbox', 'input', 'file_request'
     label: str
     value: Optional[str] = None
     options: Optional[List[str]] = None
@@ -177,15 +177,40 @@ class ResponseProcessor:
             ProcessedResponse with web-safe formatting
         """
         try:
-            logger.debug("Response processing simplified - returning original content")
+            logger.debug("Processing response for file requests and interactive elements")
             
-            # Return original content without any processing
+            # Extract requested files from AI response
+            requested_files = self._extract_file_requests(content)
+            
+            # Add Cosmos file requests from metadata if available
+            cosmos_file_requests = metadata.get('cosmos_file_requests', []) if metadata else []
+            if cosmos_file_requests:
+                logger.info(f"Adding {len(cosmos_file_requests)} Cosmos file requests to response")
+                requested_files.extend(cosmos_file_requests)
+            
+            # Create interactive elements for file requests
+            interactive_elements = []
+            if requested_files:
+                for file_request in requested_files:
+                    interactive_elements.append(InteractiveElement(
+                        element_type='file_request',
+                        label=f"Add {file_request['path']} to context",
+                        value=file_request['path'],
+                        action='add_file_to_context',
+                        metadata={
+                            'file_path': file_request['path'],
+                            'reason': file_request.get('reason', 'Requested by AI'),
+                            'branch': file_request.get('branch', 'main'),
+                            'auto_add': file_request.get('auto_add', False)
+                        }
+                    ))
+            
             processed = ProcessedResponse(
                 content=content,
                 response_type=ResponseType.TEXT,
                 code_blocks=[],
                 diff_blocks=[],
-                interactive_elements=[],
+                interactive_elements=interactive_elements,
                 file_lists=[],
                 shell_commands_converted=shell_commands_converted or [],
                 conversion_notes=conversion_notes,
@@ -193,11 +218,16 @@ class ResponseProcessor:
                 raw_content=content
             )
             
+            # Add file request metadata
+            if requested_files:
+                processed.metadata['requested_files'] = requested_files
+                processed.metadata['file_requests_count'] = len(requested_files)
+            
             # Set minimal metadata
             processed.metadata['shell_commands_filtered'] = 0
             processed.metadata['security_alternatives_provided'] = 0
             
-            logger.debug("Response returned without processing")
+            logger.debug(f"Response processed with {len(requested_files)} file requests")
             return processed
             
         except Exception as e:
@@ -583,6 +613,131 @@ class ResponseProcessor:
         
         return extension_map.get(ext, CodeLanguage.UNKNOWN)
     
+    def _extract_file_requests(self, content: str) -> List[Dict[str, Any]]:
+        """Extract file requests from AI response content."""
+        file_requests = []
+        
+        # Pattern 1: "Please add [filename] to the chat" - more flexible
+        pattern1 = re.compile(r'(?:please\s+|could\s+you\s+(?:please\s+)?)?add\s+(?:the\s+)?(?:main\s+component\s+file\s+|file\s+)?[`"]?([a-zA-Z0-9_/.-]+(?:\.[a-zA-Z0-9]+)?)[`"]?\s+to\s+(?:the\s+)?(?:chat|context)', re.IGNORECASE)
+        
+        # Pattern 2: "I need to see the contents of [filename]" - more flexible
+        pattern2 = re.compile(r'(?:i\s+(?:also\s+)?)?(?:need|want)\s+to\s+(?:see|look\s+at|examine)\s+(?:the\s+)?(?:contents?\s+of\s+|authentication\s+logic\s+in\s+)?[`"]?([a-zA-Z0-9_/.-]+(?:\.[a-zA-Z0-9]+)?)[`"]?', re.IGNORECASE)
+        
+        # Pattern 3: "Can you show me [filename]" - more flexible
+        pattern3 = re.compile(r'(?:can\s+you\s+|could\s+you\s+)?show\s+me\s+(?:the\s+)?[`"]?([a-zA-Z0-9_/.-]+(?:\.[a-zA-Z0-9]+)?)[`"]?\s+(?:file|so)', re.IGNORECASE)
+        
+        # Pattern 4: "Let me examine [filename]" - more flexible
+        pattern4 = re.compile(r'let\s+me\s+(?:examine|check|look\s+at)\s+(?:the\s+)?(?:database\s+models\s+in\s+)?[`"]?([a-zA-Z0-9_/.-]+(?:\.[a-zA-Z0-9]+)?)[`"]?', re.IGNORECASE)
+        
+        # Pattern 5: Direct file path mentions with context clues
+        pattern5 = re.compile(r'(?:file|module|component|script):\s*[`"]?([a-zA-Z0-9_/.-]+(?:\.[a-zA-Z0-9]+)?)[`"]?', re.IGNORECASE)
+        
+        # Pattern 6: "would be [filename]" - for suggestions
+        pattern6 = re.compile(r'(?:would\s+be|start\s+would\s+be)\s+[`"]?([a-zA-Z0-9_/.-]+(?:\.[a-zA-Z0-9]+)?)[`"]?', re.IGNORECASE)
+        
+        # Pattern 7: Multiple files with "and" - handle separately
+        pattern7 = re.compile(r'[`"]?([a-zA-Z0-9_/.-]+(?:\.[a-zA-Z0-9]+)?)[`"]?\s+and\s+[`"]?([a-zA-Z0-9_/.-]+(?:\.[a-zA-Z0-9]+)?)[`"]?', re.IGNORECASE)
+        
+        # Pattern 8: "search for X and add the file(s)" - for search-based requests
+        pattern8 = re.compile(r'search\s+(?:your\s+repository\s+)?for\s+[`"]?([a-zA-Z0-9_/.-]+)[`"]?\s+and\s+add\s+(?:the\s+)?file', re.IGNORECASE)
+        
+        # Pattern 9: "add the file(s) that contain X" - for content-based requests
+        pattern9 = re.compile(r'add\s+(?:the\s+)?file\(?s?\)?\s+that\s+contain\s+[`"]?([a-zA-Z0-9_/.-]+)[`"]?', re.IGNORECASE)
+        
+        # Pattern 10: Generic "add files" with directory suggestions
+        pattern10 = re.compile(r'they\s+might\s+be\s+located\s+within\s+the\s+[`"]?([a-zA-Z0-9_/.-]+)[`"]?\s+directory', re.IGNORECASE)
+        
+        # Pattern 11: Generic search request pattern
+        pattern11 = re.compile(r'please\s+search\s+(?:your\s+repository\s+)?for\s+[`"]?([a-zA-Z0-9_/.-]+)[`"]?', re.IGNORECASE)
+        
+        patterns = [pattern1, pattern2, pattern3, pattern4, pattern5, pattern6, pattern8, pattern9, pattern10]
+        
+        # Handle regular patterns
+        for pattern in patterns:
+            matches = pattern.finditer(content)
+            for match in matches:
+                file_path = match.group(1).strip()
+                
+                # Validate file path (basic validation)
+                if self._is_valid_file_path(file_path):
+                    # Extract reason from surrounding context
+                    start = max(0, match.start() - 50)
+                    end = min(len(content), match.end() + 50)
+                    context = content[start:end].strip()
+                    
+                    # Clean up the context text
+                    context = ' '.join(context.split())  # Normalize whitespace
+                    context = context.replace('\n', ' ').replace('\r', ' ')  # Remove line breaks
+                    
+                    file_request = {
+                        'path': file_path,
+                        'reason': f"AI requested: {context[:80]}..." if len(context) > 80 else f"AI requested: {context}",
+                        'branch': 'main',  # Default branch
+                        'auto_add': False,  # Don't auto-add, require user approval
+                        'pattern_matched': pattern.pattern
+                    }
+                    
+                    # Avoid duplicates
+                    if not any(req['path'] == file_path for req in file_requests):
+                        file_requests.append(file_request)
+        
+        # Handle "file1 and file2" pattern separately
+        matches = pattern7.finditer(content)
+        for match in matches:
+            file1 = match.group(1).strip()
+            file2 = match.group(2).strip()
+            
+            for file_path in [file1, file2]:
+                if self._is_valid_file_path(file_path):
+                    # Extract reason from surrounding context
+                    start = max(0, match.start() - 50)
+                    end = min(len(content), match.end() + 50)
+                    context = content[start:end].strip()
+                    
+                    file_request = {
+                        'path': file_path,
+                        'reason': f"Requested in: {context[:100]}...",
+                        'branch': 'main',  # Default branch
+                        'auto_add': False,  # Don't auto-add, require user approval
+                        'pattern_matched': pattern7.pattern
+                    }
+                    
+                    # Avoid duplicates
+                    if not any(req['path'] == file_path for req in file_requests):
+                        file_requests.append(file_request)
+        
+        return file_requests
+    
+    def _is_valid_file_path(self, path: str) -> bool:
+        """Validate if a string looks like a valid file path."""
+        if not path or len(path) < 2:
+            return False
+        
+        # Must contain at least one valid file extension or be a reasonable path
+        valid_extensions = [
+            '.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', '.h',
+            '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala',
+            '.html', '.css', '.scss', '.less', '.json', '.yaml', '.yml',
+            '.xml', '.md', '.txt', '.cfg', '.conf', '.ini', '.env',
+            '.sql', '.sh', '.bash', '.ps1', '.bat', '.dockerfile'
+        ]
+        
+        # Check if it has a valid extension
+        has_extension = any(path.lower().endswith(ext) for ext in valid_extensions)
+        
+        # Check if it looks like a reasonable file path
+        looks_like_path = '/' in path or '\\' in path or '.' in path
+        
+        # Exclude common false positives
+        false_positives = [
+            'http', 'https', 'www.', '.com', '.org', '.net', 'localhost',
+            'example.', 'test.', 'demo.', 'sample.'
+        ]
+        
+        has_false_positive = any(fp in path.lower() for fp in false_positives)
+        
+        return (has_extension or looks_like_path) and not has_false_positive
+
     def _format_file_lists(self, file_lists: List[List[FileListItem]]) -> str:
         """Format file lists for web display."""
         if not file_lists:

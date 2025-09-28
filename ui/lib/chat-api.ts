@@ -24,6 +24,20 @@ export interface ChatMessage {
     knowledge_used?: number;
     sources_count?: number;
     cosmos_available?: boolean;
+    requested_files?: Array<{
+      path: string;
+      reason: string;
+      branch?: string;
+      auto_add?: boolean;
+      metadata?: Record<string, any>;
+    }>;
+    interactive_elements?: Array<{
+      element_type: string;
+      value: string;
+      label: string;
+      metadata?: Record<string, any>;
+    }>;
+    file_requests_count?: number;
   };
   codeSnippets?: Array<{
     language: string;

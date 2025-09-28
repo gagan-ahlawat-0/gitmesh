@@ -13,11 +13,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { 
-  Brain, 
-  ChevronDown, 
-  Zap, 
-  Star, 
+import {
+  Brain,
+  ChevronDown,
+  Zap,
+  Star,
   Clock,
   DollarSign,
   Shield,
@@ -76,7 +76,7 @@ const AVAILABLE_MODELS: ModelInfo[] = [
     costTier: 'low',
     speed: 'fast'
   },
-  
+
   // Balanced models
   {
     alias: 'gemini',
@@ -102,7 +102,7 @@ const AVAILABLE_MODELS: ModelInfo[] = [
     costTier: 'medium',
     speed: 'medium'
   },
-  
+
   // Advanced models
   {
     alias: 'sonnet',
@@ -140,7 +140,7 @@ const AVAILABLE_MODELS: ModelInfo[] = [
     costTier: 'high',
     speed: 'medium'
   },
-  
+
   // Reasoning models
   {
     alias: 'r1',
@@ -166,7 +166,7 @@ const AVAILABLE_MODELS: ModelInfo[] = [
     costTier: 'medium',
     speed: 'medium'
   },
-  
+
   // Specialized models
   {
     alias: 'grok3',
@@ -201,7 +201,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const availableModels = useMemo(() => {
     const tierHierarchy = { free: 0, pro: 1, enterprise: 2 };
     const userTierLevel = tierHierarchy[userTier];
-    
+
     return AVAILABLE_MODELS.filter(model => {
       const modelTierLevel = tierHierarchy[model.tier];
       return modelTierLevel <= userTierLevel;
@@ -216,7 +216,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       advanced: availableModels.filter(m => m.category === 'advanced'),
       reasoning: availableModels.filter(m => m.category === 'reasoning'),
     };
-    
+
     // Remove empty categories
     return Object.fromEntries(
       Object.entries(categories).filter(([_, models]) => models.length > 0)
@@ -321,7 +321,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           </div>
         </TooltipContent>
       </Tooltip>
-      
+
       <DropdownMenuContent className="w-80 max-h-96 overflow-y-auto">
         <DropdownMenuLabel className="flex items-center gap-2">
           <Brain size={16} />
@@ -331,14 +331,14 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           </Badge>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        
+
         {Object.entries(modelsByCategory).map(([category, models]) => (
           <div key={category}>
             <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wide">
               {getCategoryIcon(category)}
               {category} Models
             </DropdownMenuLabel>
-            
+
             {models.map((model) => (
               <DropdownMenuItem
                 key={model.alias}
@@ -363,11 +363,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                     {getCostIndicator(model.costTier)}
                   </div>
                 </div>
-                
+
                 <div className="w-full">
                   <p className="text-sm font-medium text-foreground">{model.name}</p>
                   <p className="text-xs text-muted-foreground mb-2">{model.description}</p>
-                  
+
                   <div className="flex flex-wrap gap-1">
                     {model.features.slice(0, 3).map((feature, index) => (
                       <Badge key={index} variant="outline" className="text-xs px-1 py-0">
@@ -375,7 +375,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                       </Badge>
                     ))}
                   </div>
-                  
+
                   <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
                     <span>{model.provider}</span>
                     {model.maxTokens && (
@@ -388,7 +388,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             <DropdownMenuSeparator />
           </div>
         ))}
-        
+
         {userTier !== 'enterprise' && (
           <div className="p-3 bg-muted/50 rounded-lg m-2">
             <div className="flex items-center gap-2 mb-1">
@@ -396,7 +396,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               <span className="text-sm font-medium">Upgrade for more models</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {userTier === 'free' 
+              {userTier === 'free'
                 ? 'Upgrade to Pro or Enterprise for advanced models'
                 : 'Upgrade to Enterprise for the most powerful models'
               }

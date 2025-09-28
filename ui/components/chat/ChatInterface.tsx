@@ -35,13 +35,15 @@ import { ContextPanel } from './ContextPanel';
 import { RepositorySizeErrorDialog } from './RepositorySizeErrorDialog';
 // Removed problematic imports that don't exist
 import { ChatMessage } from '@/lib/chat-api';
+import { useIntelligentSuggestions } from '@/hooks/useIntelligentSuggestions';
+import { FileRequestPanel, FileRequest } from './FileRequestPanel';
 
 interface ChatInterfaceProps {
   className?: string;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, token } = useAuth();
   const { repository } = useRepository();
   const { selectedBranch } = useBranch();
   const {
@@ -59,6 +61,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showContextPanel, setShowContextPanel] = useState(true);
   const [showMetrics, setShowMetrics] = useState(false);
+  const [fileRequests, setFileRequests] = useState<FileRequest[]>([]);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -66,6 +69,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
 
   // Get active session
   const activeSession = getActiveSession();
+
+  // Intelligent suggestions hook
+  const { triggerAutoSuggestions } = useIntelligentSuggestions({
+    enableAutoSuggestions: true,
+    showNotifications: true,
+    maxAutoAddFiles: 3
+  });
 
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = useCallback(() => {
@@ -89,7 +99,123 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     adjustTextareaHeight();
   }, [message, adjustTextareaHeight]);
 
+  // Fetch file requests for the active session
+  const fetchFileRequests = useCallback(async () => {
+    if (!activeSession?.id || !isAuthenticated || !token) return;
+
+    try {
+      const response = await fetch(`/api/v1/file-requests/session/${activeSession.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const requests = await response.json();
+        setFileRequests(requests);
+      } else {
+        console.warn('Failed to fetch file requests:', response.statusText);
+      }
+    } catch (error) {
+      console.warn('Error fetching file requests:', error);
+    }
+  }, [activeSession?.id, isAuthenticated, token]);
+
+  // Fetch file requests when session changes
+  useEffect(() => {
+    fetchFileRequests();
+  }, [fetchFileRequests]);
+
   // Removed problematic functions that depend on missing components
+
+  // Handle file request approval
+  const handleApproveFile = useCallback(async (filePath: string, branch: string = 'main') => {
+    if (!repository?.name || !activeSession?.id || !token) {
+      toast.error('No repository, session, or authentication token available');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/v1/file-requests/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          file_path: filePath,
+          repository_name: repository.name,
+          branch: branch,
+          session_id: activeSession.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to approve file: ${response.status}`);
+      }
+
+      const result = await response.json().catch(() => null);
+
+      if (result && result.success) {
+        // Remove the approved file from the requests list
+        setFileRequests(prev => prev.filter(req => req.path !== filePath));
+
+        // Refresh file requests from API to ensure consistency
+        await fetchFileRequests();
+
+        // File approved and added to context
+        toast.success(`Added ${filePath} to context`);
+      } else {
+        const errorMessage = result?.error || 'Failed to approve file - invalid response';
+        throw new Error(errorMessage);
+      }
+
+    } catch (error: any) {
+      console.warn('Error approving file:', error);
+      throw error;
+    }
+  }, [repository?.name, activeSession?.id, token, fetchFileRequests]);
+
+  // Handle file request rejection
+  const handleRejectFile = useCallback(async (filePath: string) => {
+    if (!activeSession?.id || !token) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/v1/file-requests/reject', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          file_path: filePath,
+          session_id: activeSession.id,
+          reason: 'User rejected'
+        })
+      });
+
+      if (response.ok) {
+        // Remove the rejected file from the requests list
+        setFileRequests(prev => prev.filter(req => req.path !== filePath));
+
+        // Refresh file requests from API to ensure consistency
+        await fetchFileRequests();
+
+        toast.success(`Rejected ${filePath}`);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `Failed to reject file: ${response.status}`;
+        toast.error(errorMessage);
+      }
+
+    } catch (error) {
+      console.warn('Error rejecting file:', error);
+    }
+  }, [activeSession?.id, token, fetchFileRequests]);
 
   // Handle message submission
   const handleSendMessage = useCallback(async () => {
@@ -106,15 +232,75 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
     setMessage('');
 
     try {
-      await sendMessageWithRetry(activeSession.id, messageText, 3, {
+      const response = await sendMessageWithRetry(activeSession.id, messageText, 3, {
         model: selectedModel,
         context: {
           files: state.selectedFiles
         }
       });
+
+      // Check if the AI response contains file requests
+      const assistantMessage = response?.assistantMessage || response;
+      const metadata = assistantMessage?.metadata || response?.metadata;
+
+      if (metadata?.requested_files && metadata.requested_files.length > 0) {
+        const requests: FileRequest[] = metadata.requested_files.map((req: any) => ({
+          path: req.path,
+          reason: req.reason,
+          branch: req.branch || 'main',
+          auto_add: req.auto_add || false,
+          pattern_matched: req.pattern_matched,
+          metadata: req
+        }));
+
+        setFileRequests(prev => [...prev, ...requests]);
+
+        // Show notification
+        toast.info(`AI requested ${requests.length} file(s)`, {
+          description: 'Check below the AI response for approval buttons',
+          duration: 5000
+        });
+      } else if (metadata?.interactive_elements && metadata.interactive_elements.length > 0) {
+        // Convert interactive elements to file requests if they are file_request type
+        const fileRequestElements = metadata.interactive_elements.filter((elem: any) => elem.element_type === 'file_request');
+        if (fileRequestElements.length > 0) {
+          const requests: FileRequest[] = fileRequestElements.map((elem: any) => ({
+            path: elem.value || elem.metadata?.file_path,
+            reason: elem.metadata?.reason || elem.label,
+            branch: elem.metadata?.branch || 'main',
+            auto_add: elem.metadata?.auto_add || false,
+            pattern_matched: elem.metadata?.pattern_matched,
+            metadata: elem.metadata
+          }));
+
+          setFileRequests(prev => [...prev, ...requests]);
+
+          // Show notification
+          toast.info(`AI requested ${requests.length} file(s)`, {
+            description: 'Check below the AI response for approval buttons',
+            duration: 5000
+          });
+        }
+      }
+
+      // Trigger intelligent file suggestions based on the user's message
+      if (repository?.name && activeSession?.id) {
+        const conversationHistory = activeSession.messages
+          .slice(-5) // Last 5 messages
+          .map(msg => msg.content);
+
+        const currentFiles = state.selectedFiles.map(f => f.path);
+
+        triggerAutoSuggestions(
+          messageText,
+          activeSession.id,
+          conversationHistory,
+          currentFiles
+        );
+      }
     } catch (error: any) {
-      console.error('Failed to send message:', error);
-      
+      console.warn('Failed to send message:', error);
+
       // Handle rate limit errors specifically
       if (error instanceof RateLimitError || error?.name === 'RateLimitError' || error?.message?.includes('Rate limit exceeded')) {
         // Rate limit error is already handled by the ChatAPI and events are emitted
@@ -123,27 +309,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
         console.warn('Rate limit error handled gracefully in ChatInterface');
         return; // Don't re-throw the error
       }
-      
+
       // Handle authentication errors
       if (error?.message?.includes('No authentication token')) {
         toast.error('Please log in to send messages.');
         return;
       }
-      
+
       // Handle network errors
       if (error?.message?.includes('fetch') || error?.message?.includes('Network')) {
         toast.error('Network error. Please check your connection and try again.');
         return;
       }
-      
+
       // Handle other errors
       const errorMessage = error?.message || 'Unknown error occurred';
       toast.error(`Failed to send message: ${errorMessage}`);
-      
+
       // Don't re-throw the error to prevent unhandled runtime errors
       console.warn('Message sending failed, but error was handled gracefully');
     }
-  }, [message, activeSession, state.loadingStates.chat, state.selectedFiles, isAuthenticated, sendMessageWithRetry, selectedModel]);
+  }, [message, activeSession, state.loadingStates.chat, state.selectedFiles, isAuthenticated, sendMessageWithRetry, selectedModel, repository?.name, triggerAutoSuggestions]);
 
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -224,16 +410,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
 
           <div className="flex items-center gap-2">
             {/* Model Selector */}
-            <ModelSelector
+            {/* <ModelSelector
               selectedModel={selectedModel}
               onModelChange={setSelectedModel}
-            />
+            /> */}
 
             {/* Repository Selector */}
             <RepositorySelector />
 
             <Separator orientation="vertical" className="h-6" />
-            
+
             {/* Metrics toggle removed - component doesn't exist */}
 
             {/* Context Panel Toggle */}
@@ -255,6 +441,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
         {/* Messages Area */}
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-6 max-w-4xl mx-auto">
+            {/* File Request Panel moved to individual messages */}
+
             {/* Performance metrics components removed - don't exist */}
             {!activeSession?.messages || activeSession.messages.length === 0 ? (
               <div className="text-center py-12">
@@ -292,12 +480,32 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
             ) : (
               <AnimatePresence>
                 {activeSession.messages.map((msg) => (
-                  <ChatMessageComponent
-                    key={msg.id}
-                    message={msg}
-                    onCopy={handleCopyMessage}
-                    messageStatus={getMessageStatus(msg.id)}
-                  />
+                  <div key={msg.id}>
+                    <ChatMessageComponent
+                      message={msg}
+                      onCopy={handleCopyMessage}
+                      messageStatus={getMessageStatus(msg.id)}
+                    />
+
+                    {/* Show file request panel after assistant messages that have file requests */}
+                    {msg.type === 'assistant' && msg.metadata?.requested_files && msg.metadata.requested_files.length > 0 && (
+                      <div className="mt-4">
+                        <FileRequestPanel
+                          fileRequests={msg.metadata.requested_files.map((req: any) => ({
+                            id: `${msg.id}_${req.path}`,
+                            path: req.path,
+                            reason: req.reason,
+                            branch: req.branch || 'main',
+                            auto_add: req.auto_add || false,
+                            metadata: req.metadata || {}
+                          }))}
+                          repositoryName={repository?.name || 'unknown'}
+                          onApproveFile={handleApproveFile}
+                          onRejectFile={handleRejectFile}
+                        />
+                      </div>
+                    )}
+                  </div>
                 ))}
               </AnimatePresence>
             )}
@@ -313,7 +521,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
                   <Bot size={16} />
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <RealTimeStatusIndicator 
+                  <RealTimeStatusIndicator
                     sessionId={activeSession?.id}
                     userId={user?.id}
                     className="flex items-center gap-2"
@@ -325,6 +533,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
+
+
 
         {/* Message Input */}
         <div className="p-4 border-t border-border bg-card/50">

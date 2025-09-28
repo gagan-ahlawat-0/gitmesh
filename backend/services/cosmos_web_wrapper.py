@@ -238,12 +238,28 @@ class SafeFileOperations:
             File content or None if file cannot be read
         """
         try:
-            # First try Redis cache if available
+            # First try Redis cache if available (sync version)
             if self.repo_manager:
-                content = self.repo_manager.get_file_content(file_path)
-                if content is not None:
-                    self.logger.debug(f"Read file from Redis cache: {file_path}")
-                    return content
+                try:
+                    # Try to get from sync cache first
+                    import asyncio
+                    loop = None
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            # We're in an async context, can't use asyncio.run
+                            # Fall back to direct file reading
+                            pass
+                        else:
+                            content = asyncio.run(self.repo_manager.get_file_content(file_path))
+                            if content is not None:
+                                self.logger.debug(f"Read file from Redis cache: {file_path}")
+                                return content
+                    except RuntimeError:
+                        # Event loop is already running, fall back to direct reading
+                        pass
+                except Exception as e:
+                    self.logger.debug(f"Redis cache read failed, falling back to direct read: {e}")
             
             # Fallback to direct file reading (safe)
             if os.path.exists(file_path) and os.path.isfile(file_path):
@@ -441,8 +457,11 @@ class WebSafeInputOutput(InputOutput):
                 logger.debug(f"Read file safely: {filename}")
                 return content
             
-            # SECURITY: No fallback to original IO to prevent shell command execution
-            logger.warning(f"Could not read file safely: {filename}")
+            # File not available - create a file request instead of failing silently
+            logger.info(f"File not available, creating file request: {filename}")
+            self.wrapper._track_file_request(filename, "Cosmos requested this file for analysis")
+            
+            # Return None to indicate file is not available, but request has been created
             return None
             
         except Exception as e:
@@ -991,6 +1010,28 @@ class CosmosWebWrapper:
     def _track_file_modification(self, filename: str, content: str):
         """Track file modifications for web display."""
         self._file_modifications[filename] = content
+    
+    def _track_file_request(self, filename: str, reason: str):
+        """Track file requests when Cosmos tries to access unavailable files."""
+        if not hasattr(self, '_pending_file_requests'):
+            self._pending_file_requests = []
+        
+        # Avoid duplicate requests
+        if not any(req['path'] == filename for req in self._pending_file_requests):
+            file_request = {
+                'path': filename,
+                'reason': reason,
+                'branch': 'main',
+                'auto_add': False,
+                'requested_by': 'cosmos_file_access',
+                'timestamp': datetime.now().isoformat()
+            }
+            self._pending_file_requests.append(file_request)
+            logger.info(f"Tracked file request: {filename} - {reason}")
+    
+    def get_pending_file_requests(self) -> List[Dict[str, Any]]:
+        """Get all pending file requests from Cosmos file access attempts."""
+        return getattr(self, '_pending_file_requests', [])
         
         # Update context if file is in context
         if filename in self._context_files:
@@ -1053,7 +1094,11 @@ class CosmosWebWrapper:
             # Get captured output from IO
             captured = self.io.get_captured_output()
             
+            # Get pending file requests from Cosmos file access attempts
+            pending_requests = self.get_pending_file_requests()
+            
             # Process response for web-safe display
+            logger.info(f"Processing Cosmos response content: {response_content[:200]}...")
             processed_response = self.response_processor.process_response(
                 content=response_content,
                 shell_commands_converted=self._shell_commands_intercepted.copy(),
@@ -1063,9 +1108,38 @@ class CosmosWebWrapper:
                     'context_file_count': len(self._context_files),
                     'shell_commands_intercepted': len(self._shell_commands_intercepted),
                     'conversion_status': asdict(self._conversion_status),
-                    'captured_output': captured
+                    'captured_output': captured,
+                    'cosmos_file_requests': pending_requests  # Add Cosmos file access requests
                 }
             )
+            
+            # Merge Cosmos file requests with response processor file requests
+            if pending_requests:
+                existing_requests = processed_response.metadata.get('requested_files', [])
+                all_requests = existing_requests + pending_requests
+                
+                # Remove duplicates based on file path
+                unique_requests = []
+                seen_paths = set()
+                for req in all_requests:
+                    if req['path'] not in seen_paths:
+                        unique_requests.append(req)
+                        seen_paths.add(req['path'])
+                
+                processed_response.metadata['requested_files'] = unique_requests
+                processed_response.metadata['file_requests_count'] = len(unique_requests)
+                
+                logger.info(f"Merged file requests: {len(existing_requests)} from response + {len(pending_requests)} from Cosmos = {len(unique_requests)} total")
+                
+                # Clear pending requests after processing
+                self._pending_file_requests = []
+            
+            # Debug: Log processed response metadata
+            logger.info(f"Processed response metadata: {processed_response.metadata}")
+            if processed_response.metadata.get('requested_files'):
+                logger.info(f"Response processor found {len(processed_response.metadata['requested_files'])} file requests: {[req['path'] for req in processed_response.metadata['requested_files']]}")
+            if processed_response.interactive_elements:
+                logger.info(f"Response processor found {len(processed_response.interactive_elements)} interactive elements")
             
             # Prepare response with security information
             response = CosmosResponse(

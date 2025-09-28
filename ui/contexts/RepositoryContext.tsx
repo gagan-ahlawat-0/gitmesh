@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useRef, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useRef, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { apiService } from '@/lib/api';
 
@@ -43,7 +43,8 @@ interface RepositoryProviderProps {
 
 const REPOSITORY_STORAGE_KEY = 'GitMesh-selected-repository';
 
-export const RepositoryProvider: React.FC<RepositoryProviderProps> = ({ children }) => {
+// Internal component that uses search params
+const RepositoryProviderInternal: React.FC<RepositoryProviderProps> = ({ children }) => {
   const [repository, setRepository] = useState<RepositoryData | null>(null);
   const [isRepositoryLoaded, setIsRepositoryLoaded] = useState(false);
   const prevRepositoryRef = useRef<RepositoryData | null>(null);
@@ -141,5 +142,16 @@ export const RepositoryProvider: React.FC<RepositoryProviderProps> = ({ children
     }}>
       {children}
     </RepositoryContext.Provider>
+  );
+};
+
+// Main provider with Suspense boundary
+export const RepositoryProvider: React.FC<RepositoryProviderProps> = ({ children }) => {
+  return (
+    <Suspense fallback={<div>Loading repository...</div>}>
+      <RepositoryProviderInternal>
+        {children}
+      </RepositoryProviderInternal>
+    </Suspense>
   );
 }; 

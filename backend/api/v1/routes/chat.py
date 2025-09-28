@@ -737,6 +737,80 @@ class RedisCircuitBreaker:
 
 redis_circuit_breaker = RedisCircuitBreaker()
 
+# File request storage functions
+def get_file_requests_key(session_id: str) -> str:
+    """Get Redis key for session file requests."""
+    return f"file_requests:{session_id}"
+
+def store_file_requests(session_id: str, file_requests: List[Dict[str, Any]], ttl_hours: int = 24):
+    """Store file requests for a session."""
+    if REDIS_AVAILABLE and redis_circuit_breaker.can_execute():
+        try:
+            session_redis.setex(
+                get_file_requests_key(session_id),
+                timedelta(hours=ttl_hours),
+                json.dumps(file_requests)
+            )
+            redis_circuit_breaker.record_success()
+        except Exception as e:
+            logger.error(f"Error storing file requests: {e}")
+            redis_circuit_breaker.record_failure()
+    else:
+        # Fallback to in-memory storage
+        if session_id not in globals():
+            globals()[f"file_requests_{session_id}"] = file_requests
+
+def get_file_requests(session_id: str) -> List[Dict[str, Any]]:
+    """Get file requests for a session."""
+    if REDIS_AVAILABLE and redis_circuit_breaker.can_execute():
+        try:
+            data = session_redis.get(get_file_requests_key(session_id))
+            if data:
+                redis_circuit_breaker.record_success()
+                return json.loads(data)
+            return []
+        except Exception as e:
+            logger.error(f"Error getting file requests: {e}")
+            redis_circuit_breaker.record_failure()
+            return []
+    else:
+        # Fallback to in-memory storage
+        return globals().get(f"file_requests_{session_id}", [])
+
+async def create_file_request_entities(session_id: str, requested_files: List[Dict[str, Any]], repository_name: str):
+    """Create file request entities that can be approved/rejected."""
+    try:
+        # Get existing file requests for this session
+        existing_requests = get_file_requests(session_id)
+        
+        # Create new file request entities
+        new_requests = []
+        for file_req in requested_files:
+            file_request = {
+                "id": str(uuid.uuid4()),
+                "session_id": session_id,
+                "file_path": file_req.get("path", ""),
+                "reason": file_req.get("reason", "AI requested this file"),
+                "repository_name": repository_name,
+                "branch": "main",
+                "status": "pending",  # pending, approved, rejected
+                "created_at": datetime.now().isoformat(),
+                "metadata": file_req.get("metadata", {})
+            }
+            new_requests.append(file_request)
+        
+        # Combine with existing requests
+        all_requests = existing_requests + new_requests
+        
+        # Store updated file requests
+        store_file_requests(session_id, all_requests, ttl_hours=24)
+        
+        logger.info(f"Created {len(new_requests)} file request entities for session {session_id}")
+        
+    except Exception as e:
+        logger.error(f"Error creating file request entities: {e}")
+        raise
+
 # Session management helper functions
 def get_session_key(session_id: str) -> str:
     """Get Redis key for session data."""
@@ -1351,6 +1425,15 @@ class ChatCosmosService:
                 knowledge_used = len(sources) if sources else 0
                 model_used = cosmos_response.model_used or model_name
                 
+                # Debug: Log Cosmos response metadata
+                logger.info(f"Cosmos response metadata: {cosmos_response.metadata}")
+                if cosmos_response.metadata:
+                    logger.info(f"Cosmos metadata keys: {list(cosmos_response.metadata.keys())}")
+                    if 'requested_files' in cosmos_response.metadata:
+                        logger.info(f"Cosmos found {len(cosmos_response.metadata['requested_files'])} file requests")
+                    if 'interactive_elements' in cosmos_response.metadata:
+                        logger.info(f"Cosmos found {len(cosmos_response.metadata['interactive_elements'])} interactive elements")
+                
                 # Apply tool command filtering for security
                 try:
                     from services.tool_command_filter import filter_tool_commands
@@ -1362,6 +1445,44 @@ class ChatCosmosService:
                 except Exception as filter_error:
                     logger.error(f"Error applying tool command filter: {filter_error}")
                     assistant_content = raw_assistant_content
+                
+                # Use the processed response from Cosmos wrapper (already processed)
+                processed_response = None
+                cosmos_metadata = cosmos_response.metadata or {}
+                
+                # Check if Cosmos wrapper already processed the response for file requests
+                if cosmos_metadata.get('requested_files') or cosmos_metadata.get('interactive_elements'):
+                    logger.info(f"Using Cosmos processed response with {len(cosmos_metadata.get('requested_files', []))} file requests")
+                    processed_response = type('ProcessedResponse', (), {
+                        'metadata': cosmos_metadata,
+                        'interactive_elements': cosmos_metadata.get('interactive_elements', [])
+                    })()
+                else:
+                    # Fallback: Process response for file requests if Cosmos didn't
+                    try:
+                        from services.response_processor import ResponseProcessor
+                        processor = ResponseProcessor()
+                        processed_response = processor.process_response(
+                            content=assistant_content,
+                            metadata={
+                                "model_used": model_used,
+                                "confidence": confidence,
+                                "knowledge_used": knowledge_used,
+                                "sources_count": len(sources) if sources else 0
+                            }
+                        )
+                        logger.info(f"Fallback response processed with {len(processed_response.interactive_elements)} interactive elements and {len(processed_response.metadata.get('requested_files', []))} file requests")
+                        
+                        # Debug: Log the response content and extracted requests
+                        if processed_response.metadata.get('requested_files'):
+                            logger.info(f"File requests extracted: {[req['path'] for req in processed_response.metadata['requested_files']]}")
+                        
+                    except ImportError:
+                        logger.warning("Response processor not available")
+                    except Exception as process_error:
+                        logger.error(f"Error processing response: {process_error}")
+                        import traceback
+                        logger.error(f"Traceback: {traceback.format_exc()}")
                 
                 # Add metadata to response if available
                 if knowledge_used > 0:
@@ -1430,6 +1551,32 @@ class ChatCosmosService:
                 "cosmos_available": self.cosmos_available and COSMOS_AVAILABLE
             }
         }
+        
+        # Add processed response metadata if available
+        if processed_response:
+            requested_files = processed_response.metadata.get("requested_files", [])
+            assistant_message["metadata"].update({
+                "requested_files": requested_files,
+                "file_requests_count": processed_response.metadata.get("file_requests_count", 0),
+                "interactive_elements": [
+                    {
+                        "element_type": elem.element_type,
+                        "label": elem.label,
+                        "value": elem.value,
+                        "action": elem.action,
+                        "metadata": elem.metadata
+                    }
+                    for elem in processed_response.interactive_elements
+                ]
+            })
+            
+            # Create file request entities for approval/rejection
+            if requested_files:
+                try:
+                    await create_file_request_entities(session_id, requested_files, repository_name)
+                    logger.info(f"Created {len(requested_files)} file request entities for session {session_id}")
+                except Exception as e:
+                    logger.error(f"Error creating file request entities: {e}")
         
         # Add assistant message to history
         messages = get_messages(session_id)

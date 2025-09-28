@@ -8,15 +8,11 @@ import { RepositoryProvider } from "@/contexts/RepositoryContext"
 import { BranchProvider } from "@/contexts/BranchContext"
 import RateLimitHandler from "@/components/RateLimitHandler"
 import GlobalErrorHandler from "@/components/GlobalErrorHandler"
-import Image from "next/image"
 
 export const metadata: Metadata = {
   title: "GitMesh",
   description: "AI-powered GitHub contribution manager with structured planning and branch-aware workflows",
-  icons: [
-    { rel: "icon", url: "/light_logo.png", media: "(prefers-color-scheme: dark)" },
-    { rel: "icon", url: "/dark_logo.png", media: "(prefers-color-scheme: light)" },
-  ],
+  icons: "/meshy_face.png"
 }
 
 export default function RootLayout({

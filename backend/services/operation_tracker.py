@@ -570,6 +570,72 @@ class OperationTracker:
         
         logger.info(f"Cleaned up {len(operations_to_remove)} old operations")
     
+    async def get_system_status(self) -> Dict[str, Any]:
+        """
+        Get comprehensive system status including active operations and metrics.
+        
+        Returns:
+            Dict containing system status information
+        """
+        try:
+            active_ops = self.get_active_operations()
+            
+            # Calculate summary statistics
+            total_operations = len(active_ops)
+            operations_by_status = {}
+            operations_by_type = {}
+            
+            for op in active_ops:
+                status = op.get("status", "unknown")
+                op_type = op.get("operation_type", "unknown")
+                
+                operations_by_status[status] = operations_by_status.get(status, 0) + 1
+                operations_by_type[op_type] = operations_by_type.get(op_type, 0) + 1
+            
+            # Calculate overall system health
+            failed_ops = operations_by_status.get("failed", 0)
+            total_ops = max(total_operations, 1)  # Avoid division by zero
+            error_rate = (failed_ops / total_ops) * 100
+            
+            if error_rate > 50:
+                overall_status = "critical"
+            elif error_rate > 20:
+                overall_status = "degraded"
+            elif total_operations > 100:
+                overall_status = "busy"
+            else:
+                overall_status = "healthy"
+            
+            return {
+                "overall_status": overall_status,
+                "timestamp": datetime.now().isoformat(),
+                "operations": {
+                    "total_active": total_operations,
+                    "by_status": operations_by_status,
+                    "by_type": operations_by_type,
+                    "active_operations": active_ops[:10]  # Limit to first 10 for performance
+                },
+                "metrics": {
+                    "error_rate_percent": round(error_rate, 2),
+                    "total_tracked_operations": len(self.operation_metrics),
+                    "hierarchy_depth": len(self.operation_hierarchy)
+                },
+                "system_info": {
+                    "tracker_initialized": True,
+                    "broadcaster_connected": self.status_broadcaster is not None
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting system status: {e}")
+            return {
+                "overall_status": "error",
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e),
+                "operations": {"total_active": 0, "by_status": {}, "by_type": {}},
+                "metrics": {"error_rate_percent": 100.0}
+            }
+
     def _cleanup_operation(self, operation_id: str):
         """Clean up data for a single operation."""
         self.active_operations.pop(operation_id, None)

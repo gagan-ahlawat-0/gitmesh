@@ -52,7 +52,7 @@ export function useNavigationCache(config: NavigationCacheConfig = {}) {
     }
 
     try {
-      const response = await fetch('/api/v1/chat/navigation-cleanup', {
+      const response = await fetch('/api/v1/repository-cache/navigation-cleanup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -239,7 +239,7 @@ export function useNavigationCache(config: NavigationCacheConfig = {}) {
         });
 
         if (navigator.sendBeacon) {
-          navigator.sendBeacon('/api/v1/chat/navigation-cleanup', data);
+          navigator.sendBeacon('/api/v1/repository-cache/navigation-cleanup', data);
         }
       }
     };

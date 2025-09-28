@@ -143,13 +143,14 @@ class OptimizedRepoService:
                 logger.error(f"Error getting repository data for {repo_url}: {e}")
                 return None
     
-    def get_file_content(self, repo_url: str, file_path: str) -> Optional[str]:
+    def get_file_content(self, repo_url: str, file_path: str, branch: str = 'main') -> Optional[str]:
         """
         Get specific file content using virtual codebase mapping.
         
         Args:
             repo_url: Repository URL
             file_path: Path to the file within the repository
+            branch: Branch name (defaults to 'main')
             
         Returns:
             File content as string or None if not found
@@ -763,10 +764,10 @@ def get_repository_data_optimized(repo_url: str, user_login: Optional[str] = Non
     return service.get_repository_data(repo_url, force_refresh)
 
 
-def get_file_content_optimized(repo_url: str, file_path: str, user_login: Optional[str] = None) -> Optional[str]:
+def get_file_content_optimized(repo_url: str, file_path: str, branch: str = 'main', user_login: Optional[str] = None) -> Optional[str]:
     """Get file content using optimized service."""
     service = get_optimized_repo_service(user_login)
-    return service.get_file_content(repo_url, file_path)
+    return service.get_file_content(repo_url, file_path, branch)
 
 
 def list_repository_files_optimized(repo_url: str, user_login: Optional[str] = None) -> List[str]:
