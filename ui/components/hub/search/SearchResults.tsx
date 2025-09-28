@@ -9,7 +9,7 @@ import { OrganizationCard } from './OrganizationCard';
 
 interface SearchResultsProps {
   query: string;
-}
+}RepositoryCard
 
 export function SearchResults({ query }: SearchResultsProps) {
   const { token } = useAuth();

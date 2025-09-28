@@ -21,6 +21,12 @@ def get_hub_projects(user: User = Depends(require_auth)) -> List[Project]:
     hub_service = HubService(user)
     return hub_service.get_projects()
 
+@router.get("/search", response_model=List[Project])
+def get_hub_projects(user: User = Depends(require_auth)) -> List[Project]:
+    """Get all projects for the user."""
+    hub_service = HubService(user)
+    return hub_service.get_projects()
+
 @router.get("/insights", response_model=List[Insight])
 def get_hub_insights(user: User = Depends(require_auth)) -> List[Insight]:
     """Get insights for the user."""

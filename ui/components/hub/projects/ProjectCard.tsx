@@ -40,7 +40,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ repo }) => {
           <Button variant="outline" size="sm" onClick={() => window.open(repo.html_url, '_blank')} className="bg-black text-white hover:bg-gray-700 border-gray-700">
             <ExternalLink className="h-4 w-4" />
           </Button>
-          <Button size="sm" onClick={handleOpenInBeetle} className="bg-orange-500 text-black hover:bg-orange-600">
+          <Button 
+            size="sm" 
+            onClick={handleOpenInBeetle} 
+            className="bg-orange-500 text-black hover:bg-orange-600"
+            data-testid="open-in-gitmesh"
+          >
             Open in GitMesh
           </Button>
         </div>

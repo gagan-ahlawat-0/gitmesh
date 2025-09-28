@@ -192,6 +192,7 @@ app.include_router(auth_router, prefix="/api/v1/auth", tags=["authentication"])
 app.include_router(github_router, prefix="/api/v1/github", tags=["github"])
 app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(projects_router, prefix="/api/v1/projects", tags=["projects"])
+app.include_router(projects_router, prefix="/api/v1/search", tags=["search"])
 app.include_router(webhooks_router, prefix="/api/v1/webhooks", tags=["webhooks"])
 app.include_router(aggregated_router, prefix="/api/v1/aggregated", tags=["aggregated"])
 
