@@ -1,294 +1,48 @@
-# ================================================================= #
-# Merged .gitignore for Python, Node.js, and General Development    #
-# Combines rules for frameworks, tools, IDEs, and OS files.         #
-# ================================================================= #
-
-## Python
-#####################################################################
-# Byte-compiled / optimized / DLL files
-__pycache__/
-**/__pycache__
-*.py[cod]
-*$py.class
-*.so
-
-# C extensions
-cython_debug/
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual Environments
-.env
-.env.local
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Package managers & dependencies
-__pypackages__/
-pip-log.txt
-pip-delete-this-directory.txt
-# poetry.lock
-# Pipfile.lock
-# pdm.lock
-poetry.toml
-.pdm.toml
-
-# Framework specific
-# Django
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-# Flask
-instance/
-.webassets-cache
-# Scrapy
-.scrapy
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# Documentation
-docs/_build/
-/site
-
-# Type checkers & Linters
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pyre/
-.pytype/
-.ruff_cache/
-pyrightconfig.json
-
-# Jupyter & IPython
-.ipynb_checkpoints
-hey.ipynb
-profile_default/
-ipython_config.py
-
-# Other tools
-*.sage.py
-.pybuilder/
-target/
-
-
-## 💻 Node.js & JavaScript
-#####################################################################
-# Logs
 logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 lerna-debug.log*
-.pnpm-debug.log*
-report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+node_modules
+dist
+dist-ssr
+*.local
 
-# Build output & Framework specific
-.next/
-out/
-.nuxt/
-.svelte-kit/
-.vuepress/dist
-.temp
-.docusaurus
-# public # Uncomment if using Gatsby
-
-# Caches
-.cache/
-.eslintcache
-.stylelintcache
-.parcel-cache
-.prettier-cache/
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# TypeScript specific
-*.tsbuildinfo
-.tscache/
-next-env.d.ts
-
-# Other
-.node_repl_history
-*.tgz
-.yarn-integrity
-.lock-wscript
-
-
-## 📦 Dependencies
-#####################################################################
-node_modules/
-/**/node_modules/
-jspm_packages/
-bower_components
-web_modules/
-package-lock.json
-
-# Yarn
-.pnp/
-.pnp.*
-.pnp.js
-.yarn/
-!.yarn/patches/
-!.yarn/plugins/
-!.yarn/releases/
-!.yarn/sdks/
-!.yarn/versions/
-
-# pnpm
-.pnpm-store/
-
-
-## 🧪 Testing & Coverage
-#####################################################################
-# Python
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Node.js
-coverage/
-.nyc_output
-lib-cov
-*.lcov
-test-results/
-.cypress/
-
-
-## ⚙️ IDE & Editor
-#####################################################################
-# VSCode
-.vscode/
-.vscode-test
-*.code-workspace
-
-# JetBrains (PyCharm, WebStorm, etc.)
-.idea/
-
-# Spyder
-.spyderproject
-.spyproject
-
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-
-# Vim
-*~
-*.swp
-*.swo
-*.sw?
-.session
-
-# Other
-.ropeproject
-.windsurfrules
-.cursorrules
-.kiro
-
-
-## ☁️ Deployment & Hosting
-#####################################################################
-.vercel/
-.netlify/
-.firebase/
-.serverless/
-.webpack/
-cdk.out/
-.fusebox/
-.dynamodb/
-
-
-## 📄 General & OS
-#####################################################################
-# OS-generated files
+.vscode/*
+.vscode/launch.json
+!.vscode/extensions.json
+.idea
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-.AppleDouble
-.LSOverride
-.directory
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# Sensitive data & Environment variables
-*.log
-.env.*
-!.env.example
-.env.debug
-config.json
-secrets.json
-master.key
-user_sessions.json
-traces.jsonl
+/.history
+/.cache
+/build
+functions/build/
+.env.local
+.env
+.dev.vars
+*.vars
+.wrangler
+_worker.bundle
 
-# Temporary files
-*.tmp
-*.temp
-*.bak
-*.backup
+Modelfile
+modelfiles
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
+# docs ignore
+site
 
-# Docker
-.dockerignore
-
-# Custom
-GEMINI.md
-qdrant_storage/
-/tmp/
-/local/
-/data/
-
-.gitmesh
-.tars
-tars_sessions
-secret.yaml
-data/
-backend/scripts/performance_validation_results.json
-__tests__
+# commit file ignore
+app/commit.json
+changelogUI.md
+docs/instructions/Roadmap.md
+.cursorrules
+*.md
+.qodo
