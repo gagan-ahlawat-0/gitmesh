@@ -114,7 +114,7 @@ function formatIssueBody(data: z.infer<typeof bugReportSchema>): string {
     }
 
     if (data.environmentInfo.gitmeshVersion) {
-      body += `- gitmesh.diy: ${data.environmentInfo.gitmeshVersion}\n`;
+      body += `- gitmesh: ${data.environmentInfo.gitmeshVersion}\n`;
     }
 
     if (data.environmentInfo.aiProviders) {
@@ -136,7 +136,7 @@ function formatIssueBody(data: z.infer<typeof bugReportSchema>): string {
     body += `**Contact:** ${data.contactEmail}\n\n`;
   }
 
-  body += '---\n*Submitted via gitmesh.diy bug report feature*';
+  body += '---\n*Submitted via gitmesh bug report feature*';
 
   return body;
 }
@@ -194,9 +194,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const githubToken =
       (context?.cloudflare?.env as any)?.GITHUB_BUG_REPORT_TOKEN || process.env.GITHUB_BUG_REPORT_TOKEN;
     const targetRepo =
-      (context?.cloudflare?.env as any)?.BUG_REPORT_REPO ||
-      process.env.BUG_REPORT_REPO ||
-      'stackblitz-labs/gitmesh.diy';
+      (context?.cloudflare?.env as any)?.BUG_REPORT_REPO || process.env.BUG_REPORT_REPO || 'stackblitz-labs/gitmesh';
 
     if (!githubToken) {
       console.error('GitHub bug report token not configured');
@@ -209,7 +207,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     // Initialize GitHub client
     const octokit = new Octokit({
       auth: githubToken,
-      userAgent: 'gitmesh.diy-bug-reporter',
+      userAgent: 'gitmesh-bug-reporter',
     });
 
     // Create GitHub issue

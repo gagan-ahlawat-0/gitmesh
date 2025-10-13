@@ -65,7 +65,7 @@ export function useGit() {
       const headers: {
         [x: string]: string;
       } = {
-        'User-Agent': 'gitmesh.diy',
+        'User-Agent': 'gitmesh',
       };
 
       const auth = lookupSavedPassword(url);
