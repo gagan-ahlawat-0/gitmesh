@@ -8,15 +8,15 @@
 **AI-powered Git collaboration network for OSS**
 
 [![OpenSource License](https://img.shields.io/badge/License-Apache%20License-orange.svg?style=for-the-badge)](LICENSE.md)
-[![Contributors](https://img.shields.io/github/contributors/LF-Decentralized-Trust-Mentorships/gitmesh.svg?style=for-the-badge&logo=git)](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/graphs/contributors)
+[![Contributors](https://img.shields.io/github/contributors/LF-Decentralized-Trust-labs/gitmesh.svg?style=for-the-badge&logo=git)](https://github.com/LF-Decentralized-Trust-labs/gitmesh/graphs/contributors)
 [![Under Development](https://img.shields.io/badge/Status-Under%20Development-yellow.svg?style=for-the-badge)](#)
 [![Join Discord](https://img.shields.io/badge/Join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/FkrWfGtZn3)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10972/badge)](https://www.bestpractices.dev/projects/10972)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/LF-Decentralized-Trust-Mentorships/gitmesh/badge)](https://scorecard.dev/viewer/?uri=github.com/LF-Decentralized-Trust-Mentorships/gitmesh)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/LF-Decentralized-Trust-labs/gitmesh/badge)](https://scorecard.dev/viewer/?uri=github.com/LF-Decentralized-Trust-labs/gitmesh)
 
 *Code with purpose, Integrate with confidence*
 
-[![Documentation](https://img.shields.io/badge/Documentation-000000?style=flat&logo=github)](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/README.md) 
+[![Documentation](https://img.shields.io/badge/Documentation-000000?style=flat&logo=github)](https://github.com/LF-Decentralized-Trust-labs/gitmesh/README.md) 
 [![Join Community](https://img.shields.io/badge/Join_Community-000000?style=flat&logo=discord)](https://discord.gg/FkrWfGtZn3)
 [![Join Waitlist](https://img.shields.io/badge/Join_Waitlist-000000?style=flat&logo=github)](https://www.gitmesh.dev) 
 
@@ -35,10 +35,9 @@
    <br></br>
 </div>
 
-
 **GitMesh** is a Git collaboration network designed to solve open source's biggest challenge: contributor dropout. Our AI-powered platform provides real-time branch-level insights, intelligent contributor-task matching, and automated workflows. It transforms complex codebases into clear, guided contribution journeys—fueling engagement with gamified rewards, bounties, and integration with popular open source support programs.
 
-Our mascot (Meshy/Mesh Wolf) reflects GitMesh’s core: agile, resilient, and unstoppable together. Like a pack, we thrive on teamwork — efficient, and powerful in unison.
+Our mascot (Meshy/Mesh Wolf) reflects GitMesh's core: agile, resilient, and unstoppable together. Like a pack, we thrive on teamwork — efficient, and powerful in unison.
 
 ---
 
@@ -63,152 +62,180 @@ Our mascot (Meshy/Mesh Wolf) reflects GitMesh’s core: agile, resilient, and un
 
 ---
 
-## </> Quick Start
+## </> Installation
 
 <div align="center">
 <picture>
    <source srcset="public/mascott/meshy.png" media="(prefers-color-scheme: dark)">
-   <img src="public/mascott/mesh.png" alt="GitMesh Logo" width="250">
+   <img src="public/mascott/mesh.png" alt="GitMesh Mascot" width="250">
 </picture>
 </div>
 
 ### 👾 Prerequisites
 
-- Node.js v18+ and npm
-- Python 3.12
-- Git
-- HashiCorp Vault
-   <details>
-   <summary>Linux (.deb)</summary>
+Node.js is required to run the application.
+
+1. Visit the [Node.js Download Page](https://nodejs.org/en/download/)
+2. Download the "LTS" (Long Term Support) version for your operating system
+3. Run the installer, accepting the default settings
+4. Verify Node.js is properly installed:
+   - **For Windows Users**:
+     1. Press `Windows + R`
+     2. Type "sysdm.cpl" and press Enter
+     3. Go to "Advanced" tab → "Environment Variables"
+     4. Check if `Node.js` appears in the "Path" variable
+   - **For Mac/Linux Users**:
+     1. Open Terminal
+     2. Type this command:
+        ```bash
+        echo $PATH
+        ```
+     3. Look for `/usr/local/bin` in the output
+
+### 👾 Quick Start
+
+Choose one of the following methods to get started with GitMesh:
+
+#### Option 1: Direct Installation (Recommended for Beginners)
+
+1. **Install Package Manager (pnpm)**:
 
    ```bash
-   sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
-   wget -O- https://apt.releases.hashicorp.com/gpg | \
-   gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+   npm install -g pnpm
+   ```
 
-   echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
-   https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
-   sudo tee /etc/apt/sources.list.d/hashicorp.list
-
-   sudo apt update
-   sudo apt install vault
-   ````
-
-   </details>
-
-   <details>
-   <summary>Linux (.rpm)</summary>
+2. **Install Project Dependencies**:
 
    ```bash
-   sudo yum install -y yum-utils
-   sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
-   sudo yum install vault
+   pnpm install
    ```
 
-   </details>
-
-   <details>
-   <summary>macOS</summary>
+3. **Start the Application**:
 
    ```bash
-   brew tap hashicorp/tap
-   brew install hashicorp/tap/vault
+   pnpm run dev
    ```
 
-   </details>
+**Open the WebUI** at [http://localhost:5173](http://localhost:5173)
 
-   <details>
-   <summary>Windows</summary>
+#### Option 2: Using Docker
 
-   Download from: [https://developer.hashicorp.com/vault/downloads](https://developer.hashicorp.com/vault/downloads)
+This option requires some familiarity with Docker but provides a more isolated environment.
 
-   Or:
+**Additional Prerequisite**: Install Docker: [Download Docker](https://www.docker.com/)
 
-   ```powershell
-   choco install vault
-   # or
-   scoop install vault
-   ```
+**Steps**:
 
-   </details>
-
-### 👾 Clone the repository
-   ```bash
-   git clone https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh
-   cd gitmesh
-   ```
-
-### 👾 Environment Variables
-
-> Python Backend Configuration
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-> Frontend Configuration
-
-```bash
-cp ui/.env.example ui/.env
-```
-
-> **Note**: Replace all placeholder values [REDACTED] with your actual configuration values.
-
-
-### 👾 Running the Application
-
-1. **Start HashiCorp Vault** (in first terminal)
-   ```bash
-   vault server -dev # Keep this running
-   ```
-   
-   **In another terminal:**
-   ```bash
-   export VAULT_ADDR='http://127.0.0.1:8200'
-   export VAULT_TOKEN=your-root-token  # Copy from "vault server -dev" output
-   vault secrets enable transit
-   ```
-
-2. **Start Python Backend** (in second terminal)
-   ```bash
-   cd backend
-   ```
-
-   <details>
-   <summary>Linux/Mac</summary>
+1. **Build the Docker Image**:
 
    ```bash
-   python3.12 -m venv venv
-   source venv/bin/activate
+   # Using npm script:
+   npm run dockerbuild
+
+   # OR using direct Docker command:
+   docker build . --target gitmesh-ai-development
    ```
 
-   </details>
-   <details>
-   <summary>Windows</summary>
+2. **Run the Container**:
+   ```bash
+   docker compose --profile development up
+   ```
+
+#### Option 3: Setup Using Git (For Developers)
+
+This method is recommended for developers who want to:
+* Contribute to the project
+* Stay updated with the latest changes
+* Switch between different versions
+* Create custom modifications
+
+**Prerequisites**: Install Git: [Download Git](https://git-scm.com/downloads)
+
+**Initial Setup**:
+
+1. **Clone the Repository**:
 
    ```bash
-   python3.12 -m venv venv
-   .\venv\Scripts\activate
+   git clone https://github.com/LF-Decentralized-Trust-labs/gitmesh.git
    ```
 
-   </details>
+2. **Navigate to Project Directory**:
 
    ```bash
-   pip install -r requirements.txt
-   uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+   cd GitMesh
    ```
 
-3. **Start Frontend** (in third terminal)
+3. **Install Dependencies**:
+
    ```bash
-   cd ui
-   npm install
-   npm run dev
+   pnpm install
    ```
 
-> **Access the Application**
->   - Frontend: http://localhost:3000
->   - Vault UI: http://127.0.0.1:8200
+4. **Start the Development Server**:
+   ```bash
+   pnpm run dev
+   ```
 
+5. **(OPTIONAL)** Switch to the Main Branch if you want to use pre-release/testbranch:
+   ```bash
+   git checkout main
+   pnpm install
+   pnpm run dev
+   ```
+
+**Staying Updated**:
+
+To get the latest changes from the repository:
+
+1. **Save Your Local Changes** (if any):
+
+   ```bash
+   git stash
+   ```
+
+2. **Pull Latest Updates**:
+
+   ```bash
+   git pull 
+   ```
+
+3. **Update Dependencies**:
+
+   ```bash
+   pnpm install
+   ```
+
+4. **Restore Your Local Changes** (if any):
+   ```bash
+   git stash pop
+   ```
+
+### 👾 Troubleshooting
+
+#### Git Setup Issues
+
+If you encounter issues:
+
+1. **Clean Installation**:
+
+   ```bash
+   # Remove node modules and lock files
+   rm -rf node_modules pnpm-lock.yaml
+
+   # Clear pnpm cache
+   pnpm store prune
+
+   # Reinstall dependencies
+   pnpm install
+   ```
+
+2. **Reset Local Changes**:
+   ```bash
+   # Discard all local changes
+   git reset --hard origin/main
+   ```
+
+Remember to always commit your local changes or stash them before pulling updates to avoid conflicts.
 
 ---
 
@@ -216,13 +243,15 @@ cp ui/.env.example ui/.env
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-[![Complete Roadmap](https://img.shields.io/badge/View%20our-Roadmap-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/blob/main/ROADMAP.md)
+[![Complete Roadmap](https://img.shields.io/badge/View%20our-Roadmap-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/LF-Decentralized-Trust-labs/gitmesh/blob/main/ROADMAP.md)
 
 ### 👾 Quick Contributing Steps:
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Submit a signed pull request
+4. Commit your changes (`git commit -s -m 'Add some amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Submit a signed pull request
 
 Mesh & Meshy are excited to see what amazing contributions you'll bring to the GitMesh community!
 
@@ -286,8 +315,6 @@ Mesh & Meshy are excited to see what amazing contributions you'll bring to the G
   </tr>
 </table>
 
-
-
 ## </> Community & Support
 
 <div align="center">
@@ -301,7 +328,7 @@ Mesh & Meshy are excited to see what amazing contributions you'll bring to the G
 | [Discord](https://discord.gg/FkrWfGtZn3)                     | Real-time             | Quick questions, community discussions               |
 | [Email Support](mailto:gitmesh.oss@gmail.com)                 | 24–48 hours           | Technical issues, detailed bug reports               |
 | [Twitter / X](https://x.com/gitmesh_oss)                      | Online                | Tagging the project, general updates, public reports |
-| [GitHub Issues](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/issues) | 1–3 days              | Bug reports, feature requests, feedback              |
+| [GitHub Issues](https://github.com/LF-Decentralized-Trust-labs/gitmesh/issues) | 1–3 days              | Bug reports, feature requests, feedback              |
 
 </div>
 
@@ -313,21 +340,21 @@ Mesh & Meshy are excited to see what amazing contributions you'll bring to the G
 
 | Metric | Value |
 |--------|-------|
-| **Total Commits** | ![Commits](https://img.shields.io/github/commit-activity/t/LF-Decentralized-Trust-Mentorships/gitmesh) |
-| **Pull Requests** | ![PRs](https://img.shields.io/github/issues-pr/LF-Decentralized-Trust-Mentorships/gitmesh) |
-| **Issues Resolved** | ![Issues](https://img.shields.io/github/issues-closed/LF-Decentralized-Trust-Mentorships/gitmesh) |
-| **Latest Release** | ![Release](https://img.shields.io/github/v/release/LF-Decentralized-Trust-Mentorships/gitmesh) |
+| **Total Commits** | ![Commits](https://img.shields.io/github/commit-activity/t/LF-Decentralized-Trust-labs/gitmesh) |
+| **Pull Requests** | ![PRs](https://img.shields.io/github/issues-pr/LF-Decentralized-Trust-labs/gitmesh) |
+| **Issues Resolved** | ![Issues](https://img.shields.io/github/issues-closed/LF-Decentralized-Trust-labs/gitmesh) |
+| **Latest Release** | ![Release](https://img.shields.io/github/v/release/LF-Decentralized-Trust-labs/gitmesh) |
 
 </div>
 
 <br></br>
 
 <div align="center">
-  <a href="https://www.star-history.com/#LF-Decentralized-Trust-Mentorships/gitmesh&Date">
+  <a href="https://www.star-history.com/#LF-Decentralized-Trust-labs/gitmesh&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=LF-Decentralized-Trust-Mentorships/gitmesh&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=LF-Decentralized-Trust-Mentorships/gitmesh&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=LF-Decentralized-Trust-Mentorships/gitmesh&type=Date" width="700" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=LF-Decentralized-Trust-labs/gitmesh&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=LF-Decentralized-Trust-labs/gitmesh&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=LF-Decentralized-Trust-labs/gitmesh&type=Date" width="700" />
   </picture>
 </a>
 </div>
@@ -339,4 +366,4 @@ Mesh & Meshy are excited to see what amazing contributions you'll bring to the G
   <img src="https://www.lfdecentralizedtrust.org/hubfs/LF%20Decentralized%20Trust/lfdt-horizontal-white.png" alt="Supported by the Linux Foundation Decentralized Trust" width="220"/>
 </a>
 
-**Supported by the [Linux Foundation Decentralized Trust](https://www.lfdecentralizedtrust.org/)** – Advancing open source innovation.
+**A Lab under the [Linux Foundation Decentralized Trust](https://www.lfdecentralizedtrust.org/)** – Advancing open source innovation.
