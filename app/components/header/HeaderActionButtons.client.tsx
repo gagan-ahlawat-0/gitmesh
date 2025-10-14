@@ -24,7 +24,10 @@ export function HeaderActionButtons({ chatStarted: _chatStarted }: HeaderActionB
         <div className="flex border border-gitmesh-elements-borderColor rounded-md overflow-hidden text-sm">
           <button
             onClick={() =>
-              window.open('https://github.com/stackblitz-labs/gitmesh/issues/new?template=bug_report.yml', '_blank')
+              window.open(
+                'https://github.com/LF-Decentralized-Trust-labs/gitmesh/issues/new?template=bug_report.yml',
+                '_blank',
+              )
             }
             className="rounded-l-md items-center justify-center [&:is(:disabled,.disabled)]:cursor-not-allowed [&:is(:disabled,.disabled)]:opacity-60 px-3 py-1.5 text-xs bg-blue-500 text-white hover:text-gitmesh-elements-item-contentAccent [&:not(:disabled,.disabled)]:hover:bg-gitmesh-elements-button-primary-backgroundHover outline-accent-500 flex gap-1.5"
             title="Report Bug"
