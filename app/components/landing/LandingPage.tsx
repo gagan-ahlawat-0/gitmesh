@@ -138,7 +138,7 @@ export default function LandingPage({}: LandingPageProps) {
           {/* Authentication Form */}
           <div className="bg-gitmesh-elements-background-depth-1 rounded-lg p-6 border border-gitmesh-elements-borderColor">
             {isDevelopment || !isSupabaseConfigured() ? (
-              /* Development Mode or Supabase not configured - Guest Access */
+              // Development Mode or Supabase not configured - Guest Access
               <div className="space-y-4">
                 {/* Terms and Conditions Checkbox */}
                 <div className="flex items-start gap-3">
@@ -211,7 +211,7 @@ export default function LandingPage({}: LandingPageProps) {
                 )}
               </div>
             ) : (
-              /* Production Mode - Authentication Required */
+              // Production Mode - Authentication Required
               <div className="space-y-4">
                 {/* Terms and Conditions Checkbox */}
                 <div className="flex items-start gap-3">

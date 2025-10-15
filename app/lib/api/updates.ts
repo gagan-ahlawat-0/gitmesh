@@ -56,7 +56,7 @@ export const checkForUpdates = async (): Promise<UpdateCheckResult> => {
      * Using raw.githubusercontent.com which doesn't require authentication
      */
     const latestPackageResponse = await fetch(
-      'https://raw.githubusercontent.com/stackblitz-labs/gitmesh.diy/main/package.json',
+      'https://raw.githubusercontent.com/LF-Decentralized-Trust-labs/gitmesh/main/package.json',
     );
 
     if (!latestPackageResponse.ok) {

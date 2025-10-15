@@ -40,7 +40,7 @@ async function gitlabBranchesLoader({ request }: { request: Request }) {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
-        'User-Agent': 'gitmesh.diy-app',
+        'User-Agent': 'gitmesh-app',
       },
     });
 
@@ -72,7 +72,7 @@ async function gitlabBranchesLoader({ request }: { request: Request }) {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
-        'User-Agent': 'gitmesh.diy-app',
+        'User-Agent': 'gitmesh-app',
       },
     });
 

@@ -1,4 +1,4 @@
-appId: com.stackblitz.gitmesh.diy
+appId: com.lfdt.gitmesh
 productName: gitmesh Local
 directories:
   buildResources: build

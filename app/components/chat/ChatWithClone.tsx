@@ -12,7 +12,6 @@ import type { Message } from 'ai';
 import { detectProjectCommands, createCommandsMessage, escapegitmeshTags } from '~/utils/projectCommands';
 import { generateId } from '~/utils/fileUtils';
 import { useCloneContext } from '~/lib/contexts/CloneContext';
-import { webcontainer } from '~/lib/webcontainer';
 import { RepoStatus } from './RepoStatus';
 import { useStore } from '@nanostores/react';
 import { chatStore } from '~/lib/stores/chat';
@@ -41,60 +40,6 @@ const ig = ignore().add(IGNORE_PATTERNS);
 const MAX_FILE_SIZE = 100 * 1024; // 100KB limit per file
 const MAX_TOTAL_SIZE = 500 * 1024; // 500KB total limit
 
-async function readExistingWorkspace(): Promise<{
-  workdir: string;
-  data: Record<string, { data: any; encoding?: string }>;
-}> {
-  try {
-    const container = await webcontainer;
-    const workdir = container.workdir;
-    const data: Record<string, { data: any; encoding?: string }> = {};
-
-    // Read files recursively from the workspace
-    const readDirectory = async (dirPath: string = '') => {
-      try {
-        const entries = await container.fs.readdir(dirPath, { withFileTypes: true });
-
-        for (const entry of entries) {
-          const fullPath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
-
-          // Skip ignored paths
-          if (ig.ignores(fullPath)) {
-            continue;
-          }
-
-          if (entry.isDirectory()) {
-            await readDirectory(fullPath);
-          } else if (entry.isFile()) {
-            try {
-              // Only read text files
-              if (
-                fullPath.match(
-                  /\.(txt|md|astro|mjs|js|jsx|ts|tsx|json|html|css|scss|less|yml|yaml|xml|svg|vue|svelte)$/i,
-                )
-              ) {
-                const content = await container.fs.readFile(fullPath, 'utf8');
-                data[fullPath] = { data: content, encoding: 'utf8' };
-              }
-            } catch (error) {
-              console.warn(`Failed to read file ${fullPath}:`, error);
-            }
-          }
-        }
-      } catch (error) {
-        console.warn(`Failed to read directory ${dirPath}:`, error);
-      }
-    };
-
-    await readDirectory();
-
-    return { workdir, data };
-  } catch (error) {
-    console.error('Failed to read existing workspace:', error);
-    throw error;
-  }
-}
-
 function ChatWithCloneInner() {
   const [searchParams] = useSearchParams();
   const { ready: gitReady, gitClone } = useGit();
@@ -119,29 +64,24 @@ function ChatWithCloneInner() {
       setIsCloning(true);
 
       try {
-        let workdir: string;
-        let data: Record<string, { data: any; encoding?: string }>;
+        const repoDisplayName = repoName || cloneUrl.split('/').slice(-1)[0];
 
-        try {
-          const result = await gitClone(cloneUrl);
-          workdir = result.workdir;
-          data = result.data;
-        } catch (error) {
-          // If cloning fails due to existing files, try to read the existing workspace
-          const errorMessage = error instanceof Error ? error.message : String(error);
+        // Add a context-clearing message to indicate we're switching repositories
+        if (addClonedMessages) {
+          const contextClearMessage: Message = {
+            role: 'assistant',
+            content: `🔄 **Loading new repository: ${repoDisplayName}**
 
-          if (errorMessage.includes('would be overwritten') || errorMessage.includes('already exists')) {
-            console.log('Repository already exists in workspace, reading existing files...');
-            toast.info('Repository already cloned, loading existing files...');
+I'm now cloning and loading the repository from ${cloneUrl}. This will replace any previous repository context in our conversation.`,
+            id: generateId(),
+            createdAt: new Date(),
+          };
 
-            // Read existing files from the workspace
-            const result = await readExistingWorkspace();
-            workdir = result.workdir;
-            data = result.data;
-          } else {
-            throw error; // Re-throw other errors
-          }
+          addClonedMessages([contextClearMessage]);
         }
+
+        const result = await gitClone(cloneUrl);
+        const data = result.data;
 
         if (addClonedMessages) {
           const filePaths = Object.keys(data).filter((filePath) => !ig.ignores(filePath));
@@ -202,7 +142,9 @@ function ChatWithCloneInner() {
 
           const filesMessage: Message = {
             role: 'assistant',
-            content: `Cloning the repo ${cloneUrl} into ${workdir}
+            content: `Successfully cloned repository **${repoDisplayName}** from ${cloneUrl}
+
+I've loaded the complete codebase into the workspace. The previous repository context has been replaced with the new repository files.
 ${
   skippedFiles.length > 0
     ? `\nSkipped files (${skippedFiles.length}):
@@ -233,7 +175,6 @@ ${escapegitmeshTags(typeof file.content === 'string' ? file.content : '')}
           addClonedMessages(messages);
         }
 
-        const repoDisplayName = repoName || cloneUrl.split('/').slice(-1)[0];
         toast.success(`Repository "${repoDisplayName}" cloned successfully!`);
       } catch (error) {
         console.error('Error during import:', error);
