@@ -42,13 +42,66 @@ export function useGit() {
     });
   }, []);
 
+  const clearWorkspace = useCallback(
+    async (skipConfirmation = false) => {
+      if (!webcontainer) {
+        throw new Error('Webcontainer not initialized');
+      }
+
+      try {
+        // Get all files and directories in the workspace
+        const entries = await webcontainer.fs.readdir('.', { withFileTypes: true });
+
+        // If workspace is empty, no need to clear
+        if (entries.length === 0) {
+          return;
+        }
+
+        // Ask for confirmation unless skipped
+        if (!skipConfirmation) {
+          const confirmed = confirm(
+            'The workspace contains existing files from a previous repository. Do you want to clear it to clone the new repository?\n\nThis will permanently delete all current files in the workspace.',
+          );
+
+          if (!confirmed) {
+            throw new Error('Workspace clearing cancelled by user');
+          }
+        }
+
+        // Remove all files and directories
+        for (const entry of entries) {
+          try {
+            if (entry.isDirectory()) {
+              await webcontainer.fs.rm(entry.name, { recursive: true, force: true });
+            } else {
+              await webcontainer.fs.rm(entry.name, { force: true });
+            }
+          } catch (error) {
+            console.warn(`Failed to remove ${entry.name}:`, error);
+          }
+        }
+
+        console.log('Workspace cleared successfully');
+      } catch (error) {
+        console.error('Failed to clear workspace:', error);
+        throw new Error(`Failed to clear workspace: ${error}`);
+      }
+    },
+    [webcontainer],
+  );
+
   const gitClone = useCallback(
-    async (url: string, retryCount = 0) => {
+    async (url: string, retryCount = 0, clearFirst = false) => {
       if (!webcontainer || !fs || !ready) {
         throw new Error('Webcontainer not initialized. Please try again later.');
       }
 
       fileData.current = {};
+
+      // Clear workspace if requested
+      if (clearFirst) {
+        await clearWorkspace(false); // Ask for confirmation when clearing
+      }
 
       let branch: string | undefined;
       let baseUrl = url;
@@ -155,7 +208,7 @@ export function useGit() {
 
           // Retry for network errors, up to 3 times
           if (retryCount < 3) {
-            return gitClone(url, retryCount + 1);
+            return gitClone(url, retryCount + 1, clearFirst);
           }
 
           throw new Error(
@@ -169,16 +222,26 @@ export function useGit() {
           throw new Error(
             `Unauthorized access to repository. Please connect your GitHub account with proper permissions.`,
           );
+        } else if (
+          !clearFirst &&
+          (errorMessage.includes('would be overwritten') ||
+            errorMessage.includes('already exists') ||
+            errorMessage.includes('EEXIST') ||
+            (errorMessage.includes('destination path') && errorMessage.includes('exists')))
+        ) {
+          // If workspace has existing files, clear it and retry
+          console.log('Workspace contains existing files, clearing and retrying...');
+          return gitClone(url, retryCount, true);
         } else {
           toast.error(`Failed to clone repository: ${errorMessage}`);
           throw error;
         }
       }
     },
-    [webcontainer, fs, ready],
+    [webcontainer, fs, ready, clearWorkspace],
   );
 
-  return { ready, gitClone };
+  return { ready, gitClone, clearWorkspace };
 }
 
 const getFs = (
