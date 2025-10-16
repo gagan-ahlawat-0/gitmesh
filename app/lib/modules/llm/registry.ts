@@ -19,6 +19,8 @@ import GithubProvider from './providers/github';
 import MoonshotProvider from './providers/moonshot';
 
 export {
+  GithubProvider, // Put GitHub Models first - has free tier and easy setup
+  OllamaProvider, // Local testing when models are available
   AnthropicProvider,
   CohereProvider,
   DeepseekProvider,
@@ -28,7 +30,6 @@ export {
   HyperbolicProvider,
   MistralProvider,
   MoonshotProvider,
-  OllamaProvider,
   OpenAIProvider,
   OpenRouterProvider,
   OpenAILikeProvider,
@@ -37,5 +38,4 @@ export {
   TogetherProvider,
   LMStudioProvider,
   AmazonBedrockProvider,
-  GithubProvider,
 };
