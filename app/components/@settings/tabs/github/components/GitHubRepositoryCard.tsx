@@ -107,8 +107,8 @@ export function GitHubRepositoryCard({ repo, onClone }: GitHubRepositoryCardProp
               className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white transition-colors flex-1 justify-center"
               title="Clone repository"
             >
-              <div className="i-ph:git-branch w-4 h-4" />
-              Clone Repository
+              {/* <div className="i-ph:git-branch w-4 h-4" /> */}
+              Open in GitMesh
             </button>
           ) : (
             <span className="flex items-center gap-1 text-xs text-gitmesh-elements-textSecondary group-hover:text-blue-500 transition-colors">

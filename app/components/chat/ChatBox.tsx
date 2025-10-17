@@ -67,12 +67,6 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
     <div
       className={classNames(
         'relative bg-gitmesh-elements-background-depth-1 backdrop-blur p-3 rounded-lg border border-gitmesh-elements-borderColor relative w-full max-w-chat mx-auto z-prompt',
-
-        /*
-         * {
-         *   'sticky bottom-2': chatStarted,
-         * },
-         */
       )}
     >
       <svg className={classNames(styles.PromptEffectContainer)}>
