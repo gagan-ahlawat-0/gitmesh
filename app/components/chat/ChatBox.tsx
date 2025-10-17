@@ -18,6 +18,8 @@ import { ColorSchemeDialog } from '~/components/ui/ColorSchemeDialog';
 import type { DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
 import { McpTools } from './MCPTools';
+import { useStore } from '@nanostores/react';
+import { workbenchStore } from '~/lib/stores/workbench';
 
 interface ChatBoxProps {
   isModelSettingsCollapsed: boolean;
@@ -62,7 +64,9 @@ interface ChatBoxProps {
   setSelectedElement?: ((element: ElementInfo | null) => void) | undefined;
 }
 
-export const ChatBox: React.FC<ChatBoxProps> = (props) => {
+export const ChatBox = ({ ...props }: ChatBoxProps) => {
+  const showWorkbench = useStore(workbenchStore.showWorkbench);
+
   return (
     <div
       className={classNames(
@@ -297,6 +301,23 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
               >
                 <div className={`${props.chatMode === 'discuss' ? 'i-ph:code' : 'i-ph:chats'} text-xl`} />
                 {props.chatMode === 'discuss' ? <span>Edit</span> : <span />}
+              </IconButton>
+            )}
+            {props.chatStarted && props.chatMode === 'build' && (
+              <IconButton
+                title={showWorkbench ? 'Hide Sidebar' : 'Show Sidebar'}
+                className={classNames(
+                  'transition-all flex items-center gap-1 px-1.5',
+                  showWorkbench
+                    ? 'bg-gitmesh-elements-item-backgroundAccent text-gitmesh-elements-item-contentAccent'
+                    : 'bg-gitmesh-elements-item-backgroundDefault text-gitmesh-elements-item-contentDefault',
+                )}
+                onClick={() => {
+                  workbenchStore.showWorkbench.set(!showWorkbench);
+                }}
+              >
+                <div className={`${showWorkbench ? 'i-ph:sidebar-simple-fill' : 'i-ph:sidebar-simple'} text-xl`} />
+                <span className="text-xs">Sidebar</span>
               </IconButton>
             )}
             <IconButton

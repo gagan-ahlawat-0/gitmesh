@@ -71,10 +71,12 @@ export default function ChatPage() {
 
   return (
     <RepoProvider value={{ selectedRepo, fromHub, clearRepoContext }}>
-      <div className="flex flex-col h-full w-full bg-gitmesh-elements-background-depth-1">
+      <div className="h-screen w-full bg-gitmesh-elements-background-depth-1">
         <BackgroundRays />
         <Header />
-        <ChatWithClone />
+        <div className="h-full pt-[var(--header-height)] overflow-y-auto">
+          <ChatWithClone />
+        </div>
       </div>
     </RepoProvider>
   );

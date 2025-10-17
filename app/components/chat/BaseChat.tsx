@@ -28,6 +28,7 @@ import { SupabaseChatAlert } from '~/components/chat/SupabaseAlert';
 import { expoUrlAtom } from '~/lib/stores/qrCodeStore';
 import { useStore } from '@nanostores/react';
 import { StickToBottom, useStickToBottomContext } from '~/lib/hooks';
+import { workbenchStore } from '~/lib/stores/workbench';
 import { ChatBox } from './ChatBox';
 import type { DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
@@ -144,6 +145,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [progressAnnotations, setProgressAnnotations] = useState<ProgressAnnotation[]>([]);
     const expoUrl = useStore(expoUrlAtom);
     const [qrModalOpen, setQrModalOpen] = useState(false);
+    const showWorkbench = useStore(workbenchStore.showWorkbench);
 
     useEffect(() => {
       if (expoUrl) {
@@ -342,12 +344,17 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const baseChat = (
       <div
         ref={ref}
-        className={classNames(styles.BaseChat, 'relative flex h-full w-full overflow-hidden')}
+        className={classNames(styles.BaseChat, 'relative flex h-full w-full')}
         data-chat-visible={showChat}
       >
         <ClientOnly>{() => <Menu />}</ClientOnly>
-        <div className="flex flex-col lg:flex-row overflow-y-auto w-full h-full">
-          <div className={classNames(styles.Chat, 'flex flex-col flex-grow lg:min-w-[var(--chat-min-width)] h-full')}>
+        <div className="flex flex-col lg:flex-row w-full h-full">
+          <div
+            className={classNames(
+              styles.Chat,
+              'flex flex-col flex-grow lg:min-w-[var(--chat-min-width)] h-full overflow-y-auto',
+            )}
+          >
             {!chatStarted && (
               <div id="intro" className="mt-[16vh] max-w-2xl mx-auto text-center px-4 lg:px-0">
                 <h1 className="text-3xl lg:text-6xl font-bold text-gitmesh-elements-textPrimary mb-4 animate-fade-in">
@@ -367,7 +374,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             >
               <StickToBottom.Content
                 className={classNames('flex flex-col gap-4 relative', {
-                  'pb-[180px]': chatStarted, // Add bottom padding when chat started to account for fixed ChatBox
+                  'pb-[350px]': chatStarted, // Add bottom padding when chat started to account for fixed ChatBox
                 })}
               >
                 <ClientOnly>
@@ -474,8 +481,19 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
 
             {/* Fixed ChatBox when chat has started */}
             {chatStarted && (
-              <div className="fixed bottom-4 left-0 right-0 z-50">
-                <div className="flex flex-col gap-2 w-full max-w-chat mx-auto px-2 sm:px-6">
+              <div
+                className={classNames('fixed bottom-4 z-50', {
+                  'left-0 right-[var(--workbench-width)]': chatMode === 'build' && showWorkbench,
+                  'left-0 right-0': chatMode === 'discuss' || !chatMode || (chatMode === 'build' && !showWorkbench),
+                })}
+              >
+                <div
+                  className={classNames('flex flex-col gap-2 px-2 sm:px-6', {
+                    'w-full max-w-none mr-4': chatMode === 'build' && showWorkbench,
+                    'w-full max-w-chat mx-auto':
+                      chatMode === 'discuss' || !chatMode || (chatMode === 'build' && !showWorkbench),
+                  })}
+                >
                   {/* Alerts positioned above the fixed ChatBox */}
                   <div className="flex flex-col gap-2">
                     {deployAlert && (
