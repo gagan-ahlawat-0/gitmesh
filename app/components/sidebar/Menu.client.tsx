@@ -5,7 +5,7 @@ import { Dialog, DialogButton, DialogDescription, DialogRoot, DialogTitle } from
 import { ThemeSwitch } from '~/components/ui/ThemeSwitch';
 import { ControlPanel } from '~/components/@settings/core/ControlPanel';
 import { Button } from '~/components/ui/Button';
-import { db, deleteById, getAll, chatId, type ChatHistoryItem, useChatHistory } from '~/lib/persistence';
+import { deleteById, getAll, chatId, type ChatHistoryItem, useChatHistory, openDatabase } from '~/lib/persistence';
 import { cubicEasingFn } from '~/utils/easings';
 import { HistoryItem } from './HistoryItem';
 import { binDates } from './date-binning';
@@ -50,20 +50,57 @@ export const Menu = () => {
   const profile = useStore(profileStore);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [db, setDb] = useState<IDBDatabase | undefined>(undefined);
 
   const { filteredItems: filteredList, handleSearchChange } = useSearchFilter({
     items: list,
     searchFields: ['description'],
   });
 
+  // Initialize database on client side
+  useEffect(() => {
+    console.log('🔍 Sidebar database init effect:', { isClient: typeof window !== 'undefined', dbExists: !!db });
+
+    if (typeof window !== 'undefined' && !db) {
+      console.log('🔄 Initializing sidebar database...');
+      openDatabase()
+        .then((database) => {
+          console.log('✅ Sidebar database initialized:', !!database);
+          setDb(database);
+        })
+        .catch((error) => {
+          console.error('❌ Failed to initialize database in sidebar:', error);
+        });
+    }
+  }, [db]);
+
   const loadEntries = useCallback(() => {
+    console.log('📋 loadEntries called:', { dbAvailable: !!db });
+
     if (db) {
       getAll(db)
-        .then((list) => list.filter((item) => item.urlId && item.description))
-        .then(setList)
-        .catch((error) => toast.error(error.message));
+        .then((list) => {
+          console.log('📚 Raw chat list from DB:', list.length, list);
+          return list.filter((item) => item.urlId && item.description);
+        })
+        .then((filteredList) => {
+          console.log('📋 Filtered chat list:', filteredList.length, filteredList);
+          filteredList.forEach((chat, index) => {
+            console.log(`📄 Chat ${index}:`, {
+              id: chat.id,
+              urlId: chat.urlId,
+              description: chat.description,
+              navigationUrl: `/chat/${chat.urlId}`,
+            });
+          });
+          setList(filteredList);
+        })
+        .catch((error) => {
+          console.error('❌ Error loading entries:', error);
+          toast.error(error.message);
+        });
     }
-  }, []);
+  }, [db]);
 
   const deleteChat = useCallback(
     async (id: string): Promise<void> => {
@@ -243,6 +280,14 @@ export const Menu = () => {
       loadEntries();
     }
   }, [open, loadEntries]);
+
+  // Load entries when database becomes available
+  useEffect(() => {
+    if (db) {
+      console.log('📊 Database is now available, loading entries...');
+      loadEntries();
+    }
+  }, [db, loadEntries]);
 
   // Exit selection mode when sidebar is closed
   useEffect(() => {

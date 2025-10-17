@@ -182,9 +182,12 @@ export async function selectContext(props: {
   });
 
   const response = resp.text;
+  logger.info('LLM Response:', response);
+
   const updateContextBuffer = response.match(/<updateContextBuffer>([\s\S]*?)<\/updateContextBuffer>/);
 
   if (!updateContextBuffer) {
+    logger.error('Failed to parse updateContextBuffer from response:', response);
     throw new Error('Invalid response. Please follow the response format');
   }
 
@@ -227,10 +230,20 @@ export async function selectContext(props: {
   }
 
   const totalFiles = Object.keys(filteredFiles).length;
-  logger.info(`Total files: ${totalFiles}`);
+  logger.info(`Total files selected: ${totalFiles}`);
+  logger.info('Include files:', includeFiles);
+  logger.info('Exclude files:', excludeFiles);
+  logger.info('Current files in context:', currrentFiles);
 
   if (totalFiles == 0) {
-    throw new Error(`gitmesh failed to select files`);
+    logger.warn('No new files were selected. This could be because:');
+    logger.warn('1. LLM didnt suggest any files to include');
+    logger.warn('2. All suggested files were already in context');
+    logger.warn('3. Suggested files were not found in the file list');
+    logger.warn('Returning existing context files instead of failing');
+
+    // Return existing context files if no new files were selected
+    return contextFiles;
   }
 
   return filteredFiles;

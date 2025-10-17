@@ -106,7 +106,13 @@ export function HistoryItem({
         <a
           href={`/chat/${item.urlId}`}
           className="flex w-full relative truncate block"
-          onClick={selectionMode ? handleItemClick : undefined}
+          onClick={(e) => {
+            console.log('🔗 Navigating to chat:', { urlId: item.urlId, href: `/chat/${item.urlId}` });
+
+            if (selectionMode) {
+              handleItemClick(e);
+            }
+          }}
         >
           <WithTooltip tooltip={currentDescription}>
             <span className="truncate pr-24">{currentDescription}</span>

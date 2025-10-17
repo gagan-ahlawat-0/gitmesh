@@ -1,7 +1,7 @@
-import { json, type MetaFunction } from '@remix-run/cloudflare';
+import { json, type MetaFunction, type LoaderFunctionArgs } from '@remix-run/cloudflare';
 import { useEffect } from 'react';
 import { useStore } from '@nanostores/react';
-import { Navigate } from '@remix-run/react';
+import { Navigate, Outlet } from '@remix-run/react';
 import { Header } from '~/components/header/Header';
 import BackgroundRays from '~/components/ui/BackgroundRays';
 import { authStore, initializeAuth } from '~/lib/stores/auth';
@@ -13,7 +13,17 @@ export const meta: MetaFunction = () => {
   return [{ title: 'Chat - GitMesh' }, { name: 'description', content: 'GitMesh: Git Collaboration Network for OSS' }];
 };
 
-export const loader = () => json({});
+export const loader = (args: LoaderFunctionArgs) => {
+  console.log('🚨 BASE chat.tsx loader called with params:', args.params);
+
+  // Don't return data if this is a parameterized route
+  if (Object.keys(args.params).length > 0) {
+    console.log('🚨 BASE route detected parameters, returning empty');
+    return json({});
+  }
+
+  return json({ baseRoute: true });
+};
 
 const isDevelopment = import.meta.env.DEV;
 
@@ -26,6 +36,18 @@ const isDevelopment = import.meta.env.DEV;
 export default function ChatPage() {
   const { user, loading, initialized } = useStore(authStore);
   const { selectedRepo, fromHub, clearRepoContext } = usePersistedRepoContext();
+
+  // Check if this is a parameterized route (has path parameters)
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const hasParameters = currentPath.match(/^\/chat\/[^\/]+/);
+
+  console.log('🏠 BASE ChatPage rendered:', { currentPath, hasParameters });
+
+  // If this is a parameterized route, render the Outlet (child route)
+  if (hasParameters) {
+    console.log('🏠 BASE ChatPage detected parameters, rendering Outlet for child route');
+    return <Outlet />;
+  }
 
   useEffect(() => {
     if (!initialized) {
@@ -49,10 +71,12 @@ export default function ChatPage() {
 
   return (
     <RepoProvider value={{ selectedRepo, fromHub, clearRepoContext }}>
-      <div className="flex flex-col h-full w-full bg-gitmesh-elements-background-depth-1">
+      <div className="h-screen w-full bg-gitmesh-elements-background-depth-1">
         <BackgroundRays />
         <Header />
-        <ChatWithClone />
+        <div className="h-full pt-[var(--header-height)] overflow-y-auto">
+          <ChatWithClone />
+        </div>
       </div>
     </RepoProvider>
   );
