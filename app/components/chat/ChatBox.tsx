@@ -300,12 +300,12 @@ export const ChatBox = ({ ...props }: ChatBoxProps) => {
                 }}
               >
                 <div className={`${props.chatMode === 'discuss' ? 'i-ph:code' : 'i-ph:chats'} text-xl`} />
-                {props.chatMode === 'discuss' ? <span>Edit</span> : <span />}
+                {props.chatMode === 'discuss' ? <span>Edit</span> : <span>Discuss</span>}
               </IconButton>
             )}
-            {props.chatStarted && props.chatMode === 'build' && (
+            {props.chatStarted && (
               <IconButton
-                title={showWorkbench ? 'Hide Sidebar' : 'Show Sidebar'}
+                title={showWorkbench ? 'Hide Workbench' : 'Show Workbench'}
                 className={classNames(
                   'transition-all flex items-center gap-1 px-1.5',
                   showWorkbench
@@ -317,7 +317,7 @@ export const ChatBox = ({ ...props }: ChatBoxProps) => {
                 }}
               >
                 <div className={`${showWorkbench ? 'i-ph:sidebar-simple-fill' : 'i-ph:sidebar-simple'} text-xl`} />
-                <span className="text-xs">Sidebar</span>
+                <span className="text-xs">Workbench</span>
               </IconButton>
             )}
             <IconButton

@@ -27,7 +27,7 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
 function ChatIdRoute() {
   const loaderData = useLoaderData<typeof loader>();
   const { user, loading, initialized } = useStore(authStore);
-  const { selectedRepo, fromHub, clearRepoContext } = usePersistedRepoContext();
+  const { selectedRepo, fromHub, clearRepoContext, updateRepoContext } = usePersistedRepoContext();
 
   console.log('🎯 PARAMETERIZED ChatIdRoute rendered', { loaderData });
 
@@ -52,8 +52,8 @@ function ChatIdRoute() {
   }
 
   return (
-    <RepoProvider value={{ selectedRepo, fromHub, clearRepoContext }}>
-      <div className="flex flex-col h-full w-full bg-gitmesh-elements-background-depth-1">
+    <RepoProvider value={{ selectedRepo, fromHub, clearRepoContext, updateRepoContext }}>
+      <div className="h-screen w-full bg-gitmesh-elements-background-depth-1">
         <BackgroundRays />
         <Header />
         <ChatWithClone />

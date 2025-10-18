@@ -43,7 +43,7 @@ const MAX_TOTAL_SIZE = 500 * 1024; // 500KB total limit
 function ChatWithCloneInner() {
   const [searchParams] = useSearchParams();
   const { ready: gitReady, gitClone } = useGit();
-  const { ready: historyReady } = useChatHistory();
+  const { ready: historyReady, updateChatMestaData } = useChatHistory();
   const { addClonedMessages } = useCloneContext();
   const [isCloning, setIsCloning] = useState(false);
   const [hasProcessedClone, setHasProcessedClone] = useState(false);
@@ -51,6 +51,8 @@ function ChatWithCloneInner() {
 
   const cloneUrl = searchParams.get('clone');
   const repoName = searchParams.get('repo');
+  const repoFullName = searchParams.get('fullName');
+  const repoProvider = searchParams.get('provider') as 'github' | 'gitlab' | null;
   const fromHub = searchParams.get('from') === 'hub';
 
   useEffect(() => {
@@ -173,6 +175,17 @@ ${escapegitmeshTags(typeof file.content === 'string' ? file.content : '')}
           }
 
           addClonedMessages(messages);
+        }
+
+        // Save repository metadata to chat
+        if (repoName && repoFullName && repoProvider && updateChatMestaData) {
+          await updateChatMestaData({
+            gitUrl: cloneUrl,
+            cloneUrl,
+            repoName,
+            repoFullName,
+            repoProvider,
+          });
         }
 
         toast.success(`Repository "${repoDisplayName}" cloned successfully!`);

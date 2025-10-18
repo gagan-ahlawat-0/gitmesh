@@ -261,6 +261,25 @@ ${value.content}
             description.set(storedMessages.description);
             chatId.set(storedMessages.id);
             chatMetadata.set(storedMessages.metadata);
+
+            // Restore repository context from metadata if available
+            if (
+              storedMessages.metadata?.cloneUrl &&
+              storedMessages.metadata?.repoName &&
+              storedMessages.metadata?.repoFullName &&
+              storedMessages.metadata?.repoProvider
+            ) {
+              // Trigger repository context restoration via custom event
+              const repoEvent = new CustomEvent('restore-repo-context', {
+                detail: {
+                  cloneUrl: storedMessages.metadata.cloneUrl,
+                  repoName: storedMessages.metadata.repoName,
+                  repoFullName: storedMessages.metadata.repoFullName,
+                  provider: storedMessages.metadata.repoProvider,
+                },
+              });
+              window.dispatchEvent(repoEvent);
+            }
           } else {
             console.log('❌ No messages found, navigating to home');
             navigate('/', { replace: true });

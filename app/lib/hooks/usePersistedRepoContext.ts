@@ -72,6 +72,28 @@ export function usePersistedRepoContext() {
     }
   }, [urlCloneUrl, urlRepoName, urlRepoFullName, urlProvider, urlFromHub]);
 
+  // Listen for repository context restoration events
+  useEffect(() => {
+    const handleRepoRestore = (event: CustomEvent) => {
+      const { cloneUrl, repoName, repoFullName, provider } = event.detail;
+
+      if (cloneUrl && repoName && repoFullName && provider) {
+        updateRepoContext({
+          cloneUrl,
+          repoName,
+          repoFullName,
+          provider,
+        });
+      }
+    };
+
+    window.addEventListener('restore-repo-context', handleRepoRestore as EventListener);
+
+    return () => {
+      window.removeEventListener('restore-repo-context', handleRepoRestore as EventListener);
+    };
+  }, []);
+
   const clearRepoContext = () => {
     setRepoInfo(null);
 
@@ -83,6 +105,34 @@ export function usePersistedRepoContext() {
 
     // Navigate to clean chat page
     navigate('/chat');
+  };
+
+  const updateRepoContext = (repoData: {
+    cloneUrl: string;
+    repoName: string;
+    repoFullName: string;
+    provider: 'github' | 'gitlab';
+  }) => {
+    const newRepoInfo: RepoInfo = {
+      cloneUrl: repoData.cloneUrl,
+      repoName: repoData.repoName,
+      repoFullName: repoData.repoFullName,
+      provider: repoData.provider,
+      fromHub: true, // Set to true when restoring from chat
+    };
+
+    setRepoInfo(newRepoInfo);
+
+    try {
+      localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(newRepoInfo));
+    } catch (error) {
+      console.warn('Failed to persist repo context:', error);
+    }
+
+    /*
+     * DO NOT update URL parameters when restoring from chat metadata
+     * This prevents the ChatWithClone component from thinking it needs to clone again
+     */
   };
 
   // Transform to the format expected by RepoProvider
@@ -99,5 +149,6 @@ export function usePersistedRepoContext() {
     selectedRepo,
     fromHub: repoInfo?.fromHub ?? false,
     clearRepoContext,
+    updateRepoContext,
   };
 }
