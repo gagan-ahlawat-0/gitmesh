@@ -7,6 +7,11 @@ export interface IChatMetadata {
   gitUrl: string;
   gitBranch?: string;
   netlifySiteId?: string;
+  // Repository context information
+  repoName?: string;
+  repoFullName?: string;
+  repoProvider?: 'github' | 'gitlab';
+  cloneUrl?: string;
 }
 
 const logger = createScopedLogger('ChatHistory');

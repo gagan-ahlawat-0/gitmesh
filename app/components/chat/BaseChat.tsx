@@ -33,6 +33,7 @@ import { ChatBox } from './ChatBox';
 import type { DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
 import LlmErrorAlert from './LLMApiAlert';
+import { sidebarOpen } from '~/lib/stores/sidebar';
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -146,6 +147,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const expoUrl = useStore(expoUrlAtom);
     const [qrModalOpen, setQrModalOpen] = useState(false);
     const showWorkbench = useStore(workbenchStore.showWorkbench);
+    const isSidebarOpen = useStore(sidebarOpen);
 
     useEffect(() => {
       if (expoUrl) {
@@ -348,11 +350,15 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         data-chat-visible={showChat}
       >
         <ClientOnly>{() => <Menu />}</ClientOnly>
-        <div className="flex flex-col lg:flex-row w-full h-full">
+        <div className="flex flex-col lg:flex-row w-full h-full transition-all duration-200">
           <div
             className={classNames(
               styles.Chat,
-              'flex flex-col flex-grow lg:min-w-[var(--chat-min-width)] h-full overflow-y-auto',
+              'flex flex-col flex-grow lg:min-w-[var(--chat-min-width)] h-full overflow-y-auto transition-all duration-200',
+              {
+                'ml-[340px]': isSidebarOpen,
+                'ml-0': !isSidebarOpen,
+              },
             )}
           >
             {!chatStarted && (
@@ -482,16 +488,17 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             {/* Fixed ChatBox when chat has started */}
             {chatStarted && (
               <div
-                className={classNames('fixed bottom-4 z-50', {
-                  'left-0 right-[var(--workbench-width)]': chatMode === 'build' && showWorkbench,
-                  'left-0 right-0': chatMode === 'discuss' || !chatMode || (chatMode === 'build' && !showWorkbench),
+                className={classNames('fixed bottom-4 z-50 transition-all duration-200', {
+                  'left-[340px] right-[var(--workbench-width)]': showWorkbench && isSidebarOpen,
+                  'left-0 right-[var(--workbench-width)]': showWorkbench && !isSidebarOpen,
+                  'left-[340px] right-0': !showWorkbench && isSidebarOpen,
+                  'left-0 right-0': !showWorkbench && !isSidebarOpen,
                 })}
               >
                 <div
                   className={classNames('flex flex-col gap-2 px-2 sm:px-6', {
-                    'w-full max-w-none mr-4': chatMode === 'build' && showWorkbench,
-                    'w-full max-w-chat mx-auto':
-                      chatMode === 'discuss' || !chatMode || (chatMode === 'build' && !showWorkbench),
+                    'w-full max-w-none mr-4': showWorkbench,
+                    'w-full max-w-chat mx-auto': !showWorkbench,
                   })}
                 >
                   {/* Alerts positioned above the fixed ChatBox */}

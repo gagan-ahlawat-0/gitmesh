@@ -9,6 +9,12 @@ interface RepoContextType {
   };
   fromHub?: boolean;
   clearRepoContext?: () => void;
+  updateRepoContext?: (repoData: {
+    cloneUrl: string;
+    repoName: string;
+    repoFullName: string;
+    provider: 'github' | 'gitlab';
+  }) => void;
 }
 
 const RepoContext = createContext<RepoContextType>({});

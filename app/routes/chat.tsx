@@ -35,7 +35,7 @@ const isDevelopment = import.meta.env.DEV;
  */
 export default function ChatPage() {
   const { user, loading, initialized } = useStore(authStore);
-  const { selectedRepo, fromHub, clearRepoContext } = usePersistedRepoContext();
+  const { selectedRepo, fromHub, clearRepoContext, updateRepoContext } = usePersistedRepoContext();
 
   // Check if this is a parameterized route (has path parameters)
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
@@ -70,7 +70,7 @@ export default function ChatPage() {
   }
 
   return (
-    <RepoProvider value={{ selectedRepo, fromHub, clearRepoContext }}>
+    <RepoProvider value={{ selectedRepo, fromHub, clearRepoContext, updateRepoContext }}>
       <div className="h-screen w-full bg-gitmesh-elements-background-depth-1">
         <BackgroundRays />
         <Header />
