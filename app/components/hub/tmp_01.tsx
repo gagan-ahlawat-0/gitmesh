@@ -10,7 +10,6 @@ import { useGitHubConnection, useGitHubStats, useGitLabConnection } from '~/lib/
 import { classNames } from '~/utils/classNames';
 import { Search, RefreshCw, GitBranch, Calendar, Filter, Settings } from 'lucide-react';
 import { LoadingOverlay } from '~/components/ui/LoadingOverlay';
-import { debounce } from '~/utils/debounce';
 
 type Repository = (GitHubRepoInfo & { provider: 'github' }) | (GitLabProjectInfo & { provider: 'gitlab' });
 type SortOption = 'updated' | 'stars' | 'name' | 'created';
@@ -39,7 +38,6 @@ export function HubProjectsView() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cloning, setCloning] = useState<{ repoUrl: string; provider: string } | null>(null);
-  const [publicRepositories, setPublicRepositories] = useState<GitHubRepoInfo[]>([]);
 
   const REPOS_PER_PAGE = 12;
 
@@ -80,54 +78,20 @@ export function HubProjectsView() {
     }
   };
 
-  const fetchPublicRepositories = async (query?: string) => {
-    if (!query || query.trim().length < 3) {
-      setPublicRepositories([]);
-      setError(null);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/public-repos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: 'GITHUB_API_KEY',
-          githubUrl: 'https://api.github.com',
-          query: query.trim(),
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData: any = await response.json().catch(() => ({ error: 'Failed to fetch repositories' }));
-        throw new Error(errorData.error || 'Failed to fetch repositories');
-      }
-
-      const data: any = await response.json();
-      setPublicRepositories(data.repositories?.slice(0, 20) || []); // only top 20
-    } catch (err) {
-      console.error('Failed to fetch public repositories:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch repositories');
-    } finally {
-      if (isRefreshing) setIsRefreshing(false);
-    }
-  };
-
+  // Combine repositories from both providers
   const allRepositories: Repository[] = useMemo(() => {
     const repos: Repository[] = [];
 
     if (githubStats?.repos) {
-      repos.push(...githubStats.repos.map((r) => ({ ...r, provider: 'github' as const })));
+      repos.push(...githubStats.repos.map((repo) => ({ ...repo, provider: 'github' as const })));
     }
+
     if (gitlabRepositories) {
-      repos.push(...gitlabRepositories.map((r) => ({ ...r, provider: 'gitlab' as const })));
-    }
-    if (publicRepositories.length > 0) {
-      repos.push(...publicRepositories.map((r) => ({ ...r, provider: 'github' as const })));
+      repos.push(...gitlabRepositories.map((repo) => ({ ...repo, provider: 'gitlab' as const })));
     }
 
     return repos;
-  }, [githubStats?.repos, gitlabRepositories, publicRepositories]);
+  }, [githubStats?.repos, gitlabRepositories]);
 
   // Filter and search repositories
   const filteredRepositories = useMemo(() => {
@@ -239,13 +203,6 @@ export function HubProjectsView() {
       fetchGitLabRepositories();
     }
   }, [isGitLabConnected, gitlabConnection?.token]);
-
-  // Fetch Public GitHub Repositories
-  useEffect(() => {
-    if (isGitHubConnected) {
-      fetchPublicRepositories(searchQuery);
-    }
-  }, [searchQuery, isGitHubConnected]);
 
   const hasAnyConnection = isGitHubConnected || isGitLabConnected;
   const isLoading = isGitHubLoading || isGitLabLoading;

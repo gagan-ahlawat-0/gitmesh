@@ -441,6 +441,9 @@ importers:
       jsdom:
         specifier: ^26.0.0
         version: 26.1.0
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
       node-fetch:
         specifier: ^3.3.2
         version: 3.3.2
