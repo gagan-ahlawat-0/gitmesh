@@ -23,6 +23,7 @@ export interface GitLabProjectInfo {
   updated_at: string;
   default_branch: string;
   visibility: string;
+  source_public?: boolean;
 }
 
 export interface GitLabGroupInfo {

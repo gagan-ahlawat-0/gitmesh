@@ -34,40 +34,114 @@ export interface ChatHistoryItem {
 
 const persistenceEnabled = !import.meta.env.VITE_DISABLE_PERSISTENCE;
 
-export const db = persistenceEnabled ? await openDatabase() : undefined;
+// Database will be initialized client-side only
+export let db: IDBDatabase | undefined = undefined;
 
 export const chatId = atom<string | undefined>(undefined);
 export const description = atom<string | undefined>(undefined);
 export const chatMetadata = atom<IChatMetadata | undefined>(undefined);
 export function useChatHistory() {
   const navigate = useNavigate();
-  const { id: mixedId } = useLoaderData<{ id?: string }>();
+  const loaderData = useLoaderData<{ id?: string; mixedId?: string; baseRoute?: boolean }>();
+  // Try to get ID from either the 'id' field or 'mixedId' field
+  const mixedId = loaderData?.mixedId || loaderData?.id;
   const [searchParams] = useSearchParams();
+
+  // Add stack trace to see which component is calling this
+  const stack = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
+
+  console.log('🔍 useChatHistory initialized:', {
+    mixedId,
+    loaderData: JSON.stringify(loaderData),
+    loaderDataKeys: Object.keys(loaderData || {}),
+    currentPath: window.location.pathname,
+    href: window.location.href,
+    calledFrom: stack,
+  });
 
   const [archivedMessages, setArchivedMessages] = useState<Message[]>([]);
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
   const [ready, setReady] = useState<boolean>(false);
   const [urlId, setUrlId] = useState<string | undefined>();
+  const [database, setDatabase] = useState<IDBDatabase | undefined>(db);
+  const [dbInitialized, setDbInitialized] = useState<boolean>(false);
+
+  // Initialize database on client-side only
+  useEffect(() => {
+    console.log('🔍 Database initialization effect triggered:', {
+      isClient: typeof window !== 'undefined',
+      persistenceEnabled,
+    });
+
+    if (typeof window !== 'undefined' && persistenceEnabled) {
+      console.log('🔄 Starting database initialization...');
+      openDatabase()
+        .then((initDb) => {
+          console.log('📊 Database initialization result:', { success: !!initDb });
+          db = initDb; // Update the global variable too
+          setDatabase(initDb);
+          setDbInitialized(true);
+
+          if (!initDb) {
+            const error = new Error('Chat persistence is unavailable');
+            logStore.logError('Database initialization failed', error);
+            toast.error('Chat persistence is unavailable');
+          } else {
+            console.log('✅ Database initialized successfully');
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Failed to initialize database:', error);
+          logStore.logError('Database initialization failed', error);
+          toast.error('Chat persistence is unavailable');
+          setDatabase(undefined);
+          setDbInitialized(true);
+        });
+    } else if (!persistenceEnabled) {
+      console.log('⚠️ Persistence is disabled');
+      setDbInitialized(true);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!db) {
-      setReady(true);
-
-      if (persistenceEnabled) {
-        const error = new Error('Chat persistence is unavailable');
-        logStore.logError('Chat persistence initialization failed', error);
-        toast.error('Chat persistence is unavailable');
-      }
-
+    // Wait for database initialization to complete
+    if (!dbInitialized) {
       return;
     }
 
-    if (mixedId) {
+    // If no database and no mixedId, we're ready
+    if (!database && !mixedId) {
+      setReady(true);
+      return;
+    }
+
+    // If no database but we have mixedId, we can't load the chat
+    if (!database && mixedId) {
+      setReady(true);
+      return;
+    }
+
+    if (mixedId && database) {
+      console.log('🔍 Loading chat messages for ID:', mixedId);
       Promise.all([
-        getMessages(db, mixedId),
-        getSnapshot(db, mixedId), // Fetch snapshot from DB
+        getMessages(database, mixedId),
+        getSnapshot(database, mixedId), // Fetch snapshot from DB
       ])
         .then(async ([storedMessages, snapshot]) => {
+          console.log('📝 getMessages result:', {
+            storedMessages: storedMessages
+              ? {
+                  id: storedMessages.id,
+                  messagesLength: storedMessages.messages.length,
+                  description: storedMessages.description,
+                  urlId: storedMessages.urlId,
+                }
+              : null,
+            snapshot: snapshot
+              ? { chatIndex: snapshot.chatIndex, filesCount: Object.keys(snapshot.files || {}).length }
+              : null,
+          });
+
           if (storedMessages && storedMessages.messages.length > 0) {
             /*
              * const snapshotStr = localStorage.getItem(`snapshot:${mixedId}`); // Remove localStorage usage
@@ -173,35 +247,64 @@ ${value.content}
               restoreSnapshot(mixedId);
             }
 
+            console.log('✅ Setting initial messages:', {
+              filteredMessagesLength: filteredMessages.length,
+              archivedMessagesLength: archivedMessages.length,
+              chatId: storedMessages.id,
+              urlId: storedMessages.urlId,
+              description: storedMessages.description,
+            });
+
             setInitialMessages(filteredMessages);
 
             setUrlId(storedMessages.urlId);
             description.set(storedMessages.description);
             chatId.set(storedMessages.id);
             chatMetadata.set(storedMessages.metadata);
+
+            // Restore repository context from metadata if available
+            if (
+              storedMessages.metadata?.cloneUrl &&
+              storedMessages.metadata?.repoName &&
+              storedMessages.metadata?.repoFullName &&
+              storedMessages.metadata?.repoProvider
+            ) {
+              // Trigger repository context restoration via custom event
+              const repoEvent = new CustomEvent('restore-repo-context', {
+                detail: {
+                  cloneUrl: storedMessages.metadata.cloneUrl,
+                  repoName: storedMessages.metadata.repoName,
+                  repoFullName: storedMessages.metadata.repoFullName,
+                  provider: storedMessages.metadata.repoProvider,
+                },
+              });
+              window.dispatchEvent(repoEvent);
+            }
           } else {
+            console.log('❌ No messages found, navigating to home');
             navigate('/', { replace: true });
           }
 
           setReady(true);
         })
         .catch((error) => {
-          console.error(error);
+          console.error('❌ Error loading chat:', error);
 
           logStore.logError('Failed to load chat messages or snapshot', error); // Updated error message
           toast.error('Failed to load chat: ' + error.message); // More specific error
+          setReady(true);
         });
     } else {
       // Handle case where there is no mixedId (e.g., new chat)
       setReady(true);
     }
-  }, [mixedId, db, navigate, searchParams]); // Added db, navigate, searchParams dependencies
+  }, [mixedId, database, navigate, searchParams, dbInitialized]); // Updated to use database and dbInitialized
 
   const takeSnapshot = useCallback(
     async (chatIdx: string, files: FileMap, _chatId?: string | undefined, chatSummary?: string) => {
       const id = chatId.get();
 
-      if (!id || !db) {
+      if (!id || !database) {
         return;
       }
 
@@ -213,13 +316,13 @@ ${value.content}
 
       // localStorage.setItem(`snapshot:${id}`, JSON.stringify(snapshot)); // Remove localStorage usage
       try {
-        await setSnapshot(db, id, snapshot);
+        await setSnapshot(database, id, snapshot);
       } catch (error) {
         console.error('Failed to save snapshot:', error);
         toast.error('Failed to save chat snapshot.');
       }
     },
-    [db],
+    [database],
   );
 
   const restoreSnapshot = useCallback(async (id: string, snapshot?: Snapshot) => {
@@ -261,12 +364,12 @@ ${value.content}
     updateChatMestaData: async (metadata: IChatMetadata) => {
       const id = chatId.get();
 
-      if (!db || !id) {
+      if (!database || !id) {
         return;
       }
 
       try {
-        await setMessages(db, id, initialMessages, urlId, description.get(), undefined, metadata);
+        await setMessages(database, id, initialMessages, urlId, description.get(), undefined, metadata);
         chatMetadata.set(metadata);
       } catch (error) {
         toast.error('Failed to update chat metadata');
@@ -274,7 +377,14 @@ ${value.content}
       }
     },
     storeMessageHistory: async (messages: Message[]) => {
-      if (!db || messages.length === 0) {
+      console.log('🔍 storeMessageHistory called with:', {
+        databaseExists: !!database,
+        messagesLength: messages.length,
+        persistenceEnabled,
+      });
+
+      if (!database || messages.length === 0) {
+        console.log('❌ storeMessageHistory early return:', { database: !!database, messagesLength: messages.length });
         return;
       }
 
@@ -284,7 +394,7 @@ ${value.content}
       let _urlId = urlId;
 
       if (!urlId && firstArtifact?.id) {
-        const urlId = await getUrlId(db, firstArtifact.id);
+        const urlId = await getUrlId(database, firstArtifact.id);
         _urlId = urlId;
         navigateChat(urlId);
         setUrlId(urlId);
@@ -313,7 +423,7 @@ ${value.content}
 
       // Ensure chatId.get() is used here as well
       if (initialMessages.length === 0 && !chatId.get()) {
-        const nextId = await getNextId(db);
+        const nextId = await getNextId(database);
 
         chatId.set(nextId);
 
@@ -332,23 +442,37 @@ ${value.content}
         return;
       }
 
-      await setMessages(
-        db,
-        finalChatId, // Use the potentially updated chatId
-        [...archivedMessages, ...messages],
+      console.log('💾 Saving messages to database:', {
+        finalChatId,
+        totalMessages: [...archivedMessages, ...messages].length,
         urlId,
-        description.get(),
-        undefined,
-        chatMetadata.get(),
-      );
+        description: description.get(),
+      });
+
+      try {
+        await setMessages(
+          database,
+          finalChatId, // Use the potentially updated chatId
+          [...archivedMessages, ...messages],
+          urlId,
+          description.get(),
+          undefined,
+          chatMetadata.get(),
+        );
+        console.log('✅ Messages saved successfully');
+      } catch (error) {
+        console.error('❌ Failed to save messages:', error);
+        toast.error('Failed to save chat messages');
+        throw error;
+      }
     },
     duplicateCurrentChat: async (listItemId: string) => {
-      if (!db || (!mixedId && !listItemId)) {
+      if (!database || (!mixedId && !listItemId)) {
         return;
       }
 
       try {
-        const newId = await duplicateChat(db, mixedId || listItemId);
+        const newId = await duplicateChat(database, mixedId || listItemId);
         navigate(`/chat/${newId}`);
         toast.success('Chat duplicated successfully');
       } catch (error) {
@@ -357,12 +481,12 @@ ${value.content}
       }
     },
     importChat: async (description: string, messages: Message[], metadata?: IChatMetadata) => {
-      if (!db) {
+      if (!database) {
         return;
       }
 
       try {
-        const newId = await createChatFromMessages(db, description, messages, metadata);
+        const newId = await createChatFromMessages(database, description, messages, metadata);
         window.location.href = `/chat/${newId}`;
         toast.success('Chat imported successfully');
       } catch (error) {
@@ -374,11 +498,17 @@ ${value.content}
       }
     },
     exportChat: async (id = urlId) => {
-      if (!db || !id) {
+      if (!database || !id) {
         return;
       }
 
-      const chat = await getMessages(db, id);
+      const chat = await getMessages(database, id);
+
+      if (!chat) {
+        toast.error('Chat not found');
+        return;
+      }
+
       const chatData = {
         messages: chat.messages,
         description: chat.description,

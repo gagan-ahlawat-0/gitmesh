@@ -51,6 +51,7 @@ export interface GitHubRepoInfo {
     name: string;
     spdx_id: string;
   };
+  source_public?: boolean;
 }
 
 export interface GitHubContent {

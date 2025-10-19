@@ -11,10 +11,14 @@ export function Header() {
 
   return (
     <header
-      className={classNames('flex items-center px-4 border-b h-[var(--header-height)]', {
-        'border-transparent': !chat.started,
-        'border-gitmesh-elements-borderColor': chat.started,
-      })}
+      // Make header fixed so it stays visible at the top of the screen
+      className={classNames(
+        'flex items-center px-4 border-b h-[var(--header-height)] fixed top-0 left-0 right-0 bg-gitmesh-elements-background-depth-1 z-40',
+        {
+          'border-transparent': !chat.started,
+          'border-gitmesh-elements-borderColor': chat.started,
+        },
+      )}
     >
       <div className="flex items-center gap-2 z-logo text-gitmesh-elements-textPrimary cursor-pointer">
         <div className="i-ph:sidebar-simple-duotone text-xl" />

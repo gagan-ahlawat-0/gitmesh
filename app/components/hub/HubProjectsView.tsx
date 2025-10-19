@@ -157,11 +157,11 @@ export function HubProjectsView() {
       repos.push(...gitlabRepositories.map((r) => ({ ...r, provider: 'gitlab' as const })));
     }
     if (publicGithubRepositories.length > 0) {
-      repos.push(...publicGithubRepositories.map((r) => ({ ...r, provider: 'github' as const })));
+      repos.push(...publicGithubRepositories.map((r) => ({ ...r, provider: 'github' as const, source_public: true as const })));
     }
 
     if (publicGitlabProjects.length > 0) {
-      repos.push(...publicGitlabProjects.map((r) => ({ ...r, provider: 'gitlab' as const })));
+      repos.push(...publicGitlabProjects.map((r) => ({ ...r, provider: 'gitlab' as const, source_public: true as const })));
     }
 
     return repos;
@@ -261,10 +261,14 @@ export function HubProjectsView() {
 
     setCloning({ repoUrl, provider: repo.provider });
 
-    // Navigate to chat with the repository URL and metadata to start cloning
-    navigate(
-      `/chat?clone=${encodeURIComponent(repoUrl)}&repo=${encodeURIComponent(repo.name)}&fullName=${encodeURIComponent(fullName)}&provider=${repo.provider}&from=hub`,
-    );
+    /*
+     * Force a hard navigation to ensure clean state
+     * This creates a new chat with fresh workspace instead of reusing existing one
+     */
+    const chatUrl = `/chat?clone=${encodeURIComponent(repoUrl)}&repo=${encodeURIComponent(repo.name)}&fullName=${encodeURIComponent(fullName)}&provider=${repo.provider}&from=hub`;
+
+    // Use window.location.href for hard navigation to ensure clean workspace
+    window.location.href = chatUrl;
   };
 
   // Reset to first page when filters change

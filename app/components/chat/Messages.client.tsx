@@ -4,8 +4,9 @@ import { classNames } from '~/utils/classNames';
 import { AssistantMessage } from './AssistantMessage';
 import { UserMessage } from './UserMessage';
 import { useLocation } from '@remix-run/react';
-import { db, chatId } from '~/lib/persistence/useChatHistory';
-import { forkChat } from '~/lib/persistence/db';
+import { chatId } from '~/lib/persistence/useChatHistory';
+import { forkChat, openDatabase } from '~/lib/persistence/db';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { forwardRef } from 'react';
 import type { ForwardedRef } from 'react';
@@ -28,6 +29,18 @@ export const Messages = forwardRef<HTMLDivElement, MessagesProps>(
   (props: MessagesProps, ref: ForwardedRef<HTMLDivElement> | undefined) => {
     const { id, isStreaming = false, messages = [] } = props;
     const location = useLocation();
+    const [db, setDb] = useState<IDBDatabase | undefined>(undefined);
+
+    // Initialize database on client side
+    useEffect(() => {
+      if (typeof window !== 'undefined' && !db) {
+        openDatabase()
+          .then(setDb)
+          .catch((error) => {
+            console.error('Failed to initialize database in Messages:', error);
+          });
+      }
+    }, [db]);
 
     const handleRewind = (messageId: string) => {
       const searchParams = new URLSearchParams(location.search);

@@ -31,7 +31,7 @@ async function vercelUserLoader({ request, context }: { request: Request; contex
     const response = await fetch('https://api.vercel.com/v2/user', {
       headers: {
         Authorization: `Bearer ${vercelToken}`,
-        'User-Agent': 'gitmesh.diy-app',
+        'User-Agent': 'gitmesh-app',
       },
     });
 
@@ -110,7 +110,7 @@ async function vercelUserAction({ request, context }: { request: Request; contex
       const response = await fetch('https://api.vercel.com/v13/projects', {
         headers: {
           Authorization: `Bearer ${vercelToken}`,
-          'User-Agent': 'gitmesh.diy-app',
+          'User-Agent': 'gitmesh-app',
         },
       });
 

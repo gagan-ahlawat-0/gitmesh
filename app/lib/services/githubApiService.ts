@@ -57,7 +57,7 @@ export class GitHubApiServiceClass {
         headers: {
           Accept: 'application/vnd.github.v3+json',
           Authorization: `${this._config.tokenType === 'classic' ? 'token' : 'Bearer'} ${this._config.token}`,
-          'User-Agent': 'gitmesh.diy',
+          'User-Agent': 'gitmesh',
           ...options.headers,
         },
         signal: controller.signal,
@@ -155,7 +155,7 @@ export class GitHubApiServiceClass {
       headers: {
         Accept: 'application/vnd.github.v3+json',
         Authorization: `${this._config.tokenType === 'classic' ? 'token' : 'Bearer'} ${this._config.token}`,
-        'User-Agent': 'gitmesh.diy',
+        'User-Agent': 'gitmesh',
       },
     });
 
@@ -183,7 +183,7 @@ export class GitHubApiServiceClass {
       headers: {
         Accept: 'application/vnd.github.v3+json',
         Authorization: `${this._config.tokenType === 'classic' ? 'token' : 'Bearer'} ${this._config.token}`,
-        'User-Agent': 'gitmesh.diy',
+        'User-Agent': 'gitmesh',
       },
     });
 
@@ -211,7 +211,7 @@ export class GitHubApiServiceClass {
       headers: {
         Accept: 'application/vnd.github.v3+json',
         Authorization: `${this._config.tokenType === 'classic' ? 'token' : 'Bearer'} ${this._config.token}`,
-        'User-Agent': 'gitmesh.diy',
+        'User-Agent': 'gitmesh',
       },
     });
 

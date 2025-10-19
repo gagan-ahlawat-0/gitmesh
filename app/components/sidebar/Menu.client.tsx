@@ -5,7 +5,7 @@ import { Dialog, DialogButton, DialogDescription, DialogRoot, DialogTitle } from
 import { ThemeSwitch } from '~/components/ui/ThemeSwitch';
 import { ControlPanel } from '~/components/@settings/core/ControlPanel';
 import { Button } from '~/components/ui/Button';
-import { db, deleteById, getAll, chatId, type ChatHistoryItem, useChatHistory } from '~/lib/persistence';
+import { deleteById, getAll, chatId, type ChatHistoryItem, useChatHistory, openDatabase } from '~/lib/persistence';
 import { cubicEasingFn } from '~/utils/easings';
 import { HistoryItem } from './HistoryItem';
 import { binDates } from './date-binning';
@@ -13,7 +13,7 @@ import { useSearchFilter } from '~/lib/hooks/useSearchFilter';
 import { classNames } from '~/utils/classNames';
 import { useStore } from '@nanostores/react';
 import { profileStore } from '~/lib/stores/profile';
-import { authStore, signOut } from '~/lib/stores/auth';
+import { sidebarOpen } from '~/lib/stores/sidebar';
 
 const menuVariants = {
   closed: {
@@ -41,53 +41,67 @@ type DialogContent =
   | { type: 'bulkDelete'; items: ChatHistoryItem[] }
   | null;
 
-function CurrentDateTime() {
-  const [dateTime, setDateTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setDateTime(new Date());
-    }, 60000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800/50">
-      <div className="h-4 w-4 i-ph:clock opacity-80" />
-      <div className="flex gap-2">
-        <span>{dateTime.toLocaleDateString()}</span>
-        <span>{dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-    </div>
-  );
-}
-
 export const Menu = () => {
   const { duplicateCurrentChat, exportChat } = useChatHistory();
   const menuRef = useRef<HTMLDivElement>(null);
   const [list, setList] = useState<ChatHistoryItem[]>([]);
-  const [open, setOpen] = useState(false);
+  const open = useStore(sidebarOpen);
   const [dialogContent, setDialogContent] = useState<DialogContent>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const profile = useStore(profileStore);
-  const { user } = useStore(authStore);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [db, setDb] = useState<IDBDatabase | undefined>(undefined);
 
   const { filteredItems: filteredList, handleSearchChange } = useSearchFilter({
     items: list,
     searchFields: ['description'],
   });
 
+  // Initialize database on client side
+  useEffect(() => {
+    console.log('🔍 Sidebar database init effect:', { isClient: typeof window !== 'undefined', dbExists: !!db });
+
+    if (typeof window !== 'undefined' && !db) {
+      console.log('🔄 Initializing sidebar database...');
+      openDatabase()
+        .then((database) => {
+          console.log('✅ Sidebar database initialized:', !!database);
+          setDb(database);
+        })
+        .catch((error) => {
+          console.error('❌ Failed to initialize database in sidebar:', error);
+        });
+    }
+  }, [db]);
+
   const loadEntries = useCallback(() => {
+    console.log('📋 loadEntries called:', { dbAvailable: !!db });
+
     if (db) {
       getAll(db)
-        .then((list) => list.filter((item) => item.urlId && item.description))
-        .then(setList)
-        .catch((error) => toast.error(error.message));
+        .then((list) => {
+          console.log('📚 Raw chat list from DB:', list.length, list);
+          return list.filter((item) => item.urlId && item.description);
+        })
+        .then((filteredList) => {
+          console.log('📋 Filtered chat list:', filteredList.length, filteredList);
+          filteredList.forEach((chat, index) => {
+            console.log(`📄 Chat ${index}:`, {
+              id: chat.id,
+              urlId: chat.urlId,
+              description: chat.description,
+              navigationUrl: `/chat/${chat.urlId}`,
+            });
+          });
+          setList(filteredList);
+        })
+        .catch((error) => {
+          console.error('❌ Error loading entries:', error);
+          toast.error(error.message);
+        });
     }
-  }, []);
+  }, [db]);
 
   const deleteChat = useCallback(
     async (id: string): Promise<void> => {
@@ -268,6 +282,14 @@ export const Menu = () => {
     }
   }, [open, loadEntries]);
 
+  // Load entries when database becomes available
+  useEffect(() => {
+    if (db) {
+      console.log('📊 Database is now available, loading entries...');
+      loadEntries();
+    }
+  }, [db, loadEntries]);
+
   // Exit selection mode when sidebar is closed
   useEffect(() => {
     if (!open && selectionMode) {
@@ -289,11 +311,11 @@ export const Menu = () => {
       }
 
       if (event.pageX < enterThreshold) {
-        setOpen(true);
+        sidebarOpen.set(true);
       }
 
       if (menuRef.current && event.clientX > menuRef.current.getBoundingClientRect().right + exitThreshold) {
-        setOpen(false);
+        sidebarOpen.set(false);
       }
     }
 
@@ -309,22 +331,8 @@ export const Menu = () => {
     loadEntries(); // Reload the list after duplication
   };
 
-  const handleSettingsClick = () => {
-    setIsSettingsOpen(true);
-    setOpen(false);
-  };
-
   const handleSettingsClose = () => {
     setIsSettingsOpen(false);
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast.success('Signed out successfully');
-    } catch (error) {
-      toast.error('Failed to sign out');
-    }
   };
 
   const setDialogContentWithLogging = useCallback((content: DialogContent) => {

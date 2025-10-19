@@ -296,7 +296,7 @@ export class GitLabApiService {
         visibility: isPrivate ? 'private' : 'public',
         initialize_with_readme: false, // Don't initialize with README to avoid conflicts
         default_branch: 'main', // Explicitly set default branch
-        description: `Project created from gitmesh.diy`,
+        description: `Project created from gitmesh`,
       }),
     });
 
@@ -443,7 +443,7 @@ export class GitLabApiService {
 
       const commitRequest: GitLabCommitRequest = {
         branch: 'main',
-        commit_message: 'Initial commit from gitmesh.diy',
+        commit_message: 'Initial commit from gitmesh',
         actions,
       };
 
@@ -476,7 +476,7 @@ export class GitLabApiService {
 
     const commitRequest: GitLabCommitRequest = {
       branch: 'main',
-      commit_message: 'Update from gitmesh.diy',
+      commit_message: 'Update from gitmesh',
       actions,
     };
 
@@ -493,7 +493,7 @@ export class GitLabApiService {
 
         const updateCommitRequest: GitLabCommitRequest = {
           branch: 'main',
-          commit_message: 'Update from gitmesh.diy',
+          commit_message: 'Update from gitmesh',
           actions: updateActions,
         };
 

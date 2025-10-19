@@ -7,6 +7,11 @@ export interface IChatMetadata {
   gitUrl: string;
   gitBranch?: string;
   netlifySiteId?: string;
+  // Repository context information
+  repoName?: string;
+  repoFullName?: string;
+  repoProvider?: 'github' | 'gitlab';
+  cloneUrl?: string;
 }
 
 const logger = createScopedLogger('ChatHistory');
@@ -94,30 +99,81 @@ export async function setMessages(
   });
 }
 
-export async function getMessages(db: IDBDatabase, id: string): Promise<ChatHistoryItem> {
-  return (await getMessagesById(db, id)) || (await getMessagesByUrlId(db, id));
+export async function getMessages(db: IDBDatabase, id: string): Promise<ChatHistoryItem | undefined> {
+  console.log('🔍 getMessages called with ID:', id);
+
+  // First try to get by internal ID
+  const resultById = await getMessagesById(db, id);
+  console.log(
+    '📊 getMessagesById result:',
+    resultById ? { id: resultById.id, messagesLength: resultById.messages.length } : null,
+  );
+
+  if (resultById) {
+    return resultById;
+  }
+
+  // If not found, try to get by urlId
+  const resultByUrlId = await getMessagesByUrlId(db, id);
+  console.log(
+    '📊 getMessagesByUrlId result:',
+    resultByUrlId ? { id: resultByUrlId.id, messagesLength: resultByUrlId.messages.length } : null,
+  );
+
+  if (resultByUrlId) {
+    return resultByUrlId;
+  }
+
+  // If neither found, return undefined
+  console.log('❌ No messages found for ID:', id);
+
+  return undefined;
 }
 
-export async function getMessagesByUrlId(db: IDBDatabase, id: string): Promise<ChatHistoryItem> {
+export async function getMessagesByUrlId(db: IDBDatabase, id: string): Promise<ChatHistoryItem | undefined> {
+  console.log('🔍 getMessagesByUrlId searching for urlId:', id);
   return new Promise((resolve, reject) => {
     const transaction = db.transaction('chats', 'readonly');
     const store = transaction.objectStore('chats');
     const index = store.index('urlId');
     const request = index.get(id);
 
-    request.onsuccess = () => resolve(request.result as ChatHistoryItem);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const result = request.result as ChatHistoryItem | undefined;
+      console.log(
+        '📊 getMessagesByUrlId found:',
+        result ? { id: result.id, urlId: result.urlId, description: result.description } : null,
+      );
+      resolve(result);
+    };
+
+    request.onerror = () => {
+      console.error('❌ getMessagesByUrlId error:', request.error);
+      reject(request.error);
+    };
   });
 }
 
-export async function getMessagesById(db: IDBDatabase, id: string): Promise<ChatHistoryItem> {
+export async function getMessagesById(db: IDBDatabase, id: string): Promise<ChatHistoryItem | undefined> {
+  console.log('🔍 getMessagesById searching for ID:', id);
   return new Promise((resolve, reject) => {
     const transaction = db.transaction('chats', 'readonly');
     const store = transaction.objectStore('chats');
     const request = store.get(id);
 
-    request.onsuccess = () => resolve(request.result as ChatHistoryItem);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const result = request.result as ChatHistoryItem | undefined;
+      console.log(
+        '📊 getMessagesById found:',
+        result ? { id: result.id, urlId: result.urlId, description: result.description } : null,
+      );
+      resolve(result);
+    };
+
+    request.onerror = () => {
+      console.error('❌ getMessagesById error:', request.error);
+      reject(request.error);
+    };
   });
 }
 

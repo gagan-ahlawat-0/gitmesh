@@ -95,6 +95,21 @@ export function GitHubRepositoryCard({ repo, onClone }: GitHubRepositoryCardProp
           )}
         </div>
 
+        {/* To show if the repository is a public repository */}
+        {repo.source_public && (
+          <span className="flex items-center gap-1 text-xs text-gitmesh-elements-textSecondary group-hover:text-blue-500 transition-colors">
+            <div className="i-ph:eye w-3.5 h-3.5" />
+            Source:Public
+          </span>
+        )}
+
+        {!repo.source_public && (
+          <span className="flex items-center gap-1 text-xs text-gitmesh-elements-textSecondary group-hover:text-blue-500 transition-colors">
+            <div className="i-ph:eye w-3.5 h-3.5" />
+            Source:Connected
+          </span>
+        )}
+
         {/* Bottom section with Clone button */}
         <div className="flex items-center justify-between pt-3 mt-auto">
           {onClone ? (
@@ -107,8 +122,8 @@ export function GitHubRepositoryCard({ repo, onClone }: GitHubRepositoryCardProp
               className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white transition-colors flex-1 justify-center"
               title="Clone repository"
             >
-              <div className="i-ph:git-branch w-4 h-4" />
-              Clone Repository
+              {/* <div className="i-ph:git-branch w-4 h-4" /> */}
+              Open in GitMesh
             </button>
           ) : (
             <span className="flex items-center gap-1 text-xs text-gitmesh-elements-textSecondary group-hover:text-blue-500 transition-colors">

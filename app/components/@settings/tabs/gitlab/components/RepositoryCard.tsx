@@ -69,6 +69,21 @@ export function RepositoryCard({ repo, onClone }: RepositoryCardProps) {
           </div>
         </div>
 
+        {/* To show if the repository is a public repository */}
+        {repo.source_public && (
+          <span className="flex items-center gap-1 text-xs text-gitmesh-elements-textSecondary group-hover:text-blue-500 transition-colors">
+            <div className="i-ph:eye w-3.5 h-3.5" />
+            Source:Public
+          </span>
+        )}
+
+        {!repo.source_public && (
+          <span className="flex items-center gap-1 text-xs text-gitmesh-elements-textSecondary group-hover:text-blue-500 transition-colors">
+            <div className="i-ph:eye w-3.5 h-3.5" />
+            Source:Connected
+          </span>
+        )}
+
         {/* Bottom section with Clone button */}
         <div className="flex items-center justify-between pt-3 mt-auto">
           {onClone ? (
@@ -82,7 +97,7 @@ export function RepositoryCard({ repo, onClone }: RepositoryCardProps) {
               title="Clone repository"
             >
               <div className="i-ph:git-branch w-4 h-4" />
-              Clone Repository
+              Open in GitMesh
             </button>
           ) : (
             <span className="flex items-center gap-1 text-xs text-gitmesh-elements-textSecondary group-hover:text-blue-500 transition-colors">

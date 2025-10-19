@@ -72,7 +72,7 @@ async function githubBranchesLoader({ request, context }: { request: Request; co
       headers: {
         Accept: 'application/vnd.github.v3+json',
         Authorization: `Bearer ${githubToken}`,
-        'User-Agent': 'gitmesh.diy-app',
+        'User-Agent': 'gitmesh-app',
       },
     });
 
@@ -96,7 +96,7 @@ async function githubBranchesLoader({ request, context }: { request: Request; co
       headers: {
         Accept: 'application/vnd.github.v3+json',
         Authorization: `Bearer ${githubToken}`,
-        'User-Agent': 'gitmesh.diy-app',
+        'User-Agent': 'gitmesh-app',
       },
     });
 

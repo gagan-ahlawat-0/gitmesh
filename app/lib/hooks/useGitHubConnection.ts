@@ -76,7 +76,7 @@ export function useGitHubConnection(): UseGitHubConnectionReturn {
         headers: {
           Accept: 'application/vnd.github.v3+json',
           Authorization: `${connection.tokenType === 'classic' ? 'token' : 'Bearer'} ${connection.token}`,
-          'User-Agent': 'gitmesh.diy',
+          'User-Agent': 'gitmesh',
         },
       });
 
@@ -119,7 +119,7 @@ export function useGitHubConnection(): UseGitHubConnectionReturn {
         headers: {
           Accept: 'application/vnd.github.v3+json',
           Authorization: `${tokenType === 'classic' ? 'token' : 'Bearer'} ${token}`,
-          'User-Agent': 'gitmesh.diy',
+          'User-Agent': 'gitmesh',
         },
       });
 
@@ -224,7 +224,7 @@ export function useGitHubConnection(): UseGitHubConnectionReturn {
         headers: {
           Accept: 'application/vnd.github.v3+json',
           Authorization: `${connection.tokenType === 'classic' ? 'token' : 'Bearer'} ${connection.token}`,
-          'User-Agent': 'gitmesh.diy',
+          'User-Agent': 'gitmesh',
         },
       });
 
