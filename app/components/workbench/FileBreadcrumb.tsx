@@ -1,5 +1,6 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
+import { SafeAnimatePresence } from '~/components/ui/SafeAnimatePresence';
 import { memo, useEffect, useRef, useState } from 'react';
 import type { FileMap } from '~/lib/stores/files';
 import { classNames } from '~/utils/classNames';
@@ -102,7 +103,7 @@ export const FileBreadcrumb = memo<FileBreadcrumbProps>(({ files, pathSegments =
                 </span>
               </DropdownMenu.Trigger>
               {index > 0 && !isLast && <span className="i-ph:caret-right inline-block mx-1" />}
-              <AnimatePresence>
+              <SafeAnimatePresence>
                 {isActive && (
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content
@@ -140,7 +141,7 @@ export const FileBreadcrumb = memo<FileBreadcrumbProps>(({ files, pathSegments =
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
                 )}
-              </AnimatePresence>
+              </SafeAnimatePresence>
             </DropdownMenu.Root>
           </div>
         );
