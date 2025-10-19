@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from '@remix-run/react';
 import { useStore } from '@nanostores/react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { SafeAnimatePresence } from '~/components/ui/SafeAnimatePresence';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { toast } from 'react-toastify';
@@ -214,7 +215,7 @@ export default function Setup() {
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-6 relative z-10">
         <div className="w-full max-w-4xl">
-          <AnimatePresence mode="wait">
+          <SafeAnimatePresence mode="wait">
             {!selectedIntegration ? (
               <motion.div
                 key="selection"
@@ -364,7 +365,7 @@ export default function Setup() {
                 </div>
               </motion.div>
             )}
-          </AnimatePresence>
+          </SafeAnimatePresence>
         </div>
       </main>
 

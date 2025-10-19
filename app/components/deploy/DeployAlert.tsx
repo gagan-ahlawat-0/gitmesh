@@ -1,4 +1,5 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { SafeAnimatePresence } from '~/components/ui/SafeAnimatePresence';
 import { classNames } from '~/utils/classNames';
 import type { DeployAlert } from '~/types/actions';
 
@@ -15,7 +16,7 @@ export default function DeployChatAlert({ alert, clearAlert, postMessage }: Depl
   const showProgress = stage && (buildStatus || deployStatus);
 
   return (
-    <AnimatePresence>
+    <SafeAnimatePresence>
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -194,6 +195,6 @@ export default function DeployChatAlert({ alert, clearAlert, postMessage }: Depl
           </div>
         </div>
       </motion.div>
-    </AnimatePresence>
+    </SafeAnimatePresence>
   );
 }
