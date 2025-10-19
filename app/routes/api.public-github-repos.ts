@@ -18,16 +18,16 @@ async function publicReposLoader({ request }: { request: Request }) {
             return json({ error: 'GitHub token is required' }, { status: 400 });
         }
 
-        // Fetch top 20 results
-        const url = `${GITHUB_API_URL}?q=${encodeURIComponent(query)}&per_page=20&sort=stars&order=desc`;
+        // Fetch top 50 results
+        const url = `${GITHUB_API_URL}?q=${encodeURIComponent(query)}&per_page=50&sort=stars&order=desc`;
 
-        const response = await fetch(url, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: 'application/vnd.github.v3+json',
-                'User-Agent': 'gitmesh.diy-app',
-            },
-        });
+        const headers: Record<string, string> = {
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'gitmesh.diy-app',
+        };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const response = await fetch(url, { headers });
 
         if (!response.ok) {
             if (response.status === 401) {
@@ -73,7 +73,7 @@ async function publicReposLoader({ request }: { request: Request }) {
         }));
 
         return json({
-            repositories: transformedRepositories.slice(0, 20),
+            repositories: transformedRepositories.slice(0, 50),
             total: transformedRepositories.length,
         });
     } catch (error) {

@@ -39,7 +39,8 @@ export function HubProjectsView() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cloning, setCloning] = useState<{ repoUrl: string; provider: string } | null>(null);
-  const [publicRepositories, setPublicRepositories] = useState<GitHubRepoInfo[]>([]);
+  const [publicGithubRepositories, setPublicGithubRepositories] = useState<GitHubRepoInfo[]>([]);
+  const [publicGitlabProjects, setPublicGitlabProjects] = useState<GitLabProjectInfo[]>([]);
 
   const REPOS_PER_PAGE = 12;
 
@@ -80,19 +81,19 @@ export function HubProjectsView() {
     }
   };
 
-  const fetchPublicRepositories = async (query?: string) => {
+  const fetchPublicGitHubRepositories = async (query?: string) => {
     if (!query || query.trim().length < 3) {
-      setPublicRepositories([]);
+      setPublicGithubRepositories([]);
       setError(null);
       return;
     }
 
     try {
-      const response = await fetch('/api/public-repos', {
+      const response = await fetch('/api/public-github-repos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token: 'GITHUB_API_KEY',
+          token: githubConnection?.token,
           githubUrl: 'https://api.github.com',
           query: query.trim(),
         }),
@@ -104,7 +105,40 @@ export function HubProjectsView() {
       }
 
       const data: any = await response.json();
-      setPublicRepositories(data.repositories?.slice(0, 20) || []); // only top 20
+      setPublicGithubRepositories(data.repositories?.slice(0, 50) || []); // only top 50
+    } catch (err) {
+      console.error('Failed to fetch public repositories:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch repositories');
+    } finally {
+      if (isRefreshing) setIsRefreshing(false);
+    }
+  };
+
+  const fetchPublicGitLabProjects = async (query?: string) => {
+    if (!query || query.trim().length < 3) {
+      setPublicGitlabProjects([]);
+      setError(null);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/public-gitlab-projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: gitlabConnection?.token,
+          gitlabUrl: 'https://gitlab.com',
+          query: query.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData: any = await response.json().catch(() => ({ error: 'Failed to fetch repositories' }));
+        throw new Error(errorData.error || 'Failed to fetch repositories');
+      }
+
+      const data: any = await response.json();
+      setPublicGitlabProjects(data.projects?.slice(0, 50) || []); // only top 50
     } catch (err) {
       console.error('Failed to fetch public repositories:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch repositories');
@@ -122,12 +156,17 @@ export function HubProjectsView() {
     if (gitlabRepositories) {
       repos.push(...gitlabRepositories.map((r) => ({ ...r, provider: 'gitlab' as const })));
     }
-    if (publicRepositories.length > 0) {
-      repos.push(...publicRepositories.map((r) => ({ ...r, provider: 'github' as const })));
+    if (publicGithubRepositories.length > 0) {
+      repos.push(...publicGithubRepositories.map((r) => ({ ...r, provider: 'github' as const })));
+    }
+
+    if (publicGitlabProjects.length > 0) {
+      repos.push(...publicGitlabProjects.map((r) => ({ ...r, provider: 'gitlab' as const })));
     }
 
     return repos;
-  }, [githubStats?.repos, gitlabRepositories, publicRepositories]);
+  }, [githubStats?.repos, gitlabRepositories, publicGithubRepositories, publicGitlabProjects]);
+
 
   // Filter and search repositories
   const filteredRepositories = useMemo(() => {
@@ -240,12 +279,15 @@ export function HubProjectsView() {
     }
   }, [isGitLabConnected, gitlabConnection?.token]);
 
-  // Fetch Public GitHub Repositories
+  // Fetch Public Repositories using Debounce
   useEffect(() => {
-    if (isGitHubConnected) {
-      fetchPublicRepositories(searchQuery);
+    if(isGitHubConnected) {
+      fetchPublicGitHubRepositories(searchQuery);
     }
-  }, [searchQuery, isGitHubConnected]);
+    if(isGitLabConnected) {
+      fetchPublicGitLabProjects(searchQuery);
+    }
+  }, [searchQuery]);
 
   const hasAnyConnection = isGitHubConnected || isGitLabConnected;
   const isLoading = isGitHubLoading || isGitLabLoading;
