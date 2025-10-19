@@ -91,7 +91,7 @@ export default function HubSettingsIntegrations() {
               </Button>
             </>
           ) : (
-            <Button size="sm" onClick={onConnect}>
+            <Button size="sm" onClick={onConnect} className="text-gray-600 hover:text-gray-400">
               Connect
             </Button>
           )}
