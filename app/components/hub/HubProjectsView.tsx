@@ -10,7 +10,6 @@ import { useGitHubConnection, useGitHubStats, useGitLabConnection } from '~/lib/
 import { classNames } from '~/utils/classNames';
 import { Search, RefreshCw, GitBranch, Calendar, Filter, Settings } from 'lucide-react';
 import { LoadingOverlay } from '~/components/ui/LoadingOverlay';
-import { debounce } from '~/utils/debounce';
 
 type Repository = (GitHubRepoInfo & { provider: 'github' }) | (GitLabProjectInfo & { provider: 'gitlab' });
 type SortOption = 'updated' | 'stars' | 'name' | 'created';
@@ -85,6 +84,7 @@ export function HubProjectsView() {
     if (!query || query.trim().length < 3) {
       setPublicGithubRepositories([]);
       setError(null);
+
       return;
     }
 
@@ -110,7 +110,9 @@ export function HubProjectsView() {
       console.error('Failed to fetch public repositories:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch repositories');
     } finally {
-      if (isRefreshing) setIsRefreshing(false);
+      if (isRefreshing) {
+        setIsRefreshing(false);
+      }
     }
   };
 
@@ -118,6 +120,7 @@ export function HubProjectsView() {
     if (!query || query.trim().length < 3) {
       setPublicGitlabProjects([]);
       setError(null);
+
       return;
     }
 
@@ -143,7 +146,9 @@ export function HubProjectsView() {
       console.error('Failed to fetch public repositories:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch repositories');
     } finally {
-      if (isRefreshing) setIsRefreshing(false);
+      if (isRefreshing) {
+        setIsRefreshing(false);
+      }
     }
   };
 
@@ -153,20 +158,25 @@ export function HubProjectsView() {
     if (githubStats?.repos) {
       repos.push(...githubStats.repos.map((r) => ({ ...r, provider: 'github' as const })));
     }
+
     if (gitlabRepositories) {
       repos.push(...gitlabRepositories.map((r) => ({ ...r, provider: 'gitlab' as const })));
     }
+
     if (publicGithubRepositories.length > 0) {
-      repos.push(...publicGithubRepositories.map((r) => ({ ...r, provider: 'github' as const, source_public: true as const })));
+      repos.push(
+        ...publicGithubRepositories.map((r) => ({ ...r, provider: 'github' as const, source_public: true as const })),
+      );
     }
 
     if (publicGitlabProjects.length > 0) {
-      repos.push(...publicGitlabProjects.map((r) => ({ ...r, provider: 'gitlab' as const, source_public: true as const })));
+      repos.push(
+        ...publicGitlabProjects.map((r) => ({ ...r, provider: 'gitlab' as const, source_public: true as const })),
+      );
     }
 
     return repos;
   }, [githubStats?.repos, gitlabRepositories, publicGithubRepositories, publicGitlabProjects]);
-
 
   // Filter and search repositories
   const filteredRepositories = useMemo(() => {
@@ -285,10 +295,11 @@ export function HubProjectsView() {
 
   // Fetch Public Repositories using Debounce
   useEffect(() => {
-    if(isGitHubConnected) {
+    if (isGitHubConnected) {
       fetchPublicGitHubRepositories(searchQuery);
     }
-    if(isGitLabConnected) {
+
+    if (isGitLabConnected) {
       fetchPublicGitLabProjects(searchQuery);
     }
   }, [searchQuery]);
