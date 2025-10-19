@@ -5,6 +5,18 @@ echo "🔍 Checking commit message for sign-off..."
 # The commit message file is passed as the first argument
 commit_msg_file="$1"
 
+# Validate that the commit message file argument is provided
+if [ -z "$commit_msg_file" ]; then
+    echo "❌ Error: No commit message file provided"
+    exit 1
+fi
+
+# Validate that the commit message file exists
+if [ ! -f "$commit_msg_file" ]; then
+    echo "❌ Error: Commit message file not found: $commit_msg_file"
+    exit 1
+fi
+
 # Check if the commit message contains "Signed-off-by:"
 if ! grep -q "^Signed-off-by: " "$commit_msg_file"; then
     echo "❌ Commit is not signed off!"
