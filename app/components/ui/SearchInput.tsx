@@ -1,7 +1,8 @@
 import React, { forwardRef } from 'react';
 import { classNames } from '~/utils/classNames';
 import { Input } from './Input';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { SafeAnimatePresence } from './SafeAnimatePresence';
 
 interface SearchInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   /** Function to call when the clear button is clicked */
@@ -56,7 +57,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         />
 
         {/* Clear button */}
-        <AnimatePresence>
+        <SafeAnimatePresence>
           {hasValue && showClearButton && (
             <motion.button
               initial={{ opacity: 0, scale: 0.8 }}
@@ -71,7 +72,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
               <span className="i-ph:x w-3.5 h-3.5" />
             </motion.button>
           )}
-        </AnimatePresence>
+        </SafeAnimatePresence>
       </div>
     );
   },

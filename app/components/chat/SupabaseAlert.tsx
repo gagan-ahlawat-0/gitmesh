@@ -1,4 +1,5 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { SafeAnimatePresence } from '~/components/ui/SafeAnimatePresence';
 import type { SupabaseAlert } from '~/types/actions';
 import { classNames } from '~/utils/classNames';
 import { supabaseConnection } from '~/lib/stores/supabase';
@@ -93,7 +94,7 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
   };
 
   return (
-    <AnimatePresence>
+    <SafeAnimatePresence>
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -194,6 +195,6 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
           </div>
         </div>
       </motion.div>
-    </AnimatePresence>
+    </SafeAnimatePresence>
   );
 }

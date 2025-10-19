@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { SafeAnimatePresence } from './SafeAnimatePresence';
 import { Button } from './Button';
 import { classNames } from '~/utils/classNames';
 import { GitBranch, Check, Shield, Star, RefreshCw, X } from 'lucide-react';
@@ -128,7 +129,7 @@ export function BranchSelector({
   }
 
   return (
-    <AnimatePresence>
+    <SafeAnimatePresence>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -267,6 +268,6 @@ export function BranchSelector({
           )}
         </motion.div>
       </div>
-    </AnimatePresence>
+    </SafeAnimatePresence>
   );
 }
