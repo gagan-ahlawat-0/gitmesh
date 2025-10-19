@@ -48,11 +48,10 @@ export function HubLayout({ children }: HubLayoutProps) {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => (window.location.href = '/hub')}>
               <img src="/favicon.png" alt="GitMesh Logo" className="w-8 h-8 rounded-lg object-cover" />
               <h1 className="text-xl font-semibold text-gitmesh-elements-textPrimary">GitMesh Hub</h1>
             </div>
-
             {/* Navigation Links */}
             <div className="flex items-center space-x-1">
               {navItems.map((item) => (
