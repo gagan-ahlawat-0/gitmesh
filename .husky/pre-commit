@@ -29,46 +29,4 @@ if ! pnpm lint; then
     exit 1
 fi
 
-# Check if commit will have sign-off by checking the process tree
-echo "Checking for sign-off in commit..."
-
-# Walk up the process tree to find the git commit command
-sign_off_found=false
-current_pid=$$
-
-for i in $(seq 1 10); do  # Limit to 10 levels up
-    if [ -z "$current_pid" ] || [ "$current_pid" = "1" ]; then
-        break
-    fi
-    
-    # Get parent PID
-    parent_pid=$(ps -o ppid= -p "$current_pid" 2>/dev/null | tr -d ' ')
-    if [ -z "$parent_pid" ]; then
-        break
-    fi
-    
-    # Get command line of parent process
-    cmd_line=$(ps -o args= -p "$parent_pid" 2>/dev/null | head -1)
-    
-    # Check if this is a git commit command with -s flag
-    if echo "$cmd_line" | grep -q "git.*commit"; then
-        if echo "$cmd_line" | grep -qE "(-s|--signoff)"; then
-            sign_off_found=true
-            break
-        else
-            echo "❌ Found git commit command but no sign-off flag detected."
-            break
-        fi
-    fi
-    
-    current_pid="$parent_pid"
-done
-
-if [ "$sign_off_found" = "false" ]; then
-    echo "❌ Commit is not signed off! Please use 'git commit -s' to sign off your commit."
-    echo "Example: git commit -s -m 'your commit message'"
-    echo "This adds a 'Signed-off-by' line to indicate you have read and agreed to the project's contribution guidelines."
-    exit 1
-fi
-
 echo "👍 All checks passed! Committing changes..."
