@@ -9,16 +9,18 @@
 
 [![OpenSource License](https://img.shields.io/badge/License-Apache%20License-orange.svg?style=for-the-badge)](LICENSE.md)
 [![Contributors](https://img.shields.io/github/contributors/LF-Decentralized-Trust-labs/gitmesh.svg?style=for-the-badge&logo=git)](https://github.com/LF-Decentralized-Trust-labs/gitmesh/graphs/contributors)
-[![Under Development](https://img.shields.io/badge/Status-Under%20Development-yellow.svg?style=for-the-badge)](#)
-[![Join Discord](https://img.shields.io/badge/Join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/FkrWfGtZn3)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10972/badge)](https://www.bestpractices.dev/projects/10972)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/LF-Decentralized-Trust-labs/gitmesh/badge)](https://scorecard.dev/viewer/?uri=github.com/LF-Decentralized-Trust-labs/gitmesh)
+[![Alpha Release](https://img.shields.io/badge/Status-Alpha%20Version-yellow.svg?style=for-the-badge)](#)
+[![Join Weekly Dev Call](https://img.shields.io/badge/Join%20Weekly%20Dev%20Call-Zoom-blue.svg?style=for-the-badge&logo=zoom)](https://zoom-lfx.platform.linuxfoundation.org/meeting/96608771523?password=211b9c60-b73a-4545-8913-75ef933f9365)
+[![Join Discord](https://img.shields.io/badge/Join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/dpXFsGrx)
+[![OpenSSF Best Practices](https://img.shields.io/badge/OpenSSF-Silver%20Best%20Practices-silver.svg?style=for-the-badge&logo=opensourceinitiative)](https://www.bestpractices.dev/projects/10972)
+
 
 *Code with purpose, Integrate with confidence*
 
-[![Documentation](https://img.shields.io/badge/Documentation-000000?style=flat&logo=github)](https://github.com/LF-Decentralized-Trust-labs/gitmesh/README.md) 
-[![Join Community](https://img.shields.io/badge/Join_Community-000000?style=flat&logo=discord)](https://discord.gg/FkrWfGtZn3)
-[![Join Waitlist](https://img.shields.io/badge/Join_Waitlist-000000?style=flat&logo=github)](https://www.gitmesh.dev) 
+[![Documentation](https://img.shields.io/badge/Documentation-000000?style=flat&logo=readthedocs)](https://github.com/LF-Decentralized-Trust-labs/gitmesh/README.md) 
+[![Join Community](https://img.shields.io/badge/Join_Community-000000?style=flat&logo=discord)](https://discord.gg/dpXFsGrx)
+[![OSS Website](https://img.shields.io/badge/OSS_Website-000000?style=flat&logo=vercel)](https://www.gitmesh.dev) 
+[![Join Waitlist](https://img.shields.io/badge/Join_Waitlist-000000?style=flat&logo=mailchimp)](https://www.alveoli.app)
 
 </div>
 
@@ -91,65 +93,23 @@ Node.js is required to run the application.
         echo $PATH
         ```
      3. Look for `/usr/local/bin` in the output
+5. Install Package Manager (pnpm)
+   ```bash
+   npm install -g pnpm
+   ```
+6. Install Git: [Download Git](https://git-scm.com/downloads)
 
 ### 👾 Quick Start
 
 Choose one of the following methods to get started with GitMesh:
 
-#### Option 1: Direct Installation (Recommended for Beginners)
-
-1. **Install Package Manager (pnpm)**:
-
-   ```bash
-   npm install -g pnpm
-   ```
-
-2. **Install Project Dependencies**:
-
-   ```bash
-   pnpm install
-   ```
-
-3. **Start the Application**:
-
-   ```bash
-   pnpm run dev
-   ```
-
-**Open the WebUI** at [http://localhost:5173](http://localhost:5173)
-
-#### Option 2: Using Docker
-
-This option requires some familiarity with Docker but provides a more isolated environment.
-
-**Additional Prerequisite**: Install Docker: [Download Docker](https://www.docker.com/)
-
-**Steps**:
-
-1. **Build the Docker Image**:
-
-   ```bash
-   # Using npm script:
-   npm run dockerbuild
-
-   # OR using direct Docker command:
-   docker build . --target gitmesh-ai-development
-   ```
-
-2. **Run the Container**:
-   ```bash
-   docker compose --profile development up
-   ```
-
-#### Option 3: Setup Using Git (For Developers)
+#### Setup Using Git (For Developers)
 
 This method is recommended for developers who want to:
 * Contribute to the project
 * Stay updated with the latest changes
 * Switch between different versions
 * Create custom modifications
-
-**Prerequisites**: Install Git: [Download Git](https://git-scm.com/downloads)
 
 **Initial Setup**:
 
@@ -162,7 +122,7 @@ This method is recommended for developers who want to:
 2. **Navigate to Project Directory**:
 
    ```bash
-   cd GitMesh
+   cd gitmesh
    ```
 
 3. **Install Dependencies**:
@@ -173,13 +133,6 @@ This method is recommended for developers who want to:
 
 4. **Start the Development Server**:
    ```bash
-   pnpm run dev
-   ```
-
-5. **(OPTIONAL)** Switch to the Main Branch if you want to use pre-release/testbranch:
-   ```bash
-   git checkout main
-   pnpm install
    pnpm run dev
    ```
 
@@ -325,7 +278,7 @@ Mesh & Meshy are excited to see what amazing contributions you'll bring to the G
 
 | Channel                                                         | Typical Response Time | Best For                                             |
 | --------------------------------------------------------------- | --------------------- | ---------------------------------------------------- |
-| [Discord](https://discord.gg/FkrWfGtZn3)                     | Real-time             | Quick questions, community discussions               |
+| [Discord](https://discord.gg/dpXFsGrx)                     | Real-time             | Quick questions, community discussions               |
 | [Email Support](mailto:gitmesh.oss@gmail.com)                 | 24–48 hours           | Technical issues, detailed bug reports               |
 | [Twitter / X](https://x.com/gitmesh_oss)                      | Online                | Tagging the project, general updates, public reports |
 | [GitHub Issues](https://github.com/LF-Decentralized-Trust-labs/gitmesh/issues) | 1–3 days              | Bug reports, feature requests, feedback              |
