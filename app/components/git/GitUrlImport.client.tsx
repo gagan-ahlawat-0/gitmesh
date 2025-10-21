@@ -10,6 +10,7 @@ import { useChatHistory } from '~/lib/persistence';
 import { createCommandsMessage, detectProjectCommands, escapegitmeshTags } from '~/utils/projectCommands';
 import { LoadingOverlay } from '~/components/ui/LoadingOverlay';
 import { toast } from 'react-toastify';
+import { workbenchStore } from '~/lib/stores/workbench';
 
 const IGNORE_PATTERNS = [
   'node_modules/**',
@@ -53,6 +54,26 @@ export function GitUrlImport() {
 
       try {
         const { workdir, data } = await gitClone(repoUrl);
+
+        // Extract repository metadata from URL
+        const urlParts = repoUrl.replace('.git', '').split('/');
+        const provider = repoUrl.includes('github.com') ? 'github' : repoUrl.includes('gitlab.com') ? 'gitlab' : null;
+
+        if (provider && urlParts.length >= 5) {
+          const owner = urlParts[urlParts.length - 2];
+          const name = urlParts[urlParts.length - 1].split('#')[0]; // Remove branch if present
+          const branch = repoUrl.includes('#') ? repoUrl.split('#')[1] : 'main';
+
+          // Store repository context
+          workbenchStore.setCurrentRepository({
+            provider,
+            owner,
+            name,
+            fullName: `${owner}/${name}`,
+            branch,
+            remoteUrl: repoUrl,
+          });
+        }
 
         if (importChat) {
           const filePaths = Object.keys(data).filter((filePath) => !ig.ignores(filePath));

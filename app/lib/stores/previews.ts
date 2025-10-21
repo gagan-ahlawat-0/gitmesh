@@ -140,45 +140,60 @@ export class PreviewsStore {
   }
 
   async #init() {
-    const webcontainer = await this.#webcontainer;
+    try {
+      const webcontainer = await this.#webcontainer;
 
-    // Listen for server ready events
-    webcontainer.on('server-ready', (port, url) => {
-      console.log('[Preview] Server ready on port:', port, url);
-      this.broadcastUpdate(url);
+      // Check if webcontainer has the 'on' method before using it
+      if (typeof webcontainer.on === 'function') {
+        // Listen for server ready events
+        webcontainer.on('server-ready', (port, url) => {
+          console.log('[Preview] Server ready on port:', port, url);
+          this.broadcastUpdate(url);
 
-      // Initial storage sync when preview is ready
-      this._broadcastStorageSync();
-    });
+          // Initial storage sync when preview is ready
+          this._broadcastStorageSync();
+        });
 
-    // Listen for port events
-    webcontainer.on('port', (port, type, url) => {
-      let previewInfo = this.#availablePreviews.get(port);
+        // Listen for port events
+        webcontainer.on('port', (port, type, url) => {
+          let previewInfo = this.#availablePreviews.get(port);
 
-      if (type === 'close' && previewInfo) {
-        this.#availablePreviews.delete(port);
-        this.previews.set(this.previews.get().filter((preview) => preview.port !== port));
+          if (type === 'close' && previewInfo) {
+            this.#availablePreviews.delete(port);
+            this.previews.set(this.previews.get().filter((preview) => preview.port !== port));
 
-        return;
+            return;
+          }
+
+          const previews = this.previews.get();
+
+          if (!previewInfo) {
+            previewInfo = { port, ready: type === 'open', baseUrl: url };
+            this.#availablePreviews.set(port, previewInfo);
+            previews.push(previewInfo);
+          }
+
+          previewInfo.ready = type === 'open';
+          previewInfo.baseUrl = url;
+
+          this.previews.set([...previews]);
+
+          if (type === 'open') {
+            this.broadcastUpdate(url);
+          }
+        });
+
+        console.log('[Preview] WebContainer listeners initialized successfully');
+      } else {
+        console.warn('[Preview] WebContainer does not have "on" method available yet, retrying in 100ms');
+        // Retry initialization after a short delay
+        setTimeout(() => this.#init(), 100);
       }
-
-      const previews = this.previews.get();
-
-      if (!previewInfo) {
-        previewInfo = { port, ready: type === 'open', baseUrl: url };
-        this.#availablePreviews.set(port, previewInfo);
-        previews.push(previewInfo);
-      }
-
-      previewInfo.ready = type === 'open';
-      previewInfo.baseUrl = url;
-
-      this.previews.set([...previews]);
-
-      if (type === 'open') {
-        this.broadcastUpdate(url);
-      }
-    });
+    } catch (error) {
+      console.error('[Preview] Failed to initialize webcontainer listeners:', error);
+      // Retry initialization after a longer delay on error
+      setTimeout(() => this.#init(), 1000);
+    }
   }
 
   // Helper to extract preview ID from URL
@@ -272,15 +287,30 @@ export class PreviewsStore {
 
 // Create a singleton instance
 let previewsStore: PreviewsStore | null = null;
+let webcontainerPromise: Promise<WebContainer> | null = null;
 
 export function usePreviewStore() {
-  if (!previewsStore) {
-    /*
-     * Initialize with a Promise that resolves to WebContainer
-     * This should match how you're initializing WebContainer elsewhere
-     */
-    previewsStore = new PreviewsStore(Promise.resolve({} as WebContainer));
+  if (!previewsStore && !webcontainerPromise) {
+    // Import the actual webcontainer instance
+    webcontainerPromise = import('~/lib/webcontainer')
+      .then(({ webcontainer }) => {
+        // Wait for webcontainer to be fully initialized
+        return webcontainer.then((wc) => {
+          previewsStore = new PreviewsStore(Promise.resolve(wc));
+          return wc;
+        });
+      })
+      .catch((error) => {
+        console.error('Failed to initialize previews store:', error);
+        throw error;
+      });
   }
 
-  return previewsStore;
+  // If we have a store, return it
+  if (previewsStore) {
+    return previewsStore;
+  }
+
+  // If we're still initializing, return null and let the caller handle it
+  return null;
 }

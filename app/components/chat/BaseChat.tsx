@@ -136,6 +136,27 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     const { selectedRepo, fromHub } = useRepoContext();
+
+    // Keep WorkbenchStore in sync with the repo chosen in Chat (from hub/URL)
+    useEffect(() => {
+      if (selectedRepo && fromHub) {
+        const [owner, nameFromFull] = selectedRepo.full_name?.split('/') ?? [null, null];
+        const name = selectedRepo.name ?? nameFromFull ?? null;
+
+        if (owner && name) {
+          workbenchStore.setCurrentRepository({
+            provider: selectedRepo.provider,
+            owner,
+            name,
+            fullName: `${owner}/${name}`,
+            branch: 'main',
+            isOpen: true,
+            remoteUrl: selectedRepo.clone_url,
+          });
+        }
+      }
+    }, [selectedRepo, fromHub]);
+
     const [apiKeys, setApiKeys] = useState<Record<string, string>>(getApiKeysFromCookies());
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);

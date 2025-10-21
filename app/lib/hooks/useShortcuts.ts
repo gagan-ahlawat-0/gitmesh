@@ -32,6 +32,7 @@ export function useShortcuts(): void {
       // Don't trigger shortcuts when typing in input fields
       if (
         document.activeElement &&
+        document.activeElement.tagName &&
         INPUT_ELEMENTS.includes(document.activeElement.tagName.toLowerCase()) &&
         !event.altKey && // Allow Alt combinations even in input fields
         !event.metaKey && // Allow Cmd/Win combinations even in input fields
@@ -42,8 +43,14 @@ export function useShortcuts(): void {
 
       // Handle shortcuts
       for (const [name, shortcut] of Object.entries(shortcuts)) {
+        // Skip if shortcut.key is undefined or null
+        if (!shortcut.key) {
+          continue;
+        }
+
         const keyMatches =
-          shortcut.key.toLowerCase() === event.key.toLowerCase() || `Key${shortcut.key.toUpperCase()}` === event.code;
+          (event.key && shortcut.key.toLowerCase() === event.key.toLowerCase()) ||
+          `Key${shortcut.key.toUpperCase()}` === event.code;
 
         // Handle ctrlOrMetaKey based on OS
         const ctrlOrMetaKeyMatches = shortcut.ctrlOrMetaKey
