@@ -24,6 +24,7 @@ interface Props {
   allowFolderSelection?: boolean;
   hiddenFiles?: Array<string | RegExp>;
   unsavedFiles?: Set<string>;
+  modifiedFiles?: Set<string>;
   fileHistory?: Record<string, FileHistory>;
   className?: string;
 }
@@ -48,6 +49,7 @@ export const FileTree = memo(
     hiddenFiles,
     className,
     unsavedFiles,
+    modifiedFiles = new Set(),
     fileHistory = {},
   }: Props) => {
     renderLogger.trace('FileTree');
@@ -154,6 +156,7 @@ export const FileTree = memo(
                   file={fileOrFolder}
                   unsavedChanges={unsavedFiles instanceof Set && unsavedFiles.has(fileOrFolder.fullPath)}
                   fileHistory={fileHistory}
+                  modifiedFiles={modifiedFiles}
                   onCopyPath={() => {
                     onCopyPath(fileOrFolder);
                   }}
@@ -625,6 +628,7 @@ interface FileProps {
   selected: boolean;
   unsavedChanges?: boolean;
   fileHistory?: Record<string, FileHistory>;
+  modifiedFiles?: Set<string>;
   onCopyPath: () => void;
   onCopyRelativePath: () => void;
   onClick: () => void;
@@ -638,6 +642,7 @@ function File({
   selected,
   unsavedChanges = false,
   fileHistory = {},
+  modifiedFiles = new Set(),
 }: FileProps) {
   const { depth, name, fullPath } = file;
 
@@ -709,6 +714,9 @@ function File({
                 {additions > 0 && <span className="text-green-500">+{additions}</span>}
                 {deletions > 0 && <span className="text-red-500">-{deletions}</span>}
               </div>
+            )}
+            {modifiedFiles.has(fullPath) && (
+              <div className="shrink-0 w-2 h-2 bg-orange-500 rounded-full" title="File has uncommitted changes" />
             )}
             {locked && (
               <span

@@ -522,17 +522,17 @@ export class FilesStore {
   getModifiedFiles() {
     let modifiedFiles: { [path: string]: File } | undefined = undefined;
 
-    for (const [filePath, originalContent] of this.#modifiedFiles) {
+    for (const [filePath] of this.#modifiedFiles) {
       const file = this.files.get()[filePath];
 
       if (file?.type !== 'file') {
         continue;
       }
 
-      if (file.content === originalContent) {
-        continue;
-      }
-
+      /*
+       * Include all files tracked in #modifiedFiles.
+       * This includes both modified files and newly created files.
+       */
       if (!modifiedFiles) {
         modifiedFiles = {};
       }

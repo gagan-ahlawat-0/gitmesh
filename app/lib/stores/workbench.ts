@@ -35,8 +35,19 @@ type Artifacts = MapStore<Record<string, ArtifactState>>;
 
 export type WorkbenchViewType = 'code' | 'diff' | 'preview';
 
+export interface RepositoryContext {
+  provider: 'github' | 'gitlab' | null;
+  owner: string | null;
+  name: string | null;
+  fullName: string | null; // "owner/repo" or "group/project"
+  branch: string;
+  isOpen: boolean;
+  lastSync: Date | null;
+  remoteUrl: string | null;
+}
+
 export class WorkbenchStore {
-  #previewsStore = new PreviewsStore(webcontainer);
+  #previewsStore: PreviewsStore | null = null;
   #filesStore = new FilesStore(webcontainer);
   #editorStore = new EditorStore(this.#filesStore);
   #terminalStore = new TerminalStore(webcontainer);
@@ -44,6 +55,21 @@ export class WorkbenchStore {
   #reloadedMessages = new Set<string>();
 
   artifacts: Artifacts = import.meta.hot?.data.artifacts ?? map({});
+
+  get previewsStore(): PreviewsStore | null {
+    if (!this.#previewsStore) {
+      // Import and initialize the previews store
+      import('~/lib/stores/previews')
+        .then(({ usePreviewStore }) => {
+          this.#previewsStore = usePreviewStore();
+        })
+        .catch((error) => {
+          console.error('Failed to initialize previews store:', error);
+        });
+    }
+
+    return this.#previewsStore;
+  }
 
   showWorkbench: WritableAtom<boolean> = import.meta.hot?.data.showWorkbench ?? atom(false);
   currentView: WritableAtom<WorkbenchViewType> = import.meta.hot?.data.currentView ?? atom('code');
@@ -54,7 +80,18 @@ export class WorkbenchStore {
     import.meta.hot?.data.supabaseAlert ?? atom<SupabaseAlert | undefined>(undefined);
   deployAlert: WritableAtom<DeployAlert | undefined> =
     import.meta.hot?.data.deployAlert ?? atom<DeployAlert | undefined>(undefined);
-  modifiedFiles = new Set<string>();
+  currentRepository: WritableAtom<RepositoryContext | null> =
+    import.meta.hot?.data.currentRepository ??
+    atom<RepositoryContext | null>({
+      provider: null,
+      owner: null,
+      name: null,
+      fullName: null,
+      branch: 'main',
+      isOpen: false,
+      lastSync: null,
+      remoteUrl: null,
+    });
   artifactIdList: string[] = [];
   #globalExecutionQueue = Promise.resolve();
   constructor() {
@@ -66,6 +103,7 @@ export class WorkbenchStore {
       import.meta.hot.data.actionAlert = this.actionAlert;
       import.meta.hot.data.supabaseAlert = this.supabaseAlert;
       import.meta.hot.data.deployAlert = this.deployAlert;
+      import.meta.hot.data.currentRepository = this.currentRepository;
 
       // Ensure binary files are properly preserved across hot reloads
       const filesMap = this.files.get();
@@ -84,7 +122,7 @@ export class WorkbenchStore {
   }
 
   get previews() {
-    return this.#previewsStore.previews;
+    return this.previewsStore?.previews ?? atom([]);
   }
 
   get files() {
@@ -287,6 +325,96 @@ export class WorkbenchStore {
 
   resetAllFileModifications() {
     this.#filesStore.resetFileModifications();
+  }
+
+  /**
+   * Set the current repository context
+   * @param context Repository metadata to store
+   */
+  setCurrentRepository(context: Partial<RepositoryContext>) {
+    const current = this.currentRepository.get() || {
+      provider: null,
+      owner: null,
+      name: null,
+      fullName: null,
+      branch: 'main',
+      isOpen: false,
+      lastSync: null,
+      remoteUrl: null,
+    };
+
+    this.currentRepository.set({
+      ...current,
+      ...context,
+      isOpen: true,
+      lastSync: new Date(),
+    });
+
+    // Persist to localStorage
+    try {
+      localStorage.setItem('gitmesh_current_repository', JSON.stringify(this.currentRepository.get()));
+    } catch (error) {
+      console.error('Failed to persist repository context:', error);
+    }
+  }
+
+  /**
+   * Get the current repository context
+   * @returns Current repository context or null
+   */
+  getCurrentRepository(): RepositoryContext | null {
+    return this.currentRepository.get();
+  }
+
+  /**
+   * Clear the current repository context
+   */
+  clearCurrentRepository() {
+    this.currentRepository.set({
+      provider: null,
+      owner: null,
+      name: null,
+      fullName: null,
+      branch: 'main',
+      isOpen: false,
+      lastSync: null,
+      remoteUrl: null,
+    });
+
+    // Clear from localStorage
+    try {
+      localStorage.removeItem('gitmesh_current_repository');
+    } catch (error) {
+      console.error('Failed to clear repository context:', error);
+    }
+  }
+
+  /**
+   * Restore repository context from localStorage on page load
+   */
+  restoreRepositoryContext() {
+    try {
+      const stored = localStorage.getItem('gitmesh_current_repository');
+
+      if (stored) {
+        const context = JSON.parse(stored);
+
+        // Validate that it's not too old (e.g., 7 days)
+        if (context.lastSync) {
+          const lastSync = new Date(context.lastSync);
+          const daysSinceSync = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60 * 24);
+
+          if (daysSinceSync < 7) {
+            this.currentRepository.set(context);
+          } else {
+            // Clear expired context
+            this.clearCurrentRepository();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to restore repository context:', error);
+    }
   }
 
   /**
@@ -813,13 +941,46 @@ export class WorkbenchStore {
             const repoRefresh = await octokit.repos.get({ owner, repo: repoName });
             repo = repoRefresh.data;
 
-            // Get the latest commit SHA (assuming main branch, update dynamically if needed)
-            const { data: ref } = await octokit.git.getRef({
-              owner: repo.owner.login,
-              repo: repo.name,
-              ref: `heads/${repo.default_branch || 'main'}`, // Handle dynamic branch
-            });
-            const latestCommitSha = ref.object.sha;
+            // Use the specified branch name, or fall back to default branch
+            const targetBranch = branchName || repo.default_branch || 'main';
+
+            // Check if the target branch exists, if not create it from default branch
+            let branchRef;
+
+            try {
+              const { data: ref } = await octokit.git.getRef({
+                owner: repo.owner.login,
+                repo: repo.name,
+                ref: `heads/${targetBranch}`,
+              });
+              branchRef = ref;
+            } catch (error: any) {
+              // Branch doesn't exist, create it from default branch
+              if (error.status === 404 && branchName) {
+                console.log(`Branch ${targetBranch} doesn't exist, creating from ${repo.default_branch}`);
+
+                // Get default branch SHA
+                const { data: defaultRef } = await octokit.git.getRef({
+                  owner: repo.owner.login,
+                  repo: repo.name,
+                  ref: `heads/${repo.default_branch || 'main'}`,
+                });
+
+                // Create new branch
+                const { data: newBranch } = await octokit.git.createRef({
+                  owner: repo.owner.login,
+                  repo: repo.name,
+                  ref: `refs/heads/${targetBranch}`,
+                  sha: defaultRef.object.sha,
+                });
+
+                branchRef = newBranch;
+              } else {
+                throw error;
+              }
+            }
+
+            const latestCommitSha = branchRef.object.sha;
 
             // Create a new tree
             const { data: newTree } = await octokit.git.createTree({
@@ -843,15 +1004,15 @@ export class WorkbenchStore {
               parents: [latestCommitSha],
             });
 
-            // Update the reference
+            // Update the reference to the target branch
             await octokit.git.updateRef({
               owner: repo.owner.login,
               repo: repo.name,
-              ref: `heads/${repo.default_branch || 'main'}`, // Handle dynamic branch
+              ref: `heads/${targetBranch}`,
               sha: newCommit.sha,
             });
 
-            console.log('Files successfully pushed to repository');
+            console.log(`Files successfully pushed to branch: ${targetBranch}`);
 
             return repo.html_url;
           } catch (error) {
@@ -873,6 +1034,16 @@ export class WorkbenchStore {
         // Execute the push function with retry logic
         const repoUrl = await pushFilesToRepo();
 
+        // Update repository context after successful commit
+        this.setCurrentRepository({
+          provider: 'github',
+          owner,
+          name: repoName,
+          fullName: `${owner}/${repoName}`,
+          branch: branchName,
+          remoteUrl: repoUrl,
+        });
+
         // Return the repository URL
         return repoUrl;
       }
@@ -889,13 +1060,72 @@ export class WorkbenchStore {
           await new Promise((r) => setTimeout(r, 2000)); // Wait for repo initialization
         }
 
-        // Check if branch exists, create if not
-        const branchRes = await gitLabApiService.getFile(repo.id, 'README.md', branchName).catch(() => null);
+        // Use the specified branch name, or fall back to default branch
+        const targetBranch = branchName || repo.default_branch || 'main';
 
-        if (!branchRes || !branchRes.ok) {
-          // Create branch from default
-          await gitLabApiService.createBranch(repo.id, branchName, repo.default_branch);
-          await new Promise((r) => setTimeout(r, 1000));
+        // Check if branch exists, create if not
+        let branchExists = false;
+
+        try {
+          const branchRes = await gitLabApiService.getFile(repo.id, 'README.md', targetBranch);
+          branchExists = branchRes && branchRes.ok;
+        } catch {
+          branchExists = false;
+        }
+
+        if (!branchExists && branchName) {
+          // Validate default branch exists
+          const defaultBranch = repo.default_branch || 'main';
+
+          console.log(`Creating branch ${targetBranch} from ${defaultBranch}`);
+
+          try {
+            await gitLabApiService.createBranch(repo.id, targetBranch, defaultBranch);
+
+            // Verify branch was created with retry logic
+            let verificationAttempts = 0;
+            const maxVerificationAttempts = 5;
+            let branchVerified = false;
+
+            while (verificationAttempts < maxVerificationAttempts) {
+              verificationAttempts++;
+
+              try {
+                // Use GitLab API to directly check if branch exists
+                const branchCheckUrl = `${gitLabApiService.baseUrl}/projects/${repo.id}/repository/branches/${encodeURIComponent(targetBranch)}`;
+                const branchCheck = await fetch(branchCheckUrl, {
+                  headers: {
+                    Authorization: `Bearer ${gitLabApiService.token}`,
+                    'Content-Type': 'application/json',
+                  },
+                });
+
+                if (branchCheck.ok) {
+                  console.log(`Branch ${targetBranch} verified successfully`);
+                  branchVerified = true;
+                  break;
+                }
+              } catch {
+                if (verificationAttempts < maxVerificationAttempts) {
+                  console.log(
+                    `Branch verification attempt ${verificationAttempts}/${maxVerificationAttempts} failed, retrying...`,
+                  );
+                  await new Promise((r) => setTimeout(r, 1000));
+                }
+              }
+            }
+
+            if (!branchVerified) {
+              throw new Error(
+                `Failed to verify branch ${targetBranch} creation after ${maxVerificationAttempts} attempts`,
+              );
+            }
+          } catch (error: any) {
+            console.error('Error creating/verifying branch:', error);
+
+            const errorMessage = error.message || 'Unknown error';
+            throw new Error(`Failed to create branch ${targetBranch}: ${errorMessage}`);
+          }
         }
 
         const actions = Object.entries(files).reduce(
@@ -913,20 +1143,38 @@ export class WorkbenchStore {
           [] as { action: 'create' | 'update'; file_path: string; content: string }[],
         );
 
-        // Check which files exist and update action accordingly
+        // Check which files exist on the target branch and update action accordingly
         for (const action of actions) {
-          const fileCheck = await gitLabApiService.getFile(repo.id, action.file_path, branchName);
+          try {
+            const fileCheck = await gitLabApiService.getFile(repo.id, action.file_path, targetBranch);
 
-          if (fileCheck.ok) {
-            action.action = 'update';
+            if (fileCheck.ok) {
+              action.action = 'update';
+            }
+          } catch {
+            // File doesn't exist, keep as 'create'
+            action.action = 'create';
           }
         }
 
-        // Commit all files
+        // Commit all files to the target branch
+        console.log(`Committing ${actions.length} files to branch: ${targetBranch}`);
         await gitLabApiService.commitFiles(repo.id, {
-          branch: branchName,
+          branch: targetBranch,
           commit_message: commitMessage || 'Commit multiple files',
           actions,
+        });
+
+        console.log(`Files successfully committed to branch: ${targetBranch}`);
+
+        // Update repository context after successful commit
+        this.setCurrentRepository({
+          provider: 'gitlab',
+          owner,
+          name: repoName,
+          fullName: `${owner}/${repoName}`,
+          branch: targetBranch,
+          remoteUrl: repo.web_url,
         });
 
         return repo.web_url;

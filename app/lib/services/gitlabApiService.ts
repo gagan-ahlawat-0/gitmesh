@@ -102,6 +102,15 @@ export class GitLabApiService {
     this._baseUrl = baseUrl;
   }
 
+  // Public getters for accessing private properties
+  get baseUrl(): string {
+    return this._baseUrl;
+  }
+
+  get token(): string {
+    return this._token;
+  }
+
   private get _headers() {
     // Log token format for debugging
     console.log('GitLab API token info:', {

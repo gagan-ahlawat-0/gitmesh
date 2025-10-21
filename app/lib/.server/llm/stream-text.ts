@@ -158,6 +158,17 @@ export async function streamText(props: {
     `Token limits for model ${modelDetails.name}: maxTokens=${safeMaxTokens}, maxTokenAllowed=${modelDetails.maxTokenAllowed}, maxCompletionTokens=${modelDetails.maxCompletionTokens}`,
   );
 
+  // Get modified files from the workbench store
+  const modifiedFiles = files
+    ? Object.keys(files).filter((key) => {
+        /*
+         * This is a simplified check - in a real implementation, you'd want to track actual modifications
+         * For now, we'll assume files that exist in the files object are potentially modified
+         */
+        return files[key] && typeof files[key] === 'object' && 'content' in files[key];
+      })
+    : [];
+
   let systemPrompt =
     PromptLibrary.getPropmtFromLibrary(promptId || 'default', {
       cwd: WORK_DIR,
@@ -169,7 +180,18 @@ export async function streamText(props: {
         hasSelectedProject: options?.supabaseConnection?.hasSelectedProject || false,
         credentials: options?.supabaseConnection?.credentials || undefined,
       },
-    }) ?? getSystemPrompt();
+      modifiedFiles: new Set(modifiedFiles),
+    }) ??
+    getSystemPrompt(
+      WORK_DIR,
+      {
+        isConnected: options?.supabaseConnection?.isConnected || false,
+        hasSelectedProject: options?.supabaseConnection?.hasSelectedProject || false,
+        credentials: options?.supabaseConnection?.credentials || undefined,
+      },
+      designScheme,
+      new Set(modifiedFiles),
+    );
 
   // Set the base prompt based on chat mode
   if (chatMode === 'discuss') {

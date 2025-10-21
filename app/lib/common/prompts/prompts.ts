@@ -11,6 +11,7 @@ export const getSystemPrompt = (
     credentials?: { anonKey?: string; supabaseUrl?: string };
   },
   designScheme?: DesignScheme,
+  modifiedFiles?: Set<string>,
 ) => `
 You are gitmesh, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
 
@@ -270,6 +271,25 @@ You are gitmesh, an expert AI assistant and exceptional senior software develope
 
   IMPORTANT: NEVER skip RLS setup for any table. Security is non-negotiable!
 </database_instructions>
+
+<file_modification_status>
+${
+  modifiedFiles && modifiedFiles.size > 0
+    ? `
+CURRENT FILE MODIFICATIONS:
+- ${modifiedFiles.size} file(s) have been modified
+- Modified files: ${Array.from(modifiedFiles).join(', ')}
+- The user may want to commit these changes to save their work
+- ALWAYS suggest commit actions when files have been modified
+- Provide both GitHub and GitLab commit options when appropriate
+`
+    : `
+CURRENT FILE MODIFICATIONS:
+- No files have been modified
+- No commit actions needed at this time
+`
+}
+</file_modification_status>
 
 <code_formatting_info>
   Use 2 spaces for code indentation

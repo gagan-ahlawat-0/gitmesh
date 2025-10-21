@@ -4,7 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { useAnimate } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
-import { useMessageParser, usePromptEnhancer, useShortcuts } from '~/lib/hooks';
+import { useMessageParser, usePromptEnhancer, useShortcuts, useModifiedFiles } from '~/lib/hooks';
 import { description, useChatHistory } from '~/lib/persistence';
 import { chatStore } from '~/lib/stores/chat';
 import { workbenchStore } from '~/lib/stores/workbench';
@@ -86,6 +86,7 @@ export const ChatImpl = memo(
   ({ description, initialMessages, storeMessageHistory, importChat, exportChat }: ChatProps) => {
     useShortcuts();
 
+    const { files: modifiedFiles } = useModifiedFiles();
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [chatStarted, setChatStarted] = useState(initialMessages.length > 0);
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -509,11 +510,9 @@ export const ChatImpl = memo(
         setMessages(messages.slice(0, -1));
       }
 
-      const modifiedFiles = workbenchStore.getModifiedFiles();
-
       chatStore.setKey('aborted', false);
 
-      if (modifiedFiles !== undefined) {
+      if (Object.keys(modifiedFiles).length > 0) {
         const userUpdateArtifact = filesToArtifacts(modifiedFiles, `${Date.now()}`);
         const messageText = `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${userUpdateArtifact}${finalMessageContent}`;
 
