@@ -377,7 +377,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               styles.Chat,
               'flex flex-col flex-grow lg:min-w-[var(--chat-min-width)] h-full overflow-y-auto transition-all duration-200',
               {
-                'ml-[340px]': isSidebarOpen,
                 'ml-0': !isSidebarOpen,
               },
             )}
@@ -510,10 +509,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             {chatStarted && (
               <div
                 className={classNames('fixed bottom-4 z-50 transition-all duration-200', {
-                  'left-[340px] right-[var(--workbench-width)]': showWorkbench && isSidebarOpen,
-                  'left-0 right-[var(--workbench-width)]': showWorkbench && !isSidebarOpen,
-                  'left-[340px] right-0': !showWorkbench && isSidebarOpen,
-                  'left-0 right-0': !showWorkbench && !isSidebarOpen,
+                  'left-0 right-[var(--workbench-width)]': showWorkbench,
+                  'left-0 right-0': !showWorkbench,
                 })}
               >
                 <div

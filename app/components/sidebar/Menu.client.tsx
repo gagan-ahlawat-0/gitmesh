@@ -6,7 +6,7 @@ import { ThemeSwitch } from '~/components/ui/ThemeSwitch';
 import { ControlPanel } from '~/components/@settings/core/ControlPanel';
 import { Button } from '~/components/ui/Button';
 import { deleteById, getAll, chatId, type ChatHistoryItem, useChatHistory, openDatabase } from '~/lib/persistence';
-import { cubicEasingFn } from '~/utils/easings';
+
 import { HistoryItem } from './HistoryItem';
 import { binDates } from './date-binning';
 import { useSearchFilter } from '~/lib/hooks/useSearchFilter';
@@ -17,21 +17,23 @@ import { sidebarOpen } from '~/lib/stores/sidebar';
 
 const menuVariants = {
   closed: {
+    x: '-340px',
     opacity: 0,
-    visibility: 'hidden',
-    left: '-340px',
     transition: {
-      duration: 0.2,
-      ease: cubicEasingFn,
+      duration: 0.3,
+      ease: 'easeInOut',
+    },
+    transitionEnd: {
+      visibility: 'hidden',
     },
   },
   open: {
+    x: 0,
     opacity: 1,
     visibility: 'initial',
-    left: 0,
     transition: {
-      duration: 0.2,
-      ease: cubicEasingFn,
+      duration: 0.3,
+      ease: 'easeInOut',
     },
   },
 } satisfies Variants;
@@ -301,31 +303,6 @@ export const Menu = () => {
     }
   }, [open, selectionMode]);
 
-  useEffect(() => {
-    const enterThreshold = 20;
-    const exitThreshold = 20;
-
-    function onMouseMove(event: MouseEvent) {
-      if (isSettingsOpen) {
-        return;
-      }
-
-      if (event.pageX < enterThreshold) {
-        sidebarOpen.set(true);
-      }
-
-      if (menuRef.current && event.clientX > menuRef.current.getBoundingClientRect().right + exitThreshold) {
-        sidebarOpen.set(false);
-      }
-    }
-
-    window.addEventListener('mousemove', onMouseMove);
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-    };
-  }, [isSettingsOpen]);
-
   const handleDuplicate = async (id: string) => {
     await duplicateCurrentChat(id);
     loadEntries(); // Reload the list after duplication
@@ -349,7 +326,7 @@ export const Menu = () => {
         variants={menuVariants}
         style={{ width: '340px' }}
         className={classNames(
-          'flex selection-accent flex-col side-menu fixed top-0 h-full rounded-r-2xl',
+          'flex selection-accent flex-col side-menu fixed top-[var(--header-height)] h-[calc(100%_-_var(--header-height))] rounded-r-2xl',
           'bg-white dark:bg-gray-950 border-r border-gitmesh-elements-borderColor',
           'shadow-sm text-sm',
           isSettingsOpen ? 'z-40' : 'z-sidebar',
