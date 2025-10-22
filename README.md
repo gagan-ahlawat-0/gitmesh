@@ -169,6 +169,7 @@ You’ll be prompted to enter your Personal Access Token.
 3. Paste the token into the prompt on localhost when asked.
 
 You can configure GitHub, GitLab, or both in a similar way — just make sure to use the correct platform’s token.
+<br>
 Tip: Keep your PAT secure. Never share or commit it in any file or codebase.
 
 **Staying Updated**:
