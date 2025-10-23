@@ -11,14 +11,14 @@
 [![Contributors](https://img.shields.io/github/contributors/LF-Decentralized-Trust-labs/gitmesh.svg?style=for-the-badge&logo=git)](https://github.com/LF-Decentralized-Trust-labs/gitmesh/graphs/contributors)
 [![Alpha Release](https://img.shields.io/badge/Status-Alpha%20Version-yellow.svg?style=for-the-badge)](#)
 [![Join Weekly Dev Call](https://img.shields.io/badge/Join%20Weekly%20Dev%20Call-Zoom-blue.svg?style=for-the-badge&logo=zoom)](https://zoom-lfx.platform.linuxfoundation.org/meeting/96608771523?password=211b9c60-b73a-4545-8913-75ef933f9365)
-[![Join Discord](https://img.shields.io/badge/Join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/dpXFsGrx)
+[![Join Discord](https://img.shields.io/badge/Join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/xXvYkK3yEp)
 [![OpenSSF Best Practices](https://img.shields.io/badge/OpenSSF-Silver%20Best%20Practices-silver.svg?style=for-the-badge&logo=opensourceinitiative)](https://www.bestpractices.dev/projects/10972)
 
 
 *Code with purpose, Integrate with confidence*
 
 [![Documentation](https://img.shields.io/badge/Documentation-000000?style=flat&logo=readthedocs)](https://github.com/LF-Decentralized-Trust-labs/gitmesh/README.md) 
-[![Join Community](https://img.shields.io/badge/Join_Community-000000?style=flat&logo=discord)](https://discord.gg/dpXFsGrx)
+[![Join Community](https://img.shields.io/badge/Join_Community-000000?style=flat&logo=discord)](https://discord.gg/xXvYkK3yEp)
 [![OSS Website](https://img.shields.io/badge/OSS_Website-000000?style=flat&logo=vercel)](https://www.gitmesh.dev) 
 [![Join Waitlist](https://img.shields.io/badge/Join_Waitlist-000000?style=flat&logo=mailchimp)](https://www.alveoli.app)
 
@@ -57,6 +57,22 @@ Our mascot (Meshy/Mesh Wolf) reflects GitMesh's core: agile, resilient, and unst
             <img src="public/os_korea.avif" alt="Coming Soon" width="300" style="max-width:100%; border-radius:8px; opacity:0.7;"/>
             <br>
             <sub><em>OpenSource Summit Korea • 4-5 Nov 2025</em></sub>
+         </td>
+      </tr>
+      <tr>
+         <td align="center">
+         <a href="https://events.linuxfoundation.org/opensearchcon-korea/">
+          <img src="public/OpenSearchCon_Korea.jpg" alt="Coming Soon" width="300" style="max-width:100%; border-radius:8px; opacity:0.7;"/>
+            <br>
+            <sub><em>OpenSearchCon Korea • 4 Nov 2025</em></sub>
+         <a/> 
+         </td>
+         <td align="center">
+         <a href="https://events.linuxfoundation.org/openssf-community-day-korea/ ">
+          <img src="public/OpenSSFCommunityDay_Korea.jpg" alt="Coming Soon" width="300" style="max-width:100%; border-radius:8px; opacity:0.7;"/>
+            <br>
+            <sub><em>OpenSSF Community Day Korea • 4 Nov 2025</em></sub>
+         <a/> 
          </td>
       </tr>
    </table>
@@ -106,7 +122,6 @@ Choose one of the following methods to get started with GitMesh:
 #### Setup Using Git (For Developers)
 
 This method is recommended for developers who want to:
-* Contribute to the project
 * Stay updated with the latest changes
 * Switch between different versions
 * Create custom modifications
@@ -135,6 +150,27 @@ This method is recommended for developers who want to:
    ```bash
    pnpm run dev
    ```
+5. **Configure Github PAT**:
+If you’re running the project for the first time, you’ll need to configure your GitHub Personal Access Token (PAT) to authenticate and connect GitMesh to your GitHub account.
+
+Steps to Generate and Configure PAT
+1. Start the GitMesh server and open the provided localhost link.
+
+You’ll be prompted to enter your Personal Access Token.
+
+2. To generate a new token:
+
+- Go to GitHub → Settings → Developer settings → Personal Access Tokens → Tokens (classic)
+- Click Generate new token → Generate new token (classic)
+- Select the required scopes (typically: repo, user, read:org)
+- Click Generate Token
+- Copy the generated token (you’ll only see it once)
+
+3. Paste the token into the prompt on localhost when asked.
+
+You can configure GitHub, GitLab, or both in a similar way — just make sure to use the correct platform’s token.
+<br>
+Tip: Keep your PAT secure. Never share or commit it in any file or codebase.
 
 **Staying Updated**:
 
@@ -200,10 +236,13 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ### 👾 Quick Contributing Steps:
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+2. Create a new branch  
+  ```bash
+  git checkout -b type/branch-name
+  ```
 3. Make your changes
-4. Commit your changes (`git commit -s -m 'Add some amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
+4. Sign Commit your changes (`git commit -s -m 'Add some amazing feature'`)
+5. Push to the branch (`git push origin type/branch-name`)
 6. Submit a signed pull request
 
 Mesh & Meshy are excited to see what amazing contributions you'll bring to the GitMesh community!
@@ -272,13 +311,13 @@ Mesh & Meshy are excited to see what amazing contributions you'll bring to the G
 
 <div align="center">
 
-[![Join Discord](https://img.shields.io/badge/Join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/FkrWfGtZn3)
+[![Join Discord](https://img.shields.io/badge/Join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/xXvYkK3yEp)
 
 ### 👾 **Support Channels**
 
 | Channel                                                         | Typical Response Time | Best For                                             |
 | --------------------------------------------------------------- | --------------------- | ---------------------------------------------------- |
-| [Discord](https://discord.gg/dpXFsGrx)                     | Real-time             | Quick questions, community discussions               |
+| [Discord](https://discord.gg/xXvYkK3yEp)                     | Real-time             | Quick questions, community discussions               |
 | [Email Support](mailto:gitmesh.oss@gmail.com)                 | 24–48 hours           | Technical issues, detailed bug reports               |
 | [Twitter / X](https://x.com/gitmesh_oss)                      | Online                | Tagging the project, general updates, public reports |
 | [GitHub Issues](https://github.com/LF-Decentralized-Trust-labs/gitmesh/issues) | 1–3 days              | Bug reports, feature requests, feedback              |
