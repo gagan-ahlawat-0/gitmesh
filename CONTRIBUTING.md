@@ -137,7 +137,7 @@ The `-s` flag signs your commit, confirming you agree to the Developer Certifica
 
 ### 8. Push Your Branch to GitHub
 ```bash
-git push origin <branch-name>
+git push origin type/branch-name
 ```
 
 **Example:**

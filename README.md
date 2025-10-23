@@ -236,8 +236,10 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ### 👾 Quick Contributing Steps:
 1. Fork the repository
-2. Create a new branch 
-  - Example: `git checkout -b type/branch-name`
+2. Create a new branch  
+  ```bash
+  git checkout -b type/branch-name
+  ```
 3. Make your changes
 4. Sign Commit your changes (`git commit -s -m 'Add some amazing feature'`)
 5. Push to the branch (`git push origin type/branch-name`)
