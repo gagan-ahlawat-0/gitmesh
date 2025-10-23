@@ -162,7 +162,7 @@ You’ll be prompted to enter your Personal Access Token.
 
 - Go to GitHub → Settings → Developer settings → Personal Access Tokens → Tokens (classic)
 - Click Generate new token → Generate new token (classic)
-- Select the required scopes (typically: repo, read:org, read:user)
+- Select the required scopes (typically: repo, user, read:org)
 - Click Generate Token
 - Copy the generated token (you’ll only see it once)
 
@@ -237,11 +237,6 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ### 👾 Quick Contributing Steps:
 1. Fork the repository
 2. Create a new branch 
-Use clear and consistent naming conventions:  
-   - `feature/<short-description>` → for new features  
-   - `fix/<short-description>` → for bug fixes  
-   - `docs/<short-description>` → for documentation updates  
-   - `ui/<short-description>` → for UI improvements  
 3. Make your changes
 4. Commit your changes (`git commit -s -m 'Add some amazing feature'`)
 5. Push to the branch (`git push origin feature/amazing-feature`)
