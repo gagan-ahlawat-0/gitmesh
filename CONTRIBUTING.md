@@ -117,17 +117,8 @@ git stash pop
 
 Create a feature or fix branch before making changes:
 ```bash
-git checkout -b <branch-name>
+git checkout -b type/branch-name
 ```
-
-#### Branch Naming Conventions
-- **Feature**: Use `feature/<short-description>` — Example: `feature/add-ai-support`
-- **Bug Fix**: Use `fix/<short-description>` — Example: `fix/profile-upload-error`
-- **Documentation**: Use `docs/<short-description>` — Example: `docs/update-readme`
-- **Enhancement**: Use `enhancement/<short-description>` — Example: `enhancement/improve-theme-colors`
-- **Refactor**: Use `refactor/<short-description>` — Example: `refactor/code-cleanup`
-
- **Tip:** Use short, descriptive branch names in lowercase, separated by hyphens.
 
 
 ### 6. Make Your Changes
