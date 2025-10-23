@@ -33,7 +33,7 @@ Please review and understand these policies before contributing.
 
 ### Issue Selection
 
-**Important**: Please select a task from the [published issues](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh/issues). Contributions not addressing existing issues will not be considered. For improvement proposals, kindly attend the Wednesday meetings.
+**Important**: Please select a task from the [published issues](https://github.com/LF-Decentralized-Trust-labs/gitmesh/issues). Contributions not addressing existing issues will not be considered. For improvement proposals, kindly attend the Wednesday meetings.
 
 ### Workflow Overview
 
@@ -52,7 +52,7 @@ Follow these steps to contribute effectively to the GitMesh project.
 
 ### 1. Fork the Repository
 
-Click the **Fork** button on the top-right of the [main repository](https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh) to create your own copy.
+Click the **Fork** button on the top-right of the [main repository](https://github.com/LF-Decentralized-Trust-labs/gitmesh) to create your own copy.
 
 ### 2. Clone Your Fork
 
@@ -66,7 +66,7 @@ cd gitmesh
 
 Link your local repository with the original repository to stay updated:
 ```bash
-git remote add upstream https://github.com/LF-Decentralized-Trust-Mentorships/gitmesh.git
+git remote add upstream https://github.com/LF-Decentralized-Trust-labs/gitmesh.git
 ```
 
 **Why add upstream?**  
