@@ -25,6 +25,7 @@ import { workbenchStore } from '~/lib/stores/workbench';
 import { Search } from './Search'; // <-- Ensure Search is imported
 import { classNames } from '~/utils/classNames'; // <-- Import classNames if not already present
 import { LockManager } from './LockManager'; // <-- Import LockManager
+import { useModifiedFiles } from '~/lib/hooks';
 
 interface EditorPanelProps {
   files?: FileMap;
@@ -62,6 +63,7 @@ export const EditorPanel = memo(
 
     const theme = useStore(themeStore);
     const showTerminal = useStore(workbenchStore.showTerminal);
+    const { filePathsSet: modifiedFilesSet } = useModifiedFiles();
 
     const activeFileSegments = useMemo(() => {
       if (!editorDocument) {
@@ -124,6 +126,7 @@ export const EditorPanel = memo(
                       files={files}
                       hideRoot
                       unsavedFiles={unsavedFiles}
+                      modifiedFiles={modifiedFilesSet}
                       fileHistory={fileHistory}
                       rootFolder={WORK_DIR}
                       selectedFile={selectedFile}

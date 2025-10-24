@@ -133,6 +133,7 @@ export const Markdown = memo(
               message: 'i-ph:chats',
               implement: 'i-ph:code',
               link: 'i-ph:link',
+              commit: 'i-ph:git-commit',
             };
 
             const safeType = typeof type === 'string' ? type : '';
@@ -172,6 +173,37 @@ export const Markdown = memo(
                       ] as any,
                       role: 'user',
                     });
+                  } else if (type === 'commit' && append) {
+                    // Trigger commit dialog directly instead of just appending message
+                    if (typeof window !== 'undefined' && (window as any).gitmeshCommitAction) {
+                      // Extract provider from message (GitHub or GitLab)
+                      const messageStr = String(message);
+                      const isGitHub = messageStr.toLowerCase().includes('github');
+                      const isGitLab = messageStr.toLowerCase().includes('gitlab');
+
+                      if (isGitHub) {
+                        (window as any).gitmeshCommitAction('github');
+                      } else if (isGitLab) {
+                        (window as any).gitmeshCommitAction('gitlab');
+                      } else {
+                        // Default to GitHub if not specified
+                        (window as any).gitmeshCommitAction('github');
+                      }
+                    } else {
+                      // Fallback: append message if commit action not available
+                      append({
+                        id: `quick-action-commit-${Date.now()}`,
+                        content: [
+                          {
+                            type: 'text',
+                            text: `[Model: ${model}]\n\n[Provider: ${provider?.name}]\n\n${message}`,
+                          },
+                        ] as any,
+                        role: 'user',
+                      });
+                    }
+
+                    console.log('Commit action triggered:', message);
                   } else if (type === 'link' && typeof href === 'string') {
                     try {
                       const url = new URL(href, window.location.origin);

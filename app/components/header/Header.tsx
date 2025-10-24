@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { ClientOnly } from 'remix-utils/client-only';
 import { chatStore } from '~/lib/stores/chat';
+import { sidebarOpen } from '~/lib/stores/sidebar';
 import { classNames } from '~/utils/classNames';
 import { HeaderActionButtons } from './HeaderActionButtons.client';
 import { ChatDescription } from '~/lib/persistence/ChatDescription.client';
@@ -8,6 +9,7 @@ import { RepoStatus } from '~/components/chat/RepoStatus';
 
 export function Header() {
   const chat = useStore(chatStore);
+  const isSidebarOpen = useStore(sidebarOpen);
 
   return (
     <header
@@ -20,7 +22,11 @@ export function Header() {
         },
       )}
     >
-      <div className="flex items-center gap-2 z-logo text-gitmesh-elements-textPrimary cursor-pointer">
+      <div
+        className="flex items-center gap-2 z-logo text-gitmesh-elements-textPrimary cursor-pointer transition-colors hover:text-blue-700 dark:hover:text-blue-300"
+        onClick={() => sidebarOpen.set(!isSidebarOpen)}
+        title={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+      >
         <div className="i-ph:sidebar-simple-duotone text-xl" />
         {/* <a href="/" className="text-2xl font-semibold text-accent flex items-center">
           <img src="/gitmesh.png" alt="logo" className="w-[90px] inline-block dark:hidden" />

@@ -139,15 +139,18 @@ export function useGitHubConnection(): UseGitHubConnectionReturn {
       };
 
       // Set cookies for API requests
-      Cookies.set('githubToken', token);
-      Cookies.set('githubUsername', userData.login);
+      console.log('Setting cookies for API requests...');
+      Cookies.set('githubToken', token, { path: '/' });
+      Cookies.set('githubUsername', userData.login, { path: '/' });
       Cookies.set(
         'git:github.com',
         JSON.stringify({
           username: token,
           password: 'x-oauth-basic',
         }),
+        { path: '/' },
       );
+      console.log('Cookies have been set.');
 
       // Update the store
       updateGitHubConnection(connectionData);

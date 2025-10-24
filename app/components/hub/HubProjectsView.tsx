@@ -8,7 +8,8 @@ import type { GitHubRepoInfo } from '~/types/GitHub';
 import type { GitLabProjectInfo } from '~/types/GitLab';
 import { useGitHubConnection, useGitHubStats, useGitLabConnection } from '~/lib/hooks';
 import { classNames } from '~/utils/classNames';
-import { Search, RefreshCw, GitBranch, Calendar, Filter, Settings } from 'lucide-react';
+import { Search, RefreshCw, GitBranch, Calendar, Filter, Settings, Plus } from 'lucide-react';
+import { CreateNewProjectDialog } from '~/components/hub/CreateNewProjectDialog';
 import { LoadingOverlay } from '~/components/ui/LoadingOverlay';
 
 type Repository = (GitHubRepoInfo & { provider: 'github' }) | (GitLabProjectInfo & { provider: 'gitlab' });
@@ -17,6 +18,7 @@ type FilterOption = 'all' | 'github' | 'gitlab';
 
 export function HubProjectsView() {
   const navigate = useNavigate();
+  const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const { connection: githubConnection, isConnected: isGitHubConnected } = useGitHubConnection();
   const { connection: gitlabConnection, isConnected: isGitLabConnected } = useGitLabConnection();
 
@@ -283,6 +285,15 @@ export function HubProjectsView() {
 
   // Reset to first page when filters change
   useEffect(() => {
+    const needsRefresh = sessionStorage.getItem('projects-need-refresh');
+
+    if (needsRefresh === 'true') {
+      sessionStorage.removeItem('projects-need-refresh');
+      handleRefresh();
+    }
+  }, []);
+
+  useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, sortBy, filterBy]);
 
@@ -353,6 +364,7 @@ export function HubProjectsView() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
+      <CreateNewProjectDialog isOpen={isCreateProjectDialogOpen} onClose={() => setCreateProjectDialogOpen(false)} />
       {/* Header with stats */}
       <div className="flex items-center justify-between">
         <div>
@@ -366,16 +378,27 @@ export function HubProjectsView() {
             )}
           </p>
         </div>
-        <Button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={classNames('w-4 h-4', { 'animate-spin': isRefreshing })} />
-          Refresh
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            onClick={() => setCreateProjectDialogOpen(true)}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Create New Project
+          </Button>
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={classNames('w-4 h-4', { 'animate-spin': isRefreshing })} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {error && allRepositories.length > 0 && (

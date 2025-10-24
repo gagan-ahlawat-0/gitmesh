@@ -136,6 +136,27 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     const { selectedRepo, fromHub } = useRepoContext();
+
+    // Keep WorkbenchStore in sync with the repo chosen in Chat (from hub/URL)
+    useEffect(() => {
+      if (selectedRepo && fromHub) {
+        const [owner, nameFromFull] = selectedRepo.full_name?.split('/') ?? [null, null];
+        const name = selectedRepo.name ?? nameFromFull ?? null;
+
+        if (owner && name) {
+          workbenchStore.setCurrentRepository({
+            provider: selectedRepo.provider,
+            owner,
+            name,
+            fullName: `${owner}/${name}`,
+            branch: 'main',
+            isOpen: true,
+            remoteUrl: selectedRepo.clone_url,
+          });
+        }
+      }
+    }, [selectedRepo, fromHub]);
+
     const [apiKeys, setApiKeys] = useState<Record<string, string>>(getApiKeysFromCookies());
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);
@@ -356,7 +377,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               styles.Chat,
               'flex flex-col flex-grow lg:min-w-[var(--chat-min-width)] h-full overflow-y-auto transition-all duration-200',
               {
-                'ml-[340px]': isSidebarOpen,
                 'ml-0': !isSidebarOpen,
               },
             )}
@@ -489,10 +509,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             {chatStarted && (
               <div
                 className={classNames('fixed bottom-4 z-50 transition-all duration-200', {
-                  'left-[340px] right-[var(--workbench-width)]': showWorkbench && isSidebarOpen,
-                  'left-0 right-[var(--workbench-width)]': showWorkbench && !isSidebarOpen,
-                  'left-[340px] right-0': !showWorkbench && isSidebarOpen,
-                  'left-0 right-0': !showWorkbench && !isSidebarOpen,
+                  'left-0 right-[var(--workbench-width)]': showWorkbench,
+                  'left-0 right-0': !showWorkbench,
                 })}
               >
                 <div

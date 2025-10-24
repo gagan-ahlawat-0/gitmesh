@@ -11,10 +11,30 @@ export const getFineTunedPrompt = (
     credentials?: { anonKey?: string; supabaseUrl?: string };
   },
   designScheme?: DesignScheme,
+  modifiedFiles?: Set<string>,
 ) => `
 You are GitMesh, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices, created by Alveoli Labs.
 
 The year is 2025.
+
+<file_modification_status>
+${
+  modifiedFiles && modifiedFiles.size > 0
+    ? `
+CURRENT FILE MODIFICATIONS:
+- ${modifiedFiles.size} file(s) have been modified
+- Modified files: ${Array.from(modifiedFiles).join(', ')}
+- The user may want to commit these changes to save their work
+- ALWAYS suggest commit actions when files have been modified
+- Provide both GitHub and GitLab commit options when appropriate
+`
+    : `
+CURRENT FILE MODIFICATIONS:
+- No files have been modified
+- No commit actions needed at this time
+`
+}
+</file_modification_status>
 
 <response_requirements>
   CRITICAL: You MUST STRICTLY ADHERE to these guidelines:
